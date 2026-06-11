@@ -1,0 +1,165 @@
+:root {
+  /* Neutrals (ChatGPT-like) */
+  --color-bg:            #ffffff;   /* main content area */
+  --color-sidebar:       #f9f9f9;   /* left panel */
+  --color-surface:       #ffffff;   /* cards, panels, menus */
+  --color-surface-muted: #f4f4f4;   /* code blocks, subtle fills */
+  --color-hover:         #ececec;   /* the gray hover box on list items */
+  --color-border:        #e3e3e3;   /* hairline borders */
+  --color-border-strong: #d4d4d4;   /* inputs, dropzones */
+
+  /* Text */
+  --color-text:          #0d0d0d;   /* primary */
+  --color-text-secondary:#5d5d5d;   /* labels */
+  --color-text-muted:    #8f8f8f;   /* descriptions, hints */
+  --color-text-faint:    #b4b4b4;   /* placeholders, disabled */
+
+  /* Primary action (ChatGPT black button) */
+  --color-primary:       #0d0d0d;
+  --color-primary-hover: #2f2f2f;
+  --color-on-primary:    #ffffff;
+
+  /* Accent — interactive / traceable only (links, clickable cells, focus) */
+  --color-accent:        #2563eb;
+  --color-accent-hover:  #1d4ed8;
+  --color-accent-weak:   #eff4ff;   /* selected rows, fill-flash, tinted bg */
+  --color-accent-border: #c7d7fe;
+
+  /* Status (muted, used sparingly, text-only badges) */
+  --color-success: #15803d; --color-success-weak: #dcfce7;
+  --color-warning: #b45309; --color-warning-weak: #fef3c7;
+  --color-danger:  #b91c1c; --color-danger-weak:  #fee2e2;
+  --color-highlight: #fff3cd; --color-highlight-edge: #f4d35e; /* note highlight */
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+  --text-xs: 11px;  --text-sm: 13px;  --text-base: 14px;
+  --text-md: 15px;  --text-lg: 17px;  --text-xl: 22px;  --text-2xl: 28px;
+  --weight-normal: 400; --weight-medium: 500; --weight-semibold: 600; --weight-bold: 700;
+
+  /* Spacing (4px base) */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px;
+
+  /* Radius */
+  --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px; --radius-pill: 999px;
+
+  /* Shadow (restrained) */
+  --shadow-sm: 0 1px 2px rgba(13, 13, 13, 0.05);
+  --shadow-md: 0 4px 16px rgba(13, 13, 13, 0.08);
+  --shadow-lg: 0 20px 60px rgba(13, 13, 13, 0.18);
+
+  /* Motion */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 0.12s; --dur: 0.18s;
+
+  /* Icons */
+  --icon-sm: 16px; --icon-md: 20px; --icon-lg: 24px; --icon-stroke: 1.75;
+
+  /* Layout */
+  --content-width: 640px;  /* shared reading-column width — the home prompt field's width,
+                              reused to constrain library pages and other long-form text so
+                              content never spans the full viewport. */
+}
+
+/* Audit-specific semantic layer (DESIGN-SYSTEM §"Audit-specific semantic tokens").
+   Trust signals get named tokens so meaning is defined once; components never
+   invent their own colors. All values derive from the neutral/accent/status
+   tokens above — no new saturated hues, calm and colorblind-safe. */
+:root {
+  /* Workbook cell status backgrounds precedence: gray > blue > white. */
+  --cell-bg-legacy-not-applicable: var(--color-surface-muted); /* light gray */
+  --cell-bg-needs-review: var(--color-accent-weak);            /* light blue */
+  --cell-bg-reviewed-settled: var(--color-surface);            /* white */
+
+  /* Cell kind — direct reads as settled (no tint); interpret stands out gently. */
+  --cell-direct:    transparent;
+  --cell-interpret: var(--color-accent-weak);
+
+  /* Confidence heat-map: the front end maps low/medium/high to these tints. */
+  --confidence-high:   transparent;            /* settled, quietest */
+  --confidence-medium: var(--color-warning-weak); /* worth a look */
+  --confidence-low:    var(--color-danger-weak);  /* loudest, needs eyes */
+
+  /* Interpret review state. */
+  --review-unreviewed: var(--color-warning);   /* flag: not yet reviewed */
+  --review-reviewed:   var(--color-success);   /* flag: reviewed */
+
+  /* Indexing / status. */
+  --status-indexing: var(--color-text-muted);  /* "indexing…" badge */
+  --status-ready:    var(--color-success);
+
+  /* Run status (doc 10) — blocked cells are NOT styled in the workbook. */
+  --status-queued:          var(--color-text-muted);
+  --status-in-progress:     var(--color-accent);
+  --status-blocked:         var(--color-danger);
+  --status-in-verification: var(--color-warning);
+  --status-complete:        var(--color-success);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+#app {
+  height: 100%;
+}
+
+/* Buttons: reset the native look; components/§3.1 provide the visual treatment. */
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Inputs / selects / textareas: one shared look (§1.2). */
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  transition: border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-weak);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-faint);
+}
+
+pre {
+  margin: 0;
+}

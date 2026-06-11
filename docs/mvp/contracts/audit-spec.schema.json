@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intero.local/contracts/audit-spec.schema.json",
+  "title": "Audit specification (audit.json)",
+  "description": "The AUDIT SPECIFICATION: the audit's documented requirements — a per-field specification plus the audit's inclusion criteria. Database-agnostic (built before any database is chosen). Renamed from the old 'audit model' / audit.md. The field spec is regenerable (re-index rebuilds it from the template/spec document); the user-set state it carries — inclusion_criteria[].default, and any library-added notes/permitted_values for a local template — is PRESERVED across re-index by a small merge on field.number / criterion.id (mapping-artifact-redesign.md §6). The `kind` of a field (direct/interpret) is deliberately NOT here: that depends on what the bound database holds and is decided at mapping (see mapping.schema.json).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "audit", "title", "description", "grain", "fields", "inclusion_criteria"],
+  "properties": {
+    "schema_version": {
+      "description": "Schema version of this document. Required so consumers can migrate. Currently always \"1\".",
+      "type": "string",
+      "const": "1"
+    },
+    "status": {
+      "description": "Operational indexing-lifecycle state of this entity — NOT part of the audit's content, but carried in-model so there is no separate status sidecar (one file per entity). \"indexing\" while the model is being built (a stub document, fields may be empty), \"ready\" once a validated model is written, \"error\" if the build failed. Optional — an absent status is treated as \"ready\".",
+      "type": "string",
+      "enum": ["indexing", "ready", "error"]
+    },
+    "error": {
+      "description": "Human-readable failure reason, present only when status is \"error\". Optional.",
+      "type": "string"
+    },
+    "audit": {
+      "description": "Stable slug identifying the audit (e.g. \"npda\", \"cord-ph\"). Matches the var/audits/<audit_id>/ folder. Required — the primary key for the audit.",
+      "type": "string",
+      "minLength": 1
+    },
+    "databases": {
+      "description": "Seed-time hint listing the database slugs this audit is intended to bind to, in priority order. Optional — used as a default-pick when a run is started without an explicit database choice (HomeScreen.svelte::defaultDbChips omits the chip in real mode and expects the backend to default). The CANONICAL binding still lives in mapping.json::databases (mapping.schema.json); this field exists so a seeded audit that has not yet been mapped (no mapping.json) can still be launched, after which the mapping phase builds the real mapping against the chosen database. Keep the contract intent — spec.json is otherwise database-agnostic — by treating this purely as a launch hint, not as a substitute for the mapping.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "title": {
+      "description": "Human-readable audit title shown in the library and run views (e.g. \"National Paediatric Diabetes Audit (NPDA) Core Dataset\"). Required.",
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "description": "The dataset/spec version this specification was built from (e.g. \"2026/27\"). Optional — national datasets publish a version; a blank local template may have none.",
+      "type": "string"
+    },
+    "deadline": {
+      "description": "The audit's submission deadline as an ISO date (e.g. \"2026-07-07\"). Optional — national audits typically have one; a local template may not. Rendered on library cards / the audit detail page (doc 9) and as the result view's deadline subtitle with the >10-days / countdown / due-today display rules (doc 11). Flows to the front-end via the audit list/detail responses (it travels inside `spec`).",
+      "type": "string",
+      "format": "date"
+    },
+    "description": {
+      "description": "One-paragraph prose summary of what the audit covers and its provenance (e.g. which standard the items are drawn from). Fed to the LLM as context. Required.",
+      "type": "string",
+      "minLength": 1
+    },
+    "grain": {
+      "description": "Prose statement of the audit's unit of analysis — what one row represents (e.g. \"one row per patient visit/appointment\"). Required: it anchors how the run interprets the workbook and how the cohort is counted.",
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "description": "Provenance of this specification. Optional. Records the local template file and/or the published spec document the field definitions came from.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "template": {
+          "description": "Filename of the workbook template the grid skeleton was extracted from (e.g. \"audit.xlsx\").",
+          "type": "string"
+        },
+        "spec_document": {
+          "description": "Human-readable name of the published dataset/spec document the field meanings came from (e.g. \"NPDA Dataset 2026 (RCPCH)\"). For a blank local template this is absent and the fields are filled in the library (D9).",
+          "type": "string"
+        }
+      }
+    },
+    "sections": {
+      "description": "The audit's logical groupings of fields (e.g. \"Patient Details\", \"Routine Measurements\"). Optional. Each field may reference a section by id for rendering and review. Mirrors how national datasets organise items into sections.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name"],
+        "properties": {
+          "id": {
+            "description": "Stable slug for the section, referenced by fields[].section (e.g. \"patient-details\"). Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "description": "Human-readable section name (e.g. \"Patient Details / Information\"). Required.",
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "fields": {
+      "description": "The field specification: one record per audit field. This is the core of the document — for every field its meaning, type, permitted values and guidance, exactly the information an LLM needs to map and populate it (none of which is in the empty grid). Required (may be empty only for a freshly-created blank template awaiting library fill).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "number", "name", "type"],
+        "properties": {
+          "id": {
+            "description": "Stable slug identifying the field across documents (e.g. \"all/delivery\", \"nicu/cooled\"). Required — the FOREIGN KEY a cell's `field` resolves through (cell-resolution.schema.json) and the slug mapping.json's fields[].field points at. Distinct from `number` (the published item number, an integer used for user-facing display and for merging user-set state across re-index). Multi-sheet audits prefix each id with the slugged sheet name (`{slugify(sheet)}/{slugify(name)}`) so two cells with the same header on different sheets get structurally-distinct ids — no `_2` suffixes, no orphans. Single-sheet audits use the bare slug. **Uniqueness is a contract invariant** not enforceable in JSON Schema (object-array property keys); the seed contract test asserts `len({f.id}) == len(fields)`.",
+            "type": "string",
+            "minLength": 1
+          },
+          "number": {
+            "description": "The field's item number within the audit (1-based). Required — the published item number, also the stable identity key used to merge user-set state across re-index (§6). Cells reference fields by `id`, not by `number`.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "section": {
+            "description": "Slug of the section this field belongs to (must match a sections[].id). Optional but recommended for grouped rendering.",
+            "type": "string"
+          },
+          "cell": {
+            "description": "The workbook column the field is written to, as a bare column letter (e.g. \"D\", \"AB\"). The audit's pinned shape is headers on row 1 only, one row per record — the row is implicit, so only the column letter is recorded. Sheet context lives in mapping.json's regions, so two fields on different sheets may share a `cell` letter and the FK chain (through `id`) is unaffected. Optional — absent while only the spec document is ingested.",
+            "type": "string",
+            "pattern": "^[A-Z]+$"
+          },
+          "name": {
+            "description": "The field's name as published (e.g. \"Sex assigned at birth\", \"Patient Height (cm)\"). Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "description": "The field's value type. Drives validation, the filter surface, and how the value is rendered. \"category\" = one of a coded set (see permitted_values); \"number\"/\"date\"/\"text\"/\"boolean\" as named. Required.",
+            "type": "string",
+            "enum": ["category", "number", "date", "text", "boolean"]
+          },
+          "unit": {
+            "description": "Unit of measure for a numeric field (e.g. \"cm\"). Optional.",
+            "type": "string"
+          },
+          "format": {
+            "description": "Display/entry format hint for the value (e.g. \"999.9\" for a one-decimal number). Optional.",
+            "type": "string"
+          },
+          "permitted_values": {
+            "description": "The audit's CANONICAL coded set for the field: a code -> meaning map (e.g. {\"1\":\"Male\",\"2\":\"Female\",\"3\":\"Not specified\",\"99\":\"Unknown\"}). MUST be a map, not prose — the populate step translates codes through it and the resolver enumerates allowed values from it. Every populated cell's value MUST be one of these codes — `write_cell` rejects off-code writes from Tier 2/3 (run-population-redesign.md §2 / §5). This is the audit's own encoding; mapping.json's per-field `code` operationalises it against a real database. Present only for category fields; empty/absent for a blank local template until filled in the library (D9).",
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "description": "The meaning of this code.",
+              "type": "string"
+            },
+            "propertyNames": {
+              "description": "The code (the stored/canonical value), as a string key.",
+              "type": "string"
+            }
+          },
+          "notes": {
+            "description": "The ONE prose field: operational guidance, rationale, and any standard citation inline (e.g. \"[NG18: 1.2.46]\"). Collapses what national datasets split across Notes + Justification + Standard columns. Optional — left empty for a blank local template until a clinical lead fills it in the library (D9).",
+            "type": "string"
+          }
+        }
+      }
+    },
+    "inclusion_criteria": {
+      "description": "The audit's inclusion criteria: the database-agnostic dimensions the run can be filtered on, with their default values. Each is a CONCEPT (not yet bound to a column — that binding lives in mapping.json's criteria_bindings). At upload A1 suggests only the ~5 most likely ones with default:null; the rest are added on demand (mapping-artifact-redesign.md §5). Required (may be empty).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "type"],
+        "properties": {
+          "id": {
+            "description": "Stable slug for the criterion (e.g. \"gestation_weeks\"). Required — the key mapping.json's criteria_bindings[].criterion_id references, and the key user-set defaults are merged on across re-index.",
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "description": "Human-readable label shown when the criterion is surfaced as a filter (e.g. \"Gestation (weeks)\"). Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "description": "The criterion's value type — drives how a filter value is entered and matched. Required.",
+            "type": "string",
+            "enum": ["category", "number", "date", "text", "boolean"]
+          },
+          "suggested": {
+            "description": "Whether this criterion is part of the short (~5) upload-time suggestion list shown to the user immediately. Optional, defaults false (i.e. add-on-demand). The backing search space for add-filter is the mapping's criteria_bindings, not this flag.",
+            "type": "boolean",
+            "default": false
+          },
+          "default": {
+            "description": "The audit's stored default value for this criterion, in the audit's OWN encoding (its permitted_values), so it is database-independent. This is USER-SET STATE preserved across re-index (§6): null until learned (a library edit in D9, or the first run with explicit filters). The LLM never invents a default. Shape depends on type: a code string for category, a number/{min,max} for number, an ISO date / range for date, etc. — kept open here.",
+            "type": ["null", "string", "number", "boolean", "array", "object"]
+          }
+        }
+      }
+    }
+  }
+}

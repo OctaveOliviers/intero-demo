@@ -1,0 +1,951 @@
+{
+  "schema_version": "1",
+  "audit": "cord-ph",
+  "databases": [
+    "cord-ph"
+  ],
+  "description": "Cord pH audit bound to the cord-ph EMR. The primary entity is one baby / birth record in cord_ph_birth_records (the ALL region); the NICU region draws each baby's neonatal-unit course from nicu_admissions, joined back to the birth record by patient_code. Every audit value is a direct column read; mode of delivery carries a code map translating the database's text into the audit's coded set.",
+  "identity": {
+    "anchor": "cord-ph -> cord_ph_birth_records.patient_code",
+    "grain": "one patient per birth record",
+    "keys": [
+      "cord-ph -> cord_ph_birth_records.patient_code",
+      "cord-ph -> nicu_admissions.patient_code"
+    ],
+    "patient_grain_rule": "every criterion = this patient has >=1 matching row (EXISTS/IN over the anchor cord_ph_birth_records.patient_code), never a count-inflating join"
+  },
+  "regions": [
+    {
+      "id": "ALL",
+      "sheet": "ALL",
+      "kind": "row_per_entity",
+      "data_range": "A2:AQ500",
+      "row_id": {
+        "cell": "A",
+        "header": "Patient code"
+      }
+    },
+    {
+      "id": "NICU",
+      "sheet": "NICU",
+      "kind": "row_per_entity",
+      "data_range": "A2:N500",
+      "row_id": {
+        "cell": "A",
+        "header": "Age (hours) at NNU admission"
+      }
+    }
+  ],
+  "fields": [
+    {
+      "region": "ALL",
+      "cell": "A",
+      "header": "Patient code",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.patient_code"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "B",
+      "header": "Gestation (weeks)",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.gestation_weeks"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "C",
+      "header": "Gestation (days)",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.gestation_days"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "D",
+      "header": "Maternal age",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.maternal_age"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "E",
+      "header": "Parity",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.parity"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "G",
+      "header": "Foetal movements",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.foetal_movements"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "H",
+      "header": "Maternal comorbidities",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.maternal_comorbidities"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "I",
+      "header": "Maternal comorbidities Other",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.maternal_comorbidities_other"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "J",
+      "header": "Normal scans",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.normal_scans"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "K",
+      "header": "Normal dopplers",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.normal_dopplers"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "M",
+      "header": "CTG done",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.ctg_done"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "N",
+      "header": "Liquor- meconium",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.liquor_meconium"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "O",
+      "header": "Chorioamnionitis",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.chorioamnionitis"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "P",
+      "header": "PROM (>18hours)",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.prom_gt_18hours"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "Q",
+      "header": "RFFS",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.rffs"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "R",
+      "header": "Sentinel event",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.sentinel_event"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "T",
+      "header": "Delivery",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.delivery"
+      ],
+      "code": {
+        "1": "Spontaneous vaginal",
+        "2": "Emergency caesarean",
+        "3": "Forceps",
+        "4": "Vacuum"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "U",
+      "header": "Birth weight (grams)",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.birth_weight_grams"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "V",
+      "header": "Apgars 1",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.apgars_1"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "W",
+      "header": "Apgars 5",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.apgars_5"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "X",
+      "header": "Apgars 10",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.apgars_10"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "Y",
+      "header": "Delayed cord clamping",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.delayed_cord_clamping"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "Z",
+      "header": "Cord arterial pH",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.cord_arterial_ph"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AA",
+      "header": "Cord arterial BE",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.cord_arterial_be"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AB",
+      "header": "Cord arterial lactate",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.cord_arterial_lactate"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AD",
+      "header": "Intubated at delivery",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.intubated_at_delivery"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AE",
+      "header": "Cardiac compressions",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.cardiac_compressions"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AF",
+      "header": "Drugs given",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.drugs_given"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AG",
+      "header": "Ward",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.ward"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AH",
+      "header": "Gas repeated?",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.gas_repeated"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AI",
+      "header": "Age at repeated gas (hours)",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.age_at_repeated_gas_hours"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AJ",
+      "header": "Repeated lactate",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.repeated_lactate"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AK",
+      "header": "Age gas normalised (hours)",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.age_gas_normalised_hours"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AL",
+      "header": "Hypoglycaemia",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.hypoglycaemia"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AM",
+      "header": "Admitted to NICU",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.admitted_to_nicu"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AN",
+      "header": "Age at discharge home (days)",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.age_at_discharge_home_days"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AO",
+      "header": "Unit level questionnaire filled",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.unit_level_questionnaire_filled"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AP",
+      "header": "Local guideline for cord gas sampling available",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.local_guideline_for_cord_gas_sampling_available"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AQ",
+      "header": "Local guideline for fetal acidosis available",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> cord_ph_birth_records.local_guideline_for_fetal_acidosis_available"
+      ]
+    },
+    {
+      "region": "NICU",
+      "cell": "A",
+      "header": "Age (hours) at NNU admission",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> nicu_admissions.age_hours_at_nnu_admission"
+      ]
+    },
+    {
+      "region": "NICU",
+      "cell": "B",
+      "header": "Cooled",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> nicu_admissions.cooled"
+      ]
+    },
+    {
+      "region": "NICU",
+      "cell": "C",
+      "header": "Age at cooling (hours)",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> nicu_admissions.age_at_cooling_hours"
+      ]
+    },
+    {
+      "region": "NICU",
+      "cell": "D",
+      "header": "Transferred out",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> nicu_admissions.transferred_out"
+      ]
+    },
+    {
+      "region": "NICU",
+      "cell": "E",
+      "header": "CFM",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> nicu_admissions.cfm"
+      ]
+    },
+    {
+      "region": "NICU",
+      "cell": "F",
+      "header": "Seizures",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> nicu_admissions.seizures"
+      ]
+    },
+    {
+      "region": "NICU",
+      "cell": "G",
+      "header": "Clinical seizures",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> nicu_admissions.clinical_seizures"
+      ]
+    },
+    {
+      "region": "NICU",
+      "cell": "H",
+      "header": "Electrographic seizure",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> nicu_admissions.electrographic_seizure"
+      ]
+    },
+    {
+      "region": "NICU",
+      "cell": "I",
+      "header": "MRI injury",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> nicu_admissions.mri_injury"
+      ]
+    },
+    {
+      "region": "NICU",
+      "cell": "K",
+      "header": "Duration of admission in NICU (days)",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> nicu_admissions.duration_admission_in_nicu_days"
+      ]
+    },
+    {
+      "region": "NICU",
+      "cell": "L",
+      "header": "Age at discharge home (days)",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> nicu_admissions.age_at_discharge_home_days"
+      ]
+    },
+    {
+      "region": "NICU",
+      "cell": "M",
+      "header": "Feeding on discharge",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> nicu_admissions.feeding_on_discharge"
+      ]
+    },
+    {
+      "region": "NICU",
+      "cell": "N",
+      "header": "Abnormal neurology at discharge",
+      "kind": "direct",
+      "sources": [
+        "cord-ph -> nicu_admissions.abnormal_neurology_at_discharge"
+      ]
+    }
+  ],
+  "criteria_bindings": [
+    {
+      "criterion_id": "delivery",
+      "label": "Mode of delivery",
+      "source": "cord-ph -> cord_ph_birth_records.delivery",
+      "type": "category",
+      "join_path": "direct column on the anchor row (no join)",
+      "grain_rule": "the patient's birth record has this delivery value",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "gestation_weeks",
+      "label": "Gestation (completed weeks)",
+      "source": "cord-ph -> cord_ph_birth_records.gestation_weeks",
+      "type": "number",
+      "join_path": "direct column on the anchor row (no join)",
+      "grain_rule": "the patient's birth record has completed gestation weeks in the implied range",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "admitted_to_nicu",
+      "label": "Admitted to NICU",
+      "source": "cord-ph -> cord_ph_birth_records.admitted_to_nicu",
+      "type": "category",
+      "join_path": "direct column on the anchor row (no join)",
+      "grain_rule": "the patient's birth record is flagged admitted to NICU",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "encounter_start",
+      "label": "Delivery / encounter date",
+      "source": "cord-ph -> encounters.start",
+      "type": "date",
+      "join_path": "cord_ph_birth_records.encounter -> encounters.id",
+      "grain_rule": "the patient's birth encounter has a start date in the implied range (EXISTS over the anchor's encounter)",
+      "from": "db_column"
+    },
+    {
+      "criterion_id": "patient_birthdate",
+      "label": "Patient age (date of birth)",
+      "source": "cord-ph -> patients.birthdate",
+      "type": "date",
+      "join_path": "cord_ph_birth_records.baby_patient -> patients.id",
+      "grain_rule": "the baby has a birthdate in the implied range (older-than-5y -> birthdate <= date(:as_of,'-5 years'))",
+      "from": "db_column"
+    }
+  ],
+  "fixed_criteria": [
+    {
+      "criterion_id": "gestation_weeks",
+      "label": "Gestation (completed weeks)",
+      "type": "number",
+      "predicate": { "op": "gte", "value": 37, "unit": "weeks" },
+      "display": "Gestation ≥ 37 weeks"
+    },
+    {
+      "criterion_id": "encounter_start",
+      "label": "Delivery / encounter date",
+      "type": "date",
+      "predicate": { "op": "between", "value": ["2025-04-01", "2026-03-31"] },
+      "display": "Delivery date 1 Apr 2025 – 31 Mar 2026"
+    }
+  ],
+  "not_expressible": [
+    {
+      "criterion_id": "documented_clinical_concern",
+      "label": "Documented clinical concern",
+      "source": "cord-ph -> clinical_notes.text",
+      "reason": "only in free-text; no structured column"
+    }
+  ],
+  "executable": {
+    "schema_version": "2",
+    "audit_id": "cord-ph",
+    "workbook": "workbook.xlsx",
+    "identity_keys": [
+      "patient_code"
+    ],
+    "cohort": {
+      "database": "cord-ph",
+      "from": "cord_ph_birth_records b JOIN encounters e ON b.encounter = e.id JOIN patients p ON b.baby_patient = p.id",
+      "identity_select": "b.patient_code AS patient_code",
+      "where": []
+    },
+    "regions": [
+      {
+        "id": "ALL",
+        "sheet": "ALL",
+        "kind": "direct",
+        "queries": [
+          {
+            "database": "cord-ph",
+            "sql": "SELECT c.patient_code, c.gestation_weeks, c.gestation_days, c.maternal_age, c.parity, c.foetal_movements, c.maternal_comorbidities, c.maternal_comorbidities_other, c.normal_scans, c.normal_dopplers, c.ctg_done, c.liquor_meconium, c.chorioamnionitis, c.prom_gt_18hours, c.rffs, c.sentinel_event, c.delivery, c.birth_weight_grams, c.apgars_1, c.apgars_5, c.apgars_10, c.delayed_cord_clamping, c.cord_arterial_ph, c.cord_arterial_be, c.cord_arterial_lactate, c.intubated_at_delivery, c.cardiac_compressions, c.drugs_given, c.ward, c.gas_repeated, c.age_at_repeated_gas_hours, c.repeated_lactate, c.age_gas_normalised_hours, c.hypoglycaemia, c.admitted_to_nicu, c.age_at_discharge_home_days, c.unit_level_questionnaire_filled, c.local_guideline_for_cord_gas_sampling_available, c.local_guideline_for_fetal_acidosis_available FROM cord_ph_birth_records c WHERE c.patient_code IN (:cohort)"
+          }
+        ],
+        "row_anchor": "patient_code",
+        "cell_map": [
+          {
+            "field": "all/patient_code",
+            "column": "patient_code",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:A}{row}"
+          },
+          {
+            "field": "all/gestation_weeks",
+            "column": "gestation_weeks",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:B}{row}"
+          },
+          {
+            "field": "all/gestation_days",
+            "column": "gestation_days",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:C}{row}"
+          },
+          {
+            "field": "all/maternal_age",
+            "column": "maternal_age",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:D}{row}"
+          },
+          {
+            "field": "all/parity",
+            "column": "parity",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:E}{row}"
+          },
+          {
+            "field": "all/foetal_movements",
+            "column": "foetal_movements",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:G}{row}"
+          },
+          {
+            "field": "all/maternal_comorbidities",
+            "column": "maternal_comorbidities",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:H}{row}"
+          },
+          {
+            "field": "all/maternal_comorbidities_other",
+            "column": "maternal_comorbidities_other",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:I}{row}"
+          },
+          {
+            "field": "all/normal_scans",
+            "column": "normal_scans",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:J}{row}"
+          },
+          {
+            "field": "all/normal_dopplers",
+            "column": "normal_dopplers",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:K}{row}"
+          },
+          {
+            "field": "all/ctg_done",
+            "column": "ctg_done",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:M}{row}"
+          },
+          {
+            "field": "all/liquor_meconium",
+            "column": "liquor_meconium",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:N}{row}"
+          },
+          {
+            "field": "all/chorioamnionitis",
+            "column": "chorioamnionitis",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:O}{row}"
+          },
+          {
+            "field": "all/prom_18hours",
+            "column": "prom_gt_18hours",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:P}{row}"
+          },
+          {
+            "field": "all/rffs",
+            "column": "rffs",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:Q}{row}"
+          },
+          {
+            "field": "all/sentinel_event",
+            "column": "sentinel_event",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:R}{row}"
+          },
+          {
+            "field": "all/delivery",
+            "column": "delivery",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:T}{row}",
+            "translate": "delivery"
+          },
+          {
+            "field": "all/birth_weight_grams",
+            "column": "birth_weight_grams",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:U}{row}"
+          },
+          {
+            "field": "all/apgars_1",
+            "column": "apgars_1",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:V}{row}"
+          },
+          {
+            "field": "all/apgars_5",
+            "column": "apgars_5",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:W}{row}"
+          },
+          {
+            "field": "all/apgars_10",
+            "column": "apgars_10",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:X}{row}"
+          },
+          {
+            "field": "all/delayed_cord_clamping",
+            "column": "delayed_cord_clamping",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:Y}{row}"
+          },
+          {
+            "field": "all/cord_arterial_ph",
+            "column": "cord_arterial_ph",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:Z}{row}"
+          },
+          {
+            "field": "all/cord_arterial_be",
+            "column": "cord_arterial_be",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AA}{row}"
+          },
+          {
+            "field": "all/cord_arterial_lactate",
+            "column": "cord_arterial_lactate",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AB}{row}"
+          },
+          {
+            "field": "all/intubated_at_delivery",
+            "column": "intubated_at_delivery",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AD}{row}"
+          },
+          {
+            "field": "all/cardiac_compressions",
+            "column": "cardiac_compressions",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AE}{row}"
+          },
+          {
+            "field": "all/drugs_given",
+            "column": "drugs_given",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AF}{row}"
+          },
+          {
+            "field": "all/ward",
+            "column": "ward",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AG}{row}"
+          },
+          {
+            "field": "all/gas_repeated",
+            "column": "gas_repeated",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AH}{row}"
+          },
+          {
+            "field": "all/age_at_repeated_gas_hours",
+            "column": "age_at_repeated_gas_hours",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AI}{row}"
+          },
+          {
+            "field": "all/repeated_lactate",
+            "column": "repeated_lactate",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AJ}{row}"
+          },
+          {
+            "field": "all/age_gas_normalised_hours",
+            "column": "age_gas_normalised_hours",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AK}{row}"
+          },
+          {
+            "field": "all/hypoglycaemia",
+            "column": "hypoglycaemia",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AL}{row}"
+          },
+          {
+            "field": "all/admitted_to_nicu",
+            "column": "admitted_to_nicu",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AM}{row}"
+          },
+          {
+            "field": "all/age_at_discharge_home_days",
+            "column": "age_at_discharge_home_days",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AN}{row}"
+          },
+          {
+            "field": "all/unit_level_questionnaire_filled",
+            "column": "unit_level_questionnaire_filled",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AO}{row}"
+          },
+          {
+            "field": "all/local_guideline_for_cord_gas_sampling_available",
+            "column": "local_guideline_for_cord_gas_sampling_available",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AP}{row}"
+          },
+          {
+            "field": "all/local_guideline_for_fetal_acidosis_available",
+            "column": "local_guideline_for_fetal_acidosis_available",
+            "table": "cord_ph_birth_records",
+            "cell_template": "{col:AQ}{row}"
+          }
+        ]
+      },
+      {
+        "id": "NICU",
+        "sheet": "NICU",
+        "kind": "direct",
+        "queries": [
+          {
+            "database": "cord-ph",
+            "sql": "SELECT n.patient_code, n.age_hours_at_nnu_admission, n.cooled, n.age_at_cooling_hours, n.transferred_out, n.cfm, n.seizures, n.clinical_seizures, n.electrographic_seizure, n.mri_injury, n.duration_admission_in_nicu_days, n.age_at_discharge_home_days, n.feeding_on_discharge, n.abnormal_neurology_at_discharge FROM nicu_admissions n WHERE n.patient_code IN (:cohort)"
+          }
+        ],
+        "row_anchor": "patient_code",
+        "cell_map": [
+          {
+            "field": "nicu/age_hours_at_nnu_admission",
+            "column": "age_hours_at_nnu_admission",
+            "table": "nicu_admissions",
+            "cell_template": "{col:A}{row}"
+          },
+          {
+            "field": "nicu/cooled",
+            "column": "cooled",
+            "table": "nicu_admissions",
+            "cell_template": "{col:B}{row}"
+          },
+          {
+            "field": "nicu/age_at_cooling_hours",
+            "column": "age_at_cooling_hours",
+            "table": "nicu_admissions",
+            "cell_template": "{col:C}{row}"
+          },
+          {
+            "field": "nicu/transferred_out",
+            "column": "transferred_out",
+            "table": "nicu_admissions",
+            "cell_template": "{col:D}{row}"
+          },
+          {
+            "field": "nicu/cfm",
+            "column": "cfm",
+            "table": "nicu_admissions",
+            "cell_template": "{col:E}{row}"
+          },
+          {
+            "field": "nicu/seizures",
+            "column": "seizures",
+            "table": "nicu_admissions",
+            "cell_template": "{col:F}{row}"
+          },
+          {
+            "field": "nicu/clinical_seizures",
+            "column": "clinical_seizures",
+            "table": "nicu_admissions",
+            "cell_template": "{col:G}{row}"
+          },
+          {
+            "field": "nicu/electrographic_seizure",
+            "column": "electrographic_seizure",
+            "table": "nicu_admissions",
+            "cell_template": "{col:H}{row}"
+          },
+          {
+            "field": "nicu/mri_injury",
+            "column": "mri_injury",
+            "table": "nicu_admissions",
+            "cell_template": "{col:I}{row}"
+          },
+          {
+            "field": "nicu/duration_of_admission_in_nicu_days",
+            "column": "duration_admission_in_nicu_days",
+            "table": "nicu_admissions",
+            "cell_template": "{col:K}{row}"
+          },
+          {
+            "field": "nicu/age_at_discharge_home_days",
+            "column": "age_at_discharge_home_days",
+            "table": "nicu_admissions",
+            "cell_template": "{col:L}{row}"
+          },
+          {
+            "field": "nicu/feeding_on_discharge",
+            "column": "feeding_on_discharge",
+            "table": "nicu_admissions",
+            "cell_template": "{col:M}{row}"
+          },
+          {
+            "field": "nicu/abnormal_neurology_at_discharge",
+            "column": "abnormal_neurology_at_discharge",
+            "table": "nicu_admissions",
+            "cell_template": "{col:N}{row}"
+          }
+        ]
+      }
+    ],
+    "code_sets": {
+      "delivery": {
+        "Spontaneous vaginal": "1",
+        "Emergency caesarean": "2",
+        "Forceps": "3",
+        "Vacuum": "4"
+      }
+    }
+  }
+}

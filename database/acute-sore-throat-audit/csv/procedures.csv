@@ -1,0 +1,21 @@
+START,STOP,PATIENT,ENCOUNTER,CODE,DESCRIPTION,BASE_COST,REASONCODE,REASONDESCRIPTION
+2026-01-06T09:14:00Z,2026-01-06T09:14:00Z,ast-pat-001,ast-enc-001,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,363746003,Acute pharyngitis
+2026-01-09T15:48:00Z,2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,AST-RADT-PROC,Rapid antigen detection test for group A strep,12.00,17741008,Acute tonsillitis
+2026-01-09T15:48:00Z,2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,117010004,Throat swab culture,18.00,17741008,Acute tonsillitis
+2026-01-09T15:48:00Z,2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,17741008,Acute tonsillitis
+2026-01-18T11:22:00Z,2026-01-18T11:22:00Z,ast-pat-003,ast-enc-003,117010004,Throat swab culture,18.00,363746003,Acute pharyngitis
+2026-02-03T08:40:00Z,2026-02-03T08:40:00Z,ast-pat-004,ast-enc-004,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,162397003,Sore throat symptom
+2026-02-09T13:05:00Z,2026-02-09T13:05:00Z,ast-pat-006,ast-enc-006,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,162397003,Sore throat symptom
+2026-02-21T17:12:00Z,2026-02-21T17:12:00Z,ast-pat-007,ast-enc-007,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,363746003,Acute pharyngitis
+2026-03-02T14:26:00Z,2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,AST-RADT-PROC,Rapid antigen detection test for group A strep,12.00,43878008,Streptococcal sore throat
+2026-03-02T14:26:00Z,2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,43878008,Streptococcal sore throat
+2026-03-11T09:05:00Z,2026-03-11T09:05:00Z,ast-pat-009,ast-enc-009,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,30242009,Scarlet fever
+2026-01-14T10:02:00Z,2026-01-14T10:02:00Z,ast-pat-013,ast-enc-011,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,363746003,Acute pharyngitis
+2026-01-23T14:18:00Z,2026-01-23T14:18:00Z,ast-pat-014,ast-enc-012,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,363746003,Acute pharyngitis
+2026-01-31T09:35:00Z,2026-01-31T09:35:00Z,ast-pat-015,ast-enc-013,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,17741008,Acute tonsillitis
+2026-02-02T11:10:00Z,2026-02-02T11:10:00Z,ast-pat-016,ast-enc-014,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,363746003,Acute pharyngitis
+2026-03-04T08:55:00Z,2026-03-04T08:55:00Z,ast-pat-020,ast-enc-018,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,17741008,Acute tonsillitis
+2026-03-06T13:44:00Z,2026-03-06T13:44:00Z,ast-pat-021,ast-enc-019,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,363746003,Acute pharyngitis
+2026-03-09T10:28:00Z,2026-03-09T10:28:00Z,ast-pat-022,ast-enc-020,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,17741008,Acute tonsillitis
+2026-03-13T09:49:00Z,2026-03-13T09:49:00Z,ast-pat-023,ast-enc-021,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,162397003,Sore throat symptom
+2026-03-30T17:20:00Z,2026-03-30T17:20:00Z,ast-pat-026,ast-enc-024,AST-TARGET-LEAFLET-PROC,TARGET Treating Your Infection RTI leaflet shared,0.00,363746003,Acute pharyngitis

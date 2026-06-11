@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intero.local/contracts/database-model.schema.json",
+  "title": "Database model (database.json)",
+  "description": "The DATABASE MODEL: the schema model of one database PLUS its per-column filterable surface — \"what can be filtered in this database\". A property of the database itself, identical across audits, computed ONCE at database indexing by a read-only profiler (the salvaged PR #152 profiler, folded into this model). Renamed from the old database.md. PURELY REGENERABLE — re-index rebuilds it wholesale from the live schema; it carries no user-set state (contrast audit.json, mapping-artifact-redesign.md §6). The values/range it records are the choice domain (what a filter COULD be set to), a HINT not authority: the authoritative cohort number is always a live COUNT (§5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "database", "title", "description", "tables"],
+  "properties": {
+    "schema_version": {
+      "description": "Schema version of this document. Required so consumers can migrate. Currently always \"1\".",
+      "type": "string",
+      "const": "1"
+    },
+    "status": {
+      "description": "Operational indexing-lifecycle state of this entity — NOT part of the database's content, but carried in-model so there is no separate status sidecar (one file per entity). \"indexing\" while the model is being built (a stub document, tables may be empty), \"ready\" once a validated model is written, \"error\" if the build failed. Optional — an absent status is treated as \"ready\".",
+      "type": "string",
+      "enum": ["indexing", "ready", "error"]
+    },
+    "error": {
+      "description": "Human-readable failure reason, present only when status is \"error\". Optional.",
+      "type": "string"
+    },
+    "database": {
+      "description": "Stable slug identifying the database (e.g. \"cord-ph\"). Matches the var/databases/<database_id>/ folder. Required — the primary key for the database.",
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "description": "Human-readable database title shown in the library (e.g. \"Cord pH EMR\"). Required.",
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "description": "One-paragraph prose model of the database: which tables hold what, the primary entity, and where free-text lives. Fed to the LLM as orientation and surfaced in the library (D6). Required.",
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "description": "A one-line, ~5–10 word plain-English summary of what the database contains (e.g. \"Maternity & neonatal birth records with cord-blood gases\"). Shown as the database one-liner in the Library audit-detail page's Databases section. Optional — when absent the UI falls back to the first sentence of `description`.",
+      "type": "string",
+      "minLength": 1
+    },
+    "identity_links": {
+      "description": "MEASURED cross-database identity links: which of this database's identifier columns hold the same values as a column in a SIBLING database. Computed deterministically at indexing time by value-overlap sampling (profile.discover_identity_links) — never written by the LLM. The mapping reads these as facts when deciding identity.keys, and the compiled A3 identity bridge rests on them. Optional — absent when the database was indexed without siblings or no link was measured. Within-database links are not recorded here (PRAGMA foreign_key_list declares those).",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["column", "target", "evidence"],
+        "properties": {
+          "column": {
+            "description": "This database's column, as \"<table>.<column>\" (e.g. \"clinic_visits.patient_ref\").",
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "description": "The sibling column holding the same identity values, as \"<database_id> -> <table>.<column>\" (e.g. \"npda-demographics -> patients.nhs_number\").",
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence": {
+            "description": "The measurement that proved the link (e.g. \"24/24 sampled values found in target\").",
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "tables": {
+      "description": "One record per table in the database. Required. Each carries the table's role and its columns (with the filterable surface annotations). Identifier/free-text/reference columns are still listed (with filterable:false + a reason) so the model is complete.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "description", "columns"],
+        "properties": {
+          "name": {
+            "description": "The table name as it appears in the database (e.g. \"cord_ph_birth_records\"). Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "row_count": {
+            "description": "Number of rows at profiling time. Optional — a hint for the LLM and the library; not authoritative (re-profile on demand).",
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": {
+            "description": "Prose role of the table (e.g. \"One row per baby / birth record — the audit's primary entity.\"). Required — orients mapping and identity decisions.",
+            "type": "string",
+            "minLength": 1
+          },
+          "columns": {
+            "description": "One record per column. Required. Carries the column's type, description, and its filterable-surface annotations.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "type", "description", "filterable"],
+              "properties": {
+                "name": {
+                  "description": "The column name as stored (e.g. \"delivery\"). Required.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "type": {
+                  "description": "The column's storage type as profiled (e.g. \"text\", \"integer\", \"real\", \"date\"). Required — the raw type from schema introspection, distinct from filter_type which is the meaningful filtering type.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": {
+                  "description": "Prose meaning of the column (e.g. \"Mode of delivery.\"). Required — the library (D6) surfaces this directly and mapping uses it to bind audit concepts.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "filterable": {
+                  "description": "Whether this column is meaningfully filterable. Required and TYPE-BASED / audit-independent: true for a real category/date/number; false for identifiers, free-text, and references. Never min/max an ID, never enumerate an identifier as a category, never list a free-text column.",
+                  "type": "boolean"
+                },
+                "filter_type": {
+                  "description": "How the column is filtered when filterable:true — \"category\" (a bounded set, see values), \"number\" or \"date\" (a range, see range). Required when filterable is true; absent when filterable is false.",
+                  "type": "string",
+                  "enum": ["category", "number", "date"]
+                },
+                "values": {
+                  "description": "The choice domain for a category filter: the bounded set of observed values (e.g. [\"Spontaneous vaginal\",\"Emergency caesarean\",...]). A HINT, not authority — re-profile on demand. Present for filter_type \"category\".",
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "range": {
+                  "description": "The choice domain for a number/date filter: the observed bounds. A HINT, not authority. Present for filter_type \"number\" or \"date\".",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "min": {
+                      "description": "Lower bound of the observed range (number for filter_type number; ISO date string for date).",
+                      "type": ["number", "string"]
+                    },
+                    "max": {
+                      "description": "Upper bound of the observed range (number for filter_type number; ISO date string for date).",
+                      "type": ["number", "string"]
+                    }
+                  }
+                },
+                "codes": {
+                  "description": "For a coded DB column: a code -> meaning map of how this database encodes the column's values. Optional. The mapping's per-field `code` bridges the audit's permitted_values to these database codes; E2 cross-checks the two.",
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": { "type": "string" }
+                },
+                "reason": {
+                  "description": "Why the column is NOT filterable. Required when filterable is false; absent when true. One of: \"identifier\" (a key/id), \"free-text\" (unbounded prose), \"reference\" (a code/foreign-key reference column).",
+                  "type": "string",
+                  "enum": ["identifier", "free-text", "reference"]
+                }
+              },
+              "allOf": [
+                {
+                  "description": "A filterable column must declare HOW it is filtered.",
+                  "if": { "properties": { "filterable": { "const": true } } },
+                  "then": { "required": ["filter_type"] }
+                },
+                {
+                  "description": "A non-filterable column must declare WHY (and carries no filter_type).",
+                  "if": { "properties": { "filterable": { "const": false } } },
+                  "then": {
+                    "required": ["reason"],
+                    "not": { "required": ["filter_type"] }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

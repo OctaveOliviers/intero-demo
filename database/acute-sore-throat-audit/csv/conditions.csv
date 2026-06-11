@@ -1,0 +1,31 @@
+START,STOP,PATIENT,ENCOUNTER,CODE,DESCRIPTION
+2026-01-06,,ast-pat-001,ast-enc-001,363746003,Acute pharyngitis
+2026-01-09,,ast-pat-002,ast-enc-002,17741008,Acute tonsillitis
+2026-01-18,,ast-pat-003,ast-enc-003,363746003,Acute pharyngitis
+2026-02-03,,ast-pat-004,ast-enc-004,162397003,Sore throat symptom
+2026-02-07,,ast-pat-005,ast-enc-005,17741008,Acute tonsillitis
+2026-02-09,,ast-pat-006,ast-enc-006,162397003,Sore throat symptom
+2026-02-21,,ast-pat-007,ast-enc-007,363746003,Acute pharyngitis
+2026-03-02,,ast-pat-008,ast-enc-008,43878008,Streptococcal sore throat
+2026-03-11,,ast-pat-009,ast-enc-009,30242009,Scarlet fever
+2026-03-17,,ast-pat-010,ast-enc-010,363746003,Acute pharyngitis
+2026-01-14,,ast-pat-013,ast-enc-011,363746003,Acute pharyngitis
+2026-01-23,,ast-pat-014,ast-enc-012,363746003,Acute pharyngitis
+2026-01-31,,ast-pat-015,ast-enc-013,17741008,Acute tonsillitis
+2026-02-02,,ast-pat-016,ast-enc-014,363746003,Acute pharyngitis
+2026-02-12,,ast-pat-017,ast-enc-015,363746003,Acute pharyngitis
+2026-02-18,,ast-pat-018,ast-enc-016,162397003,Sore throat symptom
+2026-02-24,,ast-pat-019,ast-enc-017,363746003,Acute pharyngitis
+2026-03-04,,ast-pat-020,ast-enc-018,17741008,Acute tonsillitis
+2026-03-06,,ast-pat-021,ast-enc-019,363746003,Acute pharyngitis
+2026-03-09,,ast-pat-022,ast-enc-020,17741008,Acute tonsillitis
+2026-03-13,,ast-pat-023,ast-enc-021,162397003,Sore throat symptom
+2026-03-19,,ast-pat-024,ast-enc-022,363746003,Acute pharyngitis
+2026-03-24,,ast-pat-025,ast-enc-023,17741008,Acute tonsillitis
+2026-03-30,,ast-pat-026,ast-enc-024,363746003,Acute pharyngitis
+2026-03-25,,ast-pat-011,ast-enc-025,49727002,Cough
+2026-04-04,,ast-pat-012,ast-enc-026,162397003,Sore throat symptom
+2024-05-10,,ast-pat-003,ast-enc-003,195967001,Asthma
+2023-09-01,,ast-pat-005,ast-enc-005,76498008,Immunosuppression
+2026-02-21,2026-11-21,ast-pat-007,ast-enc-007,77386006,Pregnancy
+2021-02-12,,ast-pat-008,ast-enc-008,44054006,Type 2 diabetes mellitus

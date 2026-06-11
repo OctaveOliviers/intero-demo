@@ -1,0 +1,15 @@
+Id,START,STOP,PATIENT,ORGANIZATION,PROVIDER,PAYER,ENCOUNTERCLASS,CODE,DESCRIPTION,BASE_ENCOUNTER_COST,TOTAL_CLAIM_COST,PAYER_COVERAGE,REASONCODE,REASONDESCRIPTION
+cph-enc-birth-001,2026-04-02T03:12:00Z,2026-04-04T11:00:00Z,cph-baby-001,cph-org-001,cph-prov-003,cph-payer-001,inpatient,183452005,Liveborn infant born in hospital,1450.00,1840.00,1840.00,386661006,Birth
+cph-enc-birth-002,2026-04-04T18:46:00Z,2026-04-10T13:30:00Z,cph-baby-002,cph-org-001,cph-prov-001,cph-payer-001,inpatient,183452005,Liveborn infant born in hospital,1450.00,6250.00,6100.00,386661006,Birth
+cph-enc-birth-003,2026-04-06T07:28:00Z,2026-04-08T10:15:00Z,cph-baby-003,cph-org-001,cph-prov-003,cph-payer-001,inpatient,183452005,Liveborn infant born in hospital,1450.00,2390.00,2320.00,386661006,Birth
+cph-enc-birth-004,2026-04-08T22:14:00Z,2026-04-22T12:00:00Z,cph-baby-004,cph-org-001,cph-prov-002,cph-payer-001,inpatient,183452005,Liveborn infant born in hospital,1450.00,14150.00,13925.00,386661006,Birth
+cph-enc-birth-005,2026-04-11T12:03:00Z,2026-04-14T09:40:00Z,cph-baby-005,cph-org-001,cph-prov-001,cph-payer-001,inpatient,183452005,Liveborn infant born in hospital,1450.00,4180.00,4020.00,386661006,Birth
+cph-enc-birth-006,2026-04-13T02:37:00Z,2026-04-21T15:00:00Z,cph-baby-006,cph-org-001,cph-prov-002,cph-payer-001,inpatient,183452005,Liveborn infant born in hospital,1450.00,10120.00,9890.00,386661006,Birth
+cph-enc-birth-007,2026-04-16T16:51:00Z,2026-04-18T10:20:00Z,cph-baby-007,cph-org-001,cph-prov-003,cph-payer-001,inpatient,183452005,Liveborn infant born in hospital,1450.00,3540.00,3420.00,386661006,Birth
+cph-enc-birth-008,2026-04-20T05:09:00Z,2026-04-22T11:00:00Z,cph-baby-008,cph-org-001,cph-prov-003,cph-payer-001,inpatient,183452005,Liveborn infant born in hospital,1450.00,2680.00,2600.00,386661006,Birth
+cph-enc-birth-009,2026-04-23T09:35:00Z,2026-05-02T13:45:00Z,cph-baby-009,cph-org-001,cph-prov-001,cph-payer-001,inpatient,183452005,Liveborn infant born in hospital,1450.00,7600.00,7425.00,386661006,Birth
+cph-enc-birth-010,2026-04-27T21:18:00Z,2026-04-29T09:00:00Z,cph-baby-010,cph-org-001,cph-prov-003,cph-payer-001,inpatient,183452005,Liveborn infant born in hospital,1450.00,1990.00,1940.00,386661006,Birth
+cph-enc-nicu-002,2026-04-04T19:18:00Z,2026-04-10T13:30:00Z,cph-baby-002,cph-org-002,cph-prov-004,cph-payer-001,inpatient,305351004,Admission to neonatal intensive care unit,3800.00,4800.00,4700.00,230690007,Neonatal encephalopathy
+cph-enc-nicu-004,2026-04-08T22:38:00Z,2026-04-22T12:00:00Z,cph-baby-004,cph-org-002,cph-prov-004,cph-payer-001,inpatient,305351004,Admission to neonatal intensive care unit,3800.00,9800.00,9675.00,230690007,Neonatal encephalopathy
+cph-enc-nicu-006,2026-04-13T03:25:00Z,2026-04-21T15:00:00Z,cph-baby-006,cph-org-002,cph-prov-005,cph-payer-001,inpatient,305351004,Admission to neonatal intensive care unit,3800.00,6920.00,6710.00,77206006,Respiratory distress of newborn
+cph-enc-nicu-009,2026-04-23T10:20:00Z,2026-05-02T13:45:00Z,cph-baby-009,cph-org-002,cph-prov-004,cph-payer-001,inpatient,305351004,Admission to neonatal intensive care unit,3800.00,6200.00,6075.00,230690007,Neonatal encephalopathy

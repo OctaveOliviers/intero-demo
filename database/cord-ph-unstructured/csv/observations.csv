@@ -1,0 +1,37 @@
+DATE,PATIENT,ENCOUNTER,CATEGORY,CODE,DESCRIPTION,VALUE,UNITS,TYPE
+2026-04-02T03:12:00Z,cph-baby-001,cph-enc-birth-001,vital-signs,11884-4,Gestational age at birth,39,weeks,numeric
+2026-04-02T03:12:00Z,cph-baby-001,cph-enc-birth-001,vital-signs,9274-2,Apgar score 1 minute,8,score,numeric
+2026-04-02T03:17:00Z,cph-baby-001,cph-enc-birth-001,vital-signs,9272-6,Apgar score 5 minutes,9,score,numeric
+2026-04-02T03:22:00Z,cph-baby-001,cph-enc-birth-001,vital-signs,9271-8,Apgar score 10 minutes,,score,missing
+2026-04-02T03:14:00Z,cph-baby-001,cph-enc-birth-001,laboratory,28646-8,Umbilical artery blood pH,7.28,pH,numeric
+2026-04-02T03:14:00Z,cph-baby-001,cph-enc-birth-001,laboratory,1925-7,Umbilical artery base excess,-3.4,mmol/L,numeric
+2026-04-02T03:14:00Z,cph-baby-001,cph-enc-birth-001,laboratory,2524-7,Umbilical artery lactate,3.1,mmol/L,numeric
+2026-04-04T18:46:00Z,cph-baby-002,cph-enc-birth-002,vital-signs,9274-2,Apgar score 1 minute,2,score,numeric
+2026-04-04T18:51:00Z,cph-baby-002,cph-enc-birth-002,vital-signs,9272-6,Apgar score 5 minutes,5,score,numeric
+2026-04-04T18:56:00Z,cph-baby-002,cph-enc-birth-002,vital-signs,9271-8,Apgar score 10 minutes,7,score,numeric
+2026-04-04T18:48:00Z,cph-baby-002,cph-enc-birth-002,laboratory,28646-8,Umbilical artery blood pH,7.03,pH,numeric
+2026-04-04T18:48:00Z,cph-baby-002,cph-enc-birth-002,laboratory,1925-7,Umbilical artery base excess,-15.2,mmol/L,numeric
+2026-04-04T18:48:00Z,cph-baby-002,cph-enc-birth-002,laboratory,2524-7,Umbilical artery lactate,10.6,mmol/L,numeric
+2026-04-04T20:46:00Z,cph-baby-002,cph-enc-nicu-002,laboratory,11558-4,Repeat blood gas pH,7.22,pH,numeric
+2026-04-06T07:28:00Z,cph-baby-003,cph-enc-birth-003,vital-signs,8339-4,Birth weight,3180,g,numeric
+2026-04-06T07:30:00Z,cph-baby-003,cph-enc-birth-003,laboratory,28646-8,Umbilical artery blood pH,,pH,missing
+2026-04-06T07:30:00Z,cph-baby-003,cph-enc-birth-003,laboratory,1925-7,Umbilical artery base excess,,mmol/L,missing
+2026-04-08T22:16:00Z,cph-baby-004,cph-enc-birth-004,laboratory,28646-8,Umbilical artery blood pH,6.91,pH,numeric
+2026-04-08T22:16:00Z,cph-baby-004,cph-enc-birth-004,laboratory,1925-7,Umbilical artery base excess,-21.4,mmol/L,numeric
+2026-04-08T22:16:00Z,cph-baby-004,cph-enc-birth-004,laboratory,2524-7,Umbilical artery lactate,14.2,mmol/L,numeric
+2026-04-08T23:26:00Z,cph-baby-004,cph-enc-nicu-004,laboratory,11558-4,Repeat blood gas pH,7.11,pH,numeric
+2026-04-11T12:05:00Z,cph-baby-005,cph-enc-birth-005,laboratory,28646-8,Umbilical artery blood pH,7.12,pH,numeric
+2026-04-11T12:05:00Z,cph-baby-005,cph-enc-birth-005,laboratory,1925-7,Umbilical artery base excess,-9.8,mmol/L,numeric
+2026-04-11T12:05:00Z,cph-baby-005,cph-enc-birth-005,laboratory,2524-7,Umbilical artery lactate,7.2,mmol/L,numeric
+2026-04-13T02:39:00Z,cph-baby-006,cph-enc-birth-006,laboratory,28646-8,Umbilical artery blood pH,7.18,pH,numeric
+2026-04-13T02:39:00Z,cph-baby-006,cph-enc-birth-006,laboratory,1925-7,Umbilical artery base excess,-8.1,mmol/L,numeric
+2026-04-13T02:39:00Z,cph-baby-006,cph-enc-birth-006,laboratory,2524-7,Umbilical artery lactate,6.4,mmol/L,numeric
+2026-04-16T16:53:00Z,cph-baby-007,cph-enc-birth-007,laboratory,28646-8,Umbilical artery blood pH,7.24,pH,numeric
+2026-04-16T16:53:00Z,cph-baby-007,cph-enc-birth-007,laboratory,1925-7,Umbilical artery base excess,-5.6,mmol/L,numeric
+2026-04-20T05:10:00Z,cph-baby-008,cph-enc-birth-008,laboratory,28646-8,Umbilical artery blood pH,7.31,pH,numeric
+2026-04-20T05:10:00Z,cph-baby-008,cph-enc-birth-008,laboratory,1925-7,Umbilical artery base excess,-2.2,mmol/L,numeric
+2026-04-23T09:37:00Z,cph-baby-009,cph-enc-birth-009,laboratory,28646-8,Umbilical artery blood pH,6.98,pH,numeric
+2026-04-23T09:37:00Z,cph-baby-009,cph-enc-birth-009,laboratory,1925-7,Umbilical artery base excess,-18.7,mmol/L,numeric
+2026-04-23T09:37:00Z,cph-baby-009,cph-enc-birth-009,laboratory,2524-7,Umbilical artery lactate,12.8,mmol/L,numeric
+2026-04-27T21:20:00Z,cph-baby-010,cph-enc-birth-010,laboratory,28646-8,Umbilical artery blood pH,7.29,pH,numeric
+2026-04-27T21:20:00Z,cph-baby-010,cph-enc-birth-010,laboratory,1925-7,Umbilical artery base excess,-3.0,mmol/L,numeric

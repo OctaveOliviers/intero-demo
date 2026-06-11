@@ -1,0 +1,606 @@
+{
+  "schema_version": "1",
+  "database": "npda-clinical",
+  "title": "Northway PDU Diabetes Clinic EPR",
+  "description": "Clinical EPR for the Northway Paediatric Diabetes Unit (PDU). Captures the longitudinal clinic record of children and young people under diabetes care: clinic_visits (one row per outpatient or inpatient encounter, with the clinician-recorded ethnicity and diabetes type), measurements (long-form height, weight, HbA1c, blood pressure, urinary ACR and cholesterol), screening_results (annual review care processes: foot, retinal, thyroid, coeliac, influenza), technology (insulin regimen and delivery method, non-insulin medication, CGM use, blood-ketone testing, immunotherapy receipt, thyroid treatment, lifestyle advice flag), psychology (annual psychological screening, mental-health appointment status, level-3 carbohydrate-counting education date, dietitian appointment) and clinical_notes (free-text clinic letters, admission letters and admission summaries). Joined to the demographics/registration system (npda-demographics) by NHS number (patient_ref). Some clinically important data is held only in free-text clinical_notes \u2014 notably Jacob Whitfield's HbA1c on his first audit-year visit (V0004), Daniel Chen's DKA admission pH and standard bicarbonate (N0009), Ethan Brookes' carb-counting education date and pH at diagnosis (N0003), and Imani Joseph's psychological-screening narrative and awaited retinal-screening result. One patient (Daniel Chen, V0024) has a missing HbA1c because the clinic machine was offline.",
+  "identity_links": [
+    {
+      "column": "clinic_visits.patient_ref",
+      "target": "npda-demographics -> patients.nhs_number",
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "clinical_notes.patient_ref",
+      "target": "npda-demographics -> patients.nhs_number",
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "measurements.patient_ref",
+      "target": "npda-demographics -> patients.nhs_number",
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "psychology.patient_ref",
+      "target": "npda-demographics -> patients.nhs_number",
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "screening_results.patient_ref",
+      "target": "npda-demographics -> patients.nhs_number",
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "technology.patient_ref",
+      "target": "npda-demographics -> patients.nhs_number",
+      "evidence": "10/10 sampled values found in target"
+    }
+  ],
+  "tables": [
+    {
+      "name": "clinic_visits",
+      "description": "One row per clinic encounter \u2014 outpatient appointments, inpatient admissions (visit_type = 'inpatient') and the final transitional appointment for a patient transferring to adult diabetes care (visit_type = 'transition_final'). Carries the patient reference (NHS number), the recording clinician, and the ethnicity and diabetes type as recorded on the clinic system at that visit (these can differ from the registration-system codes \u2014 known for Sumaiya Begum / 9874123004 whose clinical-system ethnicity is 'L' but registration ethnicity is 'K').",
+      "columns": [
+        {
+          "name": "visit_id",
+          "type": "text",
+          "description": "Identifier of the clinic visit (V0001-V0026).",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "patient_ref",
+          "type": "text",
+          "description": "NHS number of the patient \u2014 the join key to the demographics system (npda-demographics.patients.nhs_number).",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "visit_date",
+          "type": "text",
+          "description": "Date of the clinic visit (ISO yyyy-mm-dd).",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-22",
+            "max": "2027-01-20"
+          }
+        },
+        {
+          "name": "visit_type",
+          "type": "text",
+          "description": "Type of encounter: 'outpatient' for routine clinic, 'inpatient' for hospital admission, 'transition_final' for the last paediatric visit before transferring to adult diabetes services.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "inpatient",
+            "outpatient",
+            "transition_final"
+          ],
+          "codes": {
+            "outpatient": "Outpatient clinic visit",
+            "inpatient": "Inpatient hospital admission",
+            "transition_final": "Final paediatric appointment before transition to adult service"
+          }
+        },
+        {
+          "name": "clinician",
+          "type": "text",
+          "description": "Clinician leading the visit (paediatric diabetologist or diabetes specialist nurse).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "DSN K Murray",
+            "Dr P Edwards",
+            "Dr R Singh"
+          ]
+        },
+        {
+          "name": "ethnicity_recorded",
+          "type": "text",
+          "description": "Ethnicity as recorded on the clinic EPR at this visit, using the NHS Data Dictionary letter codes (A, F, H, J, L, M, N, R). Note: this may differ from npda-demographics.patients.ethnicity_code for the same patient \u2014 for Sumaiya Begum the clinic system shows 'L' (Asian - Any other Asian background) while the registration system shows 'K' (Asian - Bangladeshi), creating a known cross-source conflict.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "A",
+            "F",
+            "H",
+            "J",
+            "L",
+            "M",
+            "N",
+            "R"
+          ]
+        },
+        {
+          "name": "diabetes_type_recorded",
+          "type": "text",
+          "description": "Diabetes type code as recorded on the clinic EPR at this visit (NPDA permitted values).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "1",
+            "2",
+            "4"
+          ],
+          "codes": {
+            "1": "Type 1 Diabetes Mellitus",
+            "2": "Type 2 Diabetes Mellitus",
+            "3": "Cystic Fibrosis Related Diabetes",
+            "4": "MODY (monogenic forms of diabetes)",
+            "5": "Other specified Diabetes Mellitus",
+            "99": "Unknown/unspecified"
+          }
+        }
+      ],
+      "row_count": 26
+    },
+    {
+      "name": "measurements",
+      "description": "Long-form table of clinical measurements and laboratory results captured at clinic visits \u2014 one row per (visit, measurement_type) tuple. Measurement types observed in the cohort: height (cm), weight (kg), hba1c (mmol/mol or %), systolic_bp / diastolic_bp (mmHg), acr (urinary albumin:creatinine ratio in mg/mmol), cholesterol (mmol/l). Not every patient has every type recorded at every visit \u2014 see also clinical_notes for HbA1c measurements taken on capillary cartridges and recorded only in narrative (e.g. Jacob Whitfield V0004) and for the missing HbA1c at Daniel Chen's V0024 visit.",
+      "columns": [
+        {
+          "name": "measurement_id",
+          "type": "text",
+          "description": "Identifier of the measurement row.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "patient_ref",
+          "type": "text",
+          "description": "NHS number of the patient.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "visit_ref",
+          "type": "text",
+          "description": "Reference to clinic_visits.visit_id.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "measurement_date",
+          "type": "text",
+          "description": "Date the measurement was taken (ISO yyyy-mm-dd). Usually equals the visit date.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-22",
+            "max": "2027-01-20"
+          }
+        },
+        {
+          "name": "measurement_type",
+          "type": "text",
+          "description": "Type of measurement: height, weight, hba1c, systolic_bp, diastolic_bp, acr (urinary albumin:creatinine), cholesterol.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "acr",
+            "cholesterol",
+            "diastolic_bp",
+            "hba1c",
+            "height",
+            "systolic_bp",
+            "weight"
+          ]
+        },
+        {
+          "name": "value",
+          "type": "text",
+          "description": "Numeric value of the measurement (recorded as text in this system because some HbA1c values use % units with one decimal place).",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 0.9,
+            "max": 173.1
+          }
+        },
+        {
+          "name": "units",
+          "type": "text",
+          "description": "Units the value is recorded in. HbA1c may be recorded in either '%' or 'mmol/mol' depending on the source analyser at time of measurement \u2014 per NPDA rules values <20 are interpreted as % and values 20-195 as mmol/mol.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "%",
+            "cm",
+            "kg",
+            "mg/mmol",
+            "mmHg",
+            "mmol/l",
+            "mmol/mol"
+          ]
+        },
+        {
+          "name": "comment",
+          "type": "text",
+          "description": "Optional free-text comment on the measurement.",
+          "filterable": false,
+          "reason": "free-text"
+        }
+      ],
+      "row_count": 82
+    },
+    {
+      "name": "screening_results",
+      "description": "Annual-review care-process records: foot assessment, retinal (eye) screening, thyroid function testing, coeliac antibody screening (or recorded dietary status), and influenza immunisation. One row per (patient, screening_type) \u2014 most are once per audit year. Result_code is a small categorical set ('normal', 'abnormal', 'positive', 'negative', 'no', 'given', 'treated', or blank when the date is known but the result is outstanding). One known data-quality gap: Imani Joseph's retinal screening (S0042) has a date but result_code is blank because the result was not yet back at audit time.",
+      "columns": [
+        {
+          "name": "screening_id",
+          "type": "text",
+          "description": "Identifier of the screening result.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "patient_ref",
+          "type": "text",
+          "description": "NHS number of the patient.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "screening_type",
+          "type": "text",
+          "description": "Care process type: foot (foot exam), retinal (diabetic retinal screening), thyroid (thyroid function blood test), coeliac (anti-TTG serology), coeliac_dietary_status (dietary status recorded in lieu of fresh screening), influenza_immunisation (annual flu vaccine recommendation/given).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "coeliac",
+            "coeliac_dietary_status",
+            "foot",
+            "influenza_immunisation",
+            "retinal",
+            "thyroid"
+          ]
+        },
+        {
+          "name": "screening_date",
+          "type": "text",
+          "description": "Date the screening was performed or recommended (ISO yyyy-mm-dd).",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2019-03-10",
+            "max": "2026-12-10"
+          }
+        },
+        {
+          "name": "result_code",
+          "type": "text",
+          "description": "Coded result. 'normal' / 'abnormal' for foot, retinal and thyroid screens; 'positive' / 'negative' for coeliac antibody tests; 'no' for coeliac_dietary_status (no gluten-free diet / no coeliac diagnosis); 'given' for influenza immunisation; 'treated' for thyroid screens where the patient is on thyroid replacement therapy; blank where the screening date is known but the result is awaited.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "abnormal",
+            "given",
+            "negative",
+            "no",
+            "normal",
+            "positive",
+            "treated"
+          ]
+        },
+        {
+          "name": "result_text",
+          "type": "text",
+          "description": "Optional free-text comment on the screening result (e.g. 'Mild non-proliferative retinopathy R eye' or 'Anti-TTG strongly positive; biopsy confirmed coeliac disease').",
+          "filterable": false,
+          "reason": "free-text"
+        }
+      ],
+      "row_count": 45
+    },
+    {
+      "name": "technology",
+      "description": "Per-patient snapshot of treatment modalities at the start of the audit year \u2014 insulin regimen, non-insulin glucose-lowering medication, CGM use, blood-ketone testing equipment use, immunotherapy receipt and date, thyroid treatment, and a lifestyle-advice-given flag. One row per patient (the latest record as_of audit start).",
+      "columns": [
+        {
+          "name": "tech_id",
+          "type": "text",
+          "description": "Identifier of the technology snapshot row.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "patient_ref",
+          "type": "text",
+          "description": "NHS number of the patient.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "as_of_date",
+          "type": "text",
+          "description": "Date the snapshot reflects (ISO yyyy-mm-dd), usually the first audit-year clinic visit.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-22",
+            "max": "2026-06-18"
+          }
+        },
+        {
+          "name": "insulin_regimen",
+          "type": "text",
+          "description": "Insulin delivery regimen the patient is on: 'none' = no insulin, 'MDI_1_to_3' = 1-3 injections/day, 'MDI_4_or_more' = 4 or more injections/day, 'insulin_pump' = standalone pump, 'hybrid_closed_loop' = hybrid closed-loop pump-CGM system.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "MDI_1_to_3",
+            "MDI_4_or_more",
+            "hybrid_closed_loop",
+            "insulin_pump",
+            "none"
+          ],
+          "codes": {
+            "none": "No insulin",
+            "MDI_1_to_3": "Multiple daily injections, 1-3 per day",
+            "MDI_4_or_more": "Multiple daily injections, 4 or more per day",
+            "insulin_pump": "Standalone insulin pump",
+            "hybrid_closed_loop": "Hybrid closed loop system"
+          }
+        },
+        {
+          "name": "non_insulin_med",
+          "type": "text",
+          "description": "Non-insulin blood-glucose-lowering medication. 'none' = no other medication, 'metformin_only', 'glp1' = GLP-1 receptor agonist, 'sglt2' = SGLT2 inhibitor, 'metformin_glp1' = metformin combined with a GLP-1 agonist, 'other'. Only metformin_glp1 and none are observed in this cohort.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "metformin_glp1",
+            "none"
+          ]
+        },
+        {
+          "name": "cgm_in_use",
+          "type": "text",
+          "description": "Whether the patient is using a continuous glucose monitor at the time of the snapshot ('yes' / 'no').",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "no",
+            "yes"
+          ]
+        },
+        {
+          "name": "blood_ketone_testing",
+          "type": "text",
+          "description": "Whether the patient has been issued, and trained to use, blood-ketone testing strips and a meter ('yes' / 'no').",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "no",
+            "yes"
+          ]
+        },
+        {
+          "name": "immunotherapy_received",
+          "type": "text",
+          "description": "Whether the patient has received immunotherapy prior to or after the diagnosis of stage 3 Type 1 diabetes ('yes' / 'no'). Only relevant for newly diagnosed Type 1 patients.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "no",
+            "yes"
+          ]
+        },
+        {
+          "name": "immunotherapy_start_date",
+          "type": "text",
+          "description": "Date immunotherapy was started (DD/MM/YYYY) \u2014 populated only when immunotherapy_received = 'yes'.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "26/06/2026",
+            "max": "26/06/2026"
+          }
+        },
+        {
+          "name": "thyroid_treatment",
+          "type": "text",
+          "description": "Current thyroid treatment status: 'none' = no thyroid therapy, 'levothyroxine' = thyroxine for hypothyroidism, 'antithyroid' = antithyroid medication for hyperthyroidism.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "levothyroxine",
+            "none"
+          ],
+          "codes": {
+            "none": "No thyroid therapy",
+            "levothyroxine": "Thyroxine for hypothyroidism",
+            "antithyroid": "Antithyroid medication for hyperthyroidism"
+          }
+        },
+        {
+          "name": "lifestyle_advice_given",
+          "type": "text",
+          "description": "Whether lifestyle and dietary modification has been recommended to reduce blood glucose levels ('yes' = recommended, blank otherwise). Usually applies to Type 2 and MODY patients.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "yes"
+          ]
+        }
+      ],
+      "row_count": 10
+    },
+    {
+      "name": "psychology",
+      "description": "Annual psychological-screening, mental-health-appointment and dietetics record. One row per patient per audit year. Captures the date of the annual psychological screening assessment, whether the patient was assessed as requiring additional psychological support outside of routine care, the status of any mental-health-professional appointment offered as part of the diabetes MDT, the date of level-3 carbohydrate-counting education, whether an additional paediatric-dietitian appointment was offered, and the date of that appointment.",
+      "columns": [
+        {
+          "name": "psych_id",
+          "type": "text",
+          "description": "Identifier of the psychology/dietetics record.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "patient_ref",
+          "type": "text",
+          "description": "NHS number of the patient.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "screening_date",
+          "type": "text",
+          "description": "Date of the annual psychological screening assessment (ISO yyyy-mm-dd).",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-22",
+            "max": "2026-07-30"
+          }
+        },
+        {
+          "name": "additional_support_needed",
+          "type": "text",
+          "description": "Outcome of psychological screening \u2014 whether the patient was assessed as requiring additional psychological support outside of routine care ('yes' / 'no').",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "no",
+            "yes"
+          ]
+        },
+        {
+          "name": "mental_health_appointment_status",
+          "type": "text",
+          "description": "Status of the additional mental-health-professional appointment offered as part of the diabetes MDT: 'offered_attended', 'offered_did_not_attend', 'offered_declined', 'not_offered', 'accessed_elsewhere'. Maps onto NPDA permitted values for item 49.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "not_offered",
+            "offered_attended",
+            "offered_declined",
+            "offered_did_not_attend"
+          ],
+          "codes": {
+            "offered_attended": "Offered and attended",
+            "offered_did_not_attend": "Offered and did not attend",
+            "offered_declined": "Offered and declined",
+            "not_offered": "Not offered",
+            "accessed_elsewhere": "Mental health support accessed elsewhere"
+          }
+        },
+        {
+          "name": "mh_appointment_date",
+          "type": "text",
+          "description": "Date of the offered/attended mental-health appointment (DD/MM/YYYY), or blank if none.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "12/06/2026",
+            "max": "20/06/2026"
+          }
+        },
+        {
+          "name": "carb_counting_education_date",
+          "type": "text",
+          "description": "Date the patient received level-3 carbohydrate-counting education (DD/MM/YYYY). Blank for one newly-diagnosed patient (Ethan Brookes) whose carb-counting education date is recorded only in the admission summary clinical note (N0003).",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "01/03/2014",
+            "max": "12/03/2019"
+          }
+        },
+        {
+          "name": "dietitian_appointment_offered",
+          "type": "text",
+          "description": "Whether the patient was offered an additional paediatric-dietitian appointment during the audit year ('yes' / 'no').",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "yes"
+          ]
+        },
+        {
+          "name": "dietitian_appointment_date",
+          "type": "text",
+          "description": "Date of the additional paediatric-dietitian appointment (DD/MM/YYYY), or blank if not attended.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "02/05/2026",
+            "max": "14/12/2026"
+          }
+        }
+      ],
+      "row_count": 10
+    },
+    {
+      "name": "clinical_notes",
+      "description": "Free-text clinic letters, admission letters and admission summaries authored by the diabetes consultants and specialist nurses. Holds clinically important content not captured in structured columns, including: Jacob Whitfield's first audit-year HbA1c (V0004 / N0002), smoking status and smoking cessation advice offer date; Ethan Brookes' diagnosis date, immunotherapy enrolment and carb-counting education date (N0003); Daniel Chen's DKA admission initial pH and standard bicarbonate, reason for admission and DKA-specific therapies received (N0009); Imani Joseph's psychological screening narrative and awaited eye-screening result (N0010A); and several patients' sick-day-rules review dates.",
+      "columns": [
+        {
+          "name": "note_id",
+          "type": "text",
+          "description": "Identifier of the clinical note (e.g. N0001).",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "patient_ref",
+          "type": "text",
+          "description": "NHS number of the patient.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "visit_ref",
+          "type": "text",
+          "description": "Reference to clinic_visits.visit_id the note belongs to.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "note_date",
+          "type": "text",
+          "description": "Date the note was authored (ISO yyyy-mm-dd).",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-22",
+            "max": "2027-01-08"
+          }
+        },
+        {
+          "name": "note_type",
+          "type": "text",
+          "description": "Kind of clinical note: 'clinic_letter' = routine outpatient letter, 'admission_letter' = DKA / inpatient discharge letter, 'admission_summary' = summary of an initial diagnosis admission.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "admission_letter",
+            "admission_summary",
+            "clinic_letter"
+          ]
+        },
+        {
+          "name": "author",
+          "type": "text",
+          "description": "Authoring clinician.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Dr P Edwards",
+            "Dr R Singh"
+          ]
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "description": "Free-text body of the clinical note.",
+          "filterable": false,
+          "reason": "free-text"
+        }
+      ],
+      "row_count": 11
+    }
+  ]
+}

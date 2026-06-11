@@ -1,0 +1,27 @@
+NOTE_ID,DATE,PATIENT,ENCOUNTER,AUTHOR,NOTE_TYPE,TEXT
+ast-note-001,2026-01-06T09:14:00Z,ast-pat-001,ast-enc-001,ast-prov-001,consultation,"Two days sore throat with cough overnight. FeverPAIN 2 recorded. Viral course discussed, leaflet shared, no antibiotic issued."
+ast-note-002,2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,ast-prov-004,consultation,"Abrupt fever, no cough, purulent tonsils and tender nodes. RADT positive. Penicillin V issued with adherence advice."
+ast-note-003,2026-01-18T11:22:00Z,ast-pat-003,ast-enc-003,ast-prov-003,urgent_care_note,FeverPAIN 3 and penicillin allergy. Swab sent. Immediate clarithromycin prescribed after patient preference; safety net not clearly documented.
+ast-note-004,2026-02-03T08:40:00Z,ast-pat-004,ast-enc-004,ast-prov-002,consultation,Cough and coryza with normal tonsils. FeverPAIN 0. Self-care and leaflet provided; no antibiotics.
+ast-note-005,2026-02-07T10:11:00Z,ast-pat-005,ast-enc-005,ast-prov-005,consultation,Severe tonsillar pain; temperature not entered because thermometer unavailable. Immunosuppressed on biologic therapy. Immediate Penicillin V and escalation advice.
+ast-note-006,2026-02-09T13:05:00Z,ast-pat-006,ast-enc-006,ast-prov-004,consultation,Mild throat discomfort and runny nose. Parent unsure when symptoms started. FeverPAIN template would not save. No antibiotic.
+ast-note-007,2026-02-21T17:12:00Z,ast-pat-007,ast-enc-007,ast-prov-003,urgent_care_note,Pregnant patient at 10 weeks. FeverPAIN 3. Delayed Penicillin V prescription if not improving after 48 hours; access and adherence advice documented.
+ast-note-008,2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,ast-prov-001,consultation,"High fever, no cough, exudative tonsils and tender nodes. RADT positive. Penicillin V prescribed; shellfish allergy only."
+ast-note-009,2026-03-11T09:05:00Z,ast-pat-009,ast-enc-009,ast-prov-004,consultation,Fever and sandpaper rash consistent with scarlet fever. FeverPAIN 4. Penicillin V prescribed with school and safety-net advice.
+ast-note-010,2026-03-17T16:42:00Z,ast-pat-010,ast-enc-010,ast-prov-002,consultation,"FeverPAIN 2. Free text says delayed script may be used if worse after weekend, but medication module shows no antibiotic order. Safety-netting field unknown."
+ast-note-011,2026-01-14T10:02:00Z,ast-pat-013,ast-enc-011,ast-prov-001,consultation,"Low scoring sore throat, FeverPAIN 1. No antibiotic. Natural history and self-care advice documented."
+ast-note-012,2026-01-23T14:18:00Z,ast-pat-014,ast-enc-012,ast-prov-005,consultation,FeverPAIN 3. Back-up prescription issued with clear instruction to collect only if worse or not improving after 3 to 5 days.
+ast-note-013,2026-01-31T09:35:00Z,ast-pat-015,ast-enc-013,ast-prov-004,consultation,FeverPAIN 4 with severe tonsillar inflammation. Back-up Penicillin V issued with adherence and access advice.
+ast-note-014,2026-02-02T11:10:00Z,ast-pat-016,ast-enc-014,ast-prov-002,consultation,Centor score 2 documented. No antibiotic issued; patient advised symptoms usually settle within a week.
+ast-note-015,2026-02-12T15:22:00Z,ast-pat-017,ast-enc-015,ast-prov-003,urgent_care_note,"Centor 4, penicillin allergy checked. Clarithromycin 500 mg BD for 5 days prescribed."
+ast-note-016,2026-02-18T12:08:00Z,ast-pat-018,ast-enc-016,ast-prov-001,consultation,"FeverPAIN 2. No antibiotic. Self-care discussed, but no explicit natural history or TARGET leaflet recorded."
+ast-note-017,2026-02-24T16:01:00Z,ast-pat-019,ast-enc-017,ast-prov-004,consultation,FeverPAIN 1 but antibiotic issued after parental concern. Needs review against guidance.
+ast-note-018,2026-03-04T08:55:00Z,ast-pat-020,ast-enc-018,ast-prov-005,consultation,FeverPAIN 5. Antibiotic recommended but patient declined after discussion. Safety net and return precautions documented.
+ast-note-019,2026-03-06T13:44:00Z,ast-pat-021,ast-enc-019,ast-prov-002,consultation,FeverPAIN 3. No antibiotic with clear advice that delayed prescription can be requested if significant worsening.
+ast-note-020,2026-03-09T10:28:00Z,ast-pat-022,ast-enc-020,ast-prov-004,consultation,"Child with FeverPAIN 4 and significant symptoms. Penicillin V for 10 days, safety net documented."
+ast-note-021,2026-03-13T09:49:00Z,ast-pat-023,ast-enc-021,ast-prov-001,consultation,FeverPAIN 0. TARGET leaflet sent by SMS; no antibiotics.
+ast-note-022,2026-03-19T15:06:00Z,ast-pat-024,ast-enc-022,ast-prov-003,urgent_care_note,"Delayed prescription recorded, but the note does not explain how to access it or when to start it."
+ast-note-023,2026-03-24T11:40:00Z,ast-pat-025,ast-enc-023,ast-prov-005,consultation,FeverPAIN 5. Amoxicillin selected instead of Penicillin V; no penicillin allergy recorded.
+ast-note-024,2026-03-30T17:20:00Z,ast-pat-026,ast-enc-024,ast-prov-002,consultation,FeverPAIN 4. Penicillin V prescribed but dose frequency and duration are below local guidance.
+ast-note-025,2026-03-25T10:33:00Z,ast-pat-011,ast-enc-025,ast-prov-003,urgent_care_note,Cough predominant illness with mild throat irritation. Not an acute sore throat audit consultation.
+ast-note-026,2026-04-04T12:20:00Z,ast-pat-012,ast-enc-026,ast-prov-005,consultation,Sore throat after the Q1 audit period.

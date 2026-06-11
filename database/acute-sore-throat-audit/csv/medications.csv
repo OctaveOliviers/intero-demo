@@ -1,0 +1,15 @@
+START,STOP,PATIENT,PAYER,ENCOUNTER,CODE,DESCRIPTION,BASE_COST,PAYER_COVERAGE,DISPENSES,TOTALCOST,REASONCODE,REASONDESCRIPTION,DOSE_TEXT,FREQUENCY,ROUTE,COURSE_LENGTH_DAYS,PRESCRIPTION_TYPE,STATUS,ADHERENCE_ADVICE_GIVEN,ACCESS_ADVICE_GIVEN
+2026-01-09T15:48:00Z,,ast-pat-002,ast-payer-001,ast-enc-002,575997,Phenoxymethylpenicillin 250mg oral tablet,8.40,8.40,1,8.40,17741008,Acute tonsillitis,250mg,QDS,oral,10,acute,active,yes,not_applicable
+2026-01-18T11:22:00Z,,ast-pat-003,ast-payer-002,ast-enc-003,197361,Clarithromycin 250mg oral tablet,8.40,8.40,1,8.40,363746003,Acute pharyngitis,250mg,BD,oral,5,acute,active,yes,not_applicable
+2026-02-07T10:11:00Z,,ast-pat-005,ast-payer-001,ast-enc-005,575997,Phenoxymethylpenicillin 500mg oral tablet,8.40,8.40,1,8.40,17741008,Acute tonsillitis,500mg,QDS,oral,10,acute,active,yes,not_applicable
+2026-02-21T17:12:00Z,,ast-pat-007,ast-payer-002,ast-enc-007,575997,Phenoxymethylpenicillin 500mg oral tablet,8.40,8.40,0,8.40,363746003,Acute pharyngitis,500mg,QDS,oral,5,delayed,delayed,yes,yes
+2026-03-02T14:26:00Z,,ast-pat-008,ast-payer-001,ast-enc-008,575997,Phenoxymethylpenicillin 500mg oral tablet,8.40,8.40,1,8.40,43878008,Streptococcal sore throat,500mg,QDS,oral,10,acute,active,yes,not_applicable
+2026-03-11T09:05:00Z,,ast-pat-009,ast-payer-001,ast-enc-009,575997,Phenoxymethylpenicillin 250mg oral tablet,8.40,8.40,1,8.40,30242009,Scarlet fever,250mg,QDS,oral,10,acute,active,yes,not_applicable
+2026-01-23T14:18:00Z,,ast-pat-014,ast-payer-001,ast-enc-012,575997,Phenoxymethylpenicillin 500mg oral tablet,8.40,8.40,0,8.40,363746003,Acute pharyngitis,500mg,QDS,oral,5,delayed,delayed,yes,yes
+2026-01-31T09:35:00Z,,ast-pat-015,ast-payer-001,ast-enc-013,575997,Phenoxymethylpenicillin 250mg oral tablet,8.40,8.40,0,8.40,17741008,Acute tonsillitis,250mg,QDS,oral,10,delayed,delayed,yes,yes
+2026-02-12T15:22:00Z,,ast-pat-017,ast-payer-002,ast-enc-015,197361,Clarithromycin 500mg oral tablet,8.40,8.40,1,8.40,363746003,Acute pharyngitis,500mg,BD,oral,5,acute,active,yes,not_applicable
+2026-02-24T16:01:00Z,,ast-pat-019,ast-payer-001,ast-enc-017,575997,Phenoxymethylpenicillin 250mg oral tablet,8.40,8.40,1,8.40,363746003,Acute pharyngitis,250mg,QDS,oral,5,acute,active,yes,not_applicable
+2026-03-09T10:28:00Z,,ast-pat-022,ast-payer-001,ast-enc-020,575997,Phenoxymethylpenicillin 250mg oral tablet,8.40,8.40,1,8.40,17741008,Acute tonsillitis,250mg,QDS,oral,10,acute,active,yes,not_applicable
+2026-03-19T15:06:00Z,,ast-pat-024,ast-payer-001,ast-enc-022,575997,Phenoxymethylpenicillin 500mg oral tablet,8.40,8.40,0,8.40,363746003,Acute pharyngitis,500mg,QDS,oral,5,delayed,delayed,yes,no
+2026-03-24T11:40:00Z,,ast-pat-025,ast-payer-001,ast-enc-023,723,Amoxicillin 500mg oral tablet,8.40,8.40,1,8.40,17741008,Acute tonsillitis,500mg,TDS,oral,7,acute,active,yes,not_applicable
+2026-03-30T17:20:00Z,,ast-pat-026,ast-payer-001,ast-enc-024,575997,Phenoxymethylpenicillin 250mg oral tablet,8.40,8.40,1,8.40,363746003,Acute pharyngitis,250mg,BD,oral,3,acute,active,yes,not_applicable

@@ -1,0 +1,11 @@
+psych_id,patient_ref,screening_date,additional_support_needed,mental_health_appointment_status,mh_appointment_date,carb_counting_education_date,dietitian_appointment_offered,dietitian_appointment_date
+PS0001,9874123001,2026-04-22,no,not_offered,,12/03/2019,yes,10/06/2026
+PS0002,9874123002,2026-05-14,yes,offered_attended,20/06/2026,26/06/2015,yes,26/06/2026
+PS0003,9874123003,2026-07-30,no,not_offered,,,yes,30/07/2026
+PS0004,9874123004,2026-05-02,no,not_offered,,,yes,02/05/2026
+PS0005,9874123005,2026-04-30,no,not_offered,,07/04/2024,yes,14/12/2026
+PS0006,9874123006,2026-06-04,no,not_offered,,,yes,04/06/2026
+PS0007,9874123007,2026-05-21,no,offered_declined,,01/03/2014,yes,21/05/2026
+PS0008,9874123008,2026-04-24,no,not_offered,,02/09/2022,yes,24/04/2026
+PS0009,9874123009,2026-05-09,no,offered_did_not_attend,12/06/2026,20/10/2021,yes,09/05/2026
+PS0010,9874123010,2026-06-12,yes,offered_attended,09/09/2026,10/05/2023,yes,12/06/2026

@@ -1,0 +1,6 @@
+Id,ORGANIZATION,NAME,GENDER,SPECIALITY,ADDRESS,CITY,STATE,ZIP,LAT,LON,UTILIZATION
+cph-prov-001,cph-org-001,Dr Hannah Reid,F,Obstetrics,100 River Road,Cambridge,Massachusetts,02139,42.366,-71.105,185
+cph-prov-002,cph-org-001,Dr Mark Alvarez,M,Obstetrics,100 River Road,Cambridge,Massachusetts,02139,42.366,-71.105,174
+cph-prov-003,cph-org-001,Leah Morgan,F,Midwifery,100 River Road,Cambridge,Massachusetts,02139,42.366,-71.105,242
+cph-prov-004,cph-org-002,Dr Priya Shah,F,Neonatology,102 River Road,Cambridge,Massachusetts,02139,42.367,-71.104,128
+cph-prov-005,cph-org-002,Dr Owen Carter,M,Paediatrics,102 River Road,Cambridge,Massachusetts,02139,42.367,-71.104,151

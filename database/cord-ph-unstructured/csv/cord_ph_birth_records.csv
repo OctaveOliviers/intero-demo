@@ -1,0 +1,11 @@
+RECORD_ID,SOURCE_SYSTEM,SOURCE_RECORD_ID,EXTRACTED_AT,PATIENT_CODE,BABY_PATIENT,MOTHER_PATIENT,ENCOUNTER
+cph-rec-001,Northbank Maternity EHR,MAT-2026-0402-001,2026-05-01T09:00:00Z,CPH001,cph-baby-001,cph-mother-001,cph-enc-birth-001
+cph-rec-002,Northbank Maternity EHR,MAT-2026-0404-002,2026-05-01T09:00:00Z,CPH002,cph-baby-002,cph-mother-002,cph-enc-birth-002
+cph-rec-003,Northbank Maternity EHR,MAT-2026-0406-003,2026-05-01T09:00:00Z,CPH003,cph-baby-003,cph-mother-003,cph-enc-birth-003
+cph-rec-004,Northbank Maternity EHR,MAT-2026-0408-004,2026-05-01T09:00:00Z,CPH004,cph-baby-004,cph-mother-004,cph-enc-birth-004
+cph-rec-005,Northbank Maternity EHR,MAT-2026-0411-005,2026-05-01T09:00:00Z,CPH005,cph-baby-005,cph-mother-005,cph-enc-birth-005
+cph-rec-006,Northbank Maternity EHR,MAT-2026-0413-006,2026-05-01T09:00:00Z,CPH006,cph-baby-006,cph-mother-006,cph-enc-birth-006
+cph-rec-007,Northbank Maternity EHR,MAT-2026-0416-007,2026-05-01T09:00:00Z,CPH007,cph-baby-007,cph-mother-007,cph-enc-birth-007
+cph-rec-008,Northbank Maternity EHR,MAT-2026-0420-008,2026-05-01T09:00:00Z,CPH008,cph-baby-008,cph-mother-008,cph-enc-birth-008
+cph-rec-009,Northbank Maternity EHR,MAT-2026-0423-009,2026-05-01T09:00:00Z,CPH009,cph-baby-009,cph-mother-009,cph-enc-birth-009
+cph-rec-010,Northbank Maternity EHR,MAT-2026-0427-010,2026-05-01T09:00:00Z,CPH010,cph-baby-010,cph-mother-010,cph-enc-birth-010

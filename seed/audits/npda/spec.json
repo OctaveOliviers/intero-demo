@@ -1,0 +1,806 @@
+{
+  "schema_version": "1",
+  "audit": "npda",
+  "databases": [
+    "npda-demographics",
+    "npda-clinical"
+  ],
+  "title": "National Paediatric Diabetes Audit (NPDA) Core Dataset",
+  "version": "2026/27",
+  "description": "The National Paediatric Diabetes Audit (NPDA) core dataset is the national audit of paediatric diabetes care in England and Wales, covering children and young people (CYP) with diabetes seen by a Paediatric Diabetes Unit (PDU). The 2026/27 revised dataset captures patient demographics and diagnosis details, routine clinical measurements (height, weight, HbA1c), treatment regime and technology use, the seven annual review health checks (BP, foot, retinal, urinary ACR, cholesterol, thyroid, coeliac), psychological screening, dietetics review and diabetes-related hospital admissions. Items are drawn primarily from NICE NG18 (diabetes in children and young people), NG19 (diabetic foot problems) and NG20 (coeliac disease), with additional items reflecting Best Practice Tariff (BPT) requirements.",
+  "grain": "one row per patient visit/appointment",
+  "source": {
+    "spec_document": "NPDA Dataset 2026 (RCPCH), revised dataset effective 1st April 2026"
+  },
+  "sections": [
+    {
+      "id": "patient-details",
+      "name": "Patient Details / Information"
+    },
+    {
+      "id": "routine-measurements",
+      "name": "Routine Measurements"
+    },
+    {
+      "id": "treatment-monitoring",
+      "name": "Treatment and Monitoring"
+    },
+    {
+      "id": "health-checks",
+      "name": "Annual Review - Health Checks"
+    },
+    {
+      "id": "psychology",
+      "name": "Annual Review - Psychology"
+    },
+    {
+      "id": "dietetics",
+      "name": "Annual Review - Dietetics"
+    },
+    {
+      "id": "admissions",
+      "name": "Hospital Admissions / Inpatient Entry"
+    }
+  ],
+  "fields": [
+    {
+      "id": "patient-details/nhs_number",
+      "number": 1,
+      "name": "NHS Number",
+      "type": "text",
+      "section": "patient-details",
+      "cell": "A",
+      "format": "9999999999",
+      "notes": "10 digit numeric. Unique identifier necessary for linkage analysis with other databases such as Hospital Episode Statistics (HES) for England and the Patient Episode Database for Wales (PEDW)."
+    },
+    {
+      "id": "patient-details/date_of_birth",
+      "number": 2,
+      "name": "Date of Birth",
+      "type": "date",
+      "section": "patient-details",
+      "cell": "B",
+      "format": "DD/MM/YYYY",
+      "notes": "Full D.O.B. is required to calculate accurate decimal age for each patient and for linkage with other databases. Allows interpretation of height, weight, calculated BMI and BP since these are age- and sex-specific."
+    },
+    {
+      "id": "patient-details/postcode",
+      "number": 3,
+      "name": "Postcode of usual address",
+      "type": "text",
+      "section": "patient-details",
+      "cell": "C",
+      "notes": "The patient's full postcode in upper case with a space in the correct place (e.g. 'E13 0RJ'). Allows analysis of the effect of deprivation on outcome measures and analysis of population statistics."
+    },
+    {
+      "id": "patient-details/sex_assigned_at_birth",
+      "number": 4,
+      "name": "Sex assigned at birth",
+      "type": "category",
+      "section": "patient-details",
+      "cell": "D",
+      "permitted_values": {
+        "1": "Male",
+        "2": "Female",
+        "3": "Not specified",
+        "99": "Unknown"
+      },
+      "notes": "Sex assigned at birth. 'Not specified' means indeterminate (the patient is unable to be classified as either male or female). 'Unknown' means the sex has not been recorded. Allows analysis of the effect of sex on outcomes and for interpretation of height, weight, BMI and BP."
+    },
+    {
+      "id": "patient-details/ethnic_category",
+      "number": 5,
+      "name": "Ethnic Category",
+      "type": "category",
+      "section": "patient-details",
+      "cell": "E",
+      "permitted_values": {
+        "A": "White - British",
+        "B": "White - Irish",
+        "C": "White - Any other White background",
+        "D": "Mixed - White and Black Caribbean",
+        "E": "Mixed - White and Black African",
+        "F": "Mixed - White and Asian",
+        "G": "Mixed - Any other Mixed background",
+        "H": "Asian - Indian",
+        "J": "Asian - Pakistani",
+        "K": "Asian - Bangladeshi",
+        "L": "Asian - Any other Asian background",
+        "M": "Black - Caribbean",
+        "N": "Black - African",
+        "P": "Black - Any other Black background",
+        "R": "Chinese",
+        "S": "Other - Any other ethnic group",
+        "Z": "Not stated",
+        "99": "Not Known"
+      },
+      "notes": "Ethnicity should be self-reported by the family. Per DSCN 11/2008, 'Z = Not stated' means the person was asked and declined, while '99 = Not Known' should be used where the patient was not asked or could not be asked (e.g. unconscious). Necessary to examine the influence of ethnic origin on outcomes."
+    },
+    {
+      "id": "patient-details/adhd_asd_diagnosis",
+      "number": 6,
+      "name": "Has the patient had a diagnosis of Attention Deficit Hyperactivity Disorder (ADHD) or Autism Spectrum Disorder (ASD)?",
+      "type": "category",
+      "section": "patient-details",
+      "cell": "F",
+      "permitted_values": {
+        "1": "Yes, ADHD",
+        "2": "Yes, ASD",
+        "3": "Yes, both ADHD and ASD",
+        "4": "No, neither",
+        "99": "Unknown"
+      },
+      "notes": "Only include diagnoses confirmed by a healthcare professional qualified to make such a diagnosis. To examine the relationship between the presence of ADHD and/or ASD on care and outcomes."
+    },
+    {
+      "id": "patient-details/learning_disability",
+      "number": 7,
+      "name": "Does the patient have a diagnosis of a learning disability?",
+      "type": "category",
+      "section": "patient-details",
+      "cell": "G",
+      "permitted_values": {
+        "1": "Yes",
+        "2": "No",
+        "99": "Unknown"
+      },
+      "notes": "Refers to a significantly reduced ability to understand new or complex information and to learn new skills (impaired intelligence), with a reduced ability to cope independently (impaired social functioning), which started before adulthood (DHSC, 2001). Includes intellectual disability, learning disabilities and global developmental delay. A learning disability is different to a learning difficulty (e.g. dyslexia)."
+    },
+    {
+      "id": "patient-details/diabetes_type",
+      "number": 8,
+      "name": "Diabetes Type",
+      "type": "category",
+      "section": "patient-details",
+      "cell": "H",
+      "permitted_values": {
+        "1": "Type 1 Diabetes Mellitus",
+        "2": "Type 2 Diabetes Mellitus",
+        "3": "Cystic Fibrosis Related Diabetes",
+        "4": "MODY (monogenic forms of diabetes)",
+        "5": "Other specified Diabetes Mellitus",
+        "99": "Unknown/unspecified"
+      },
+      "notes": "Use category 5 where there is a recognised cause of diabetes (e.g. post organ transplantation, steroid-induced, post pancreatitis/pancreatectomy) or related to a syndrome (e.g. Prader-Willi). Use 99 when the patient has diabetes but the cause is unknown. Do not include patients with preclinical type 1 diabetes (stages 1 and 2)."
+    },
+    {
+      "id": "patient-details/diabetes_diagnosis_date",
+      "number": 9,
+      "name": "Date of Diabetes Diagnosis",
+      "type": "date",
+      "section": "patient-details",
+      "cell": "I",
+      "format": "DD/MM/YYYY",
+      "notes": "If the patient was diagnosed elsewhere and the exact date cannot be ascertained, insert the first day in the month of diagnosis and year (e.g. diagnosed in March 2014 → 01/03/2014). Accurate date is required to relate outcomes with duration of diabetes."
+    },
+    {
+      "id": "patient-details/leaving_service_date",
+      "number": 10,
+      "name": "Date of leaving service",
+      "type": "date",
+      "section": "patient-details",
+      "cell": "J",
+      "format": "DD/MM/YYYY",
+      "notes": "Enter date if patient left the service during the audit year, otherwise leave blank."
+    },
+    {
+      "id": "patient-details/leaving_service_reason",
+      "number": 11,
+      "name": "Reason for leaving service",
+      "type": "category",
+      "section": "patient-details",
+      "cell": "K",
+      "permitted_values": {
+        "1": "Transitioned to adult diabetes service",
+        "2": "Moved out of area",
+        "3": "Other"
+      },
+      "notes": "Enter reason for leaving if patient has left your service during the audit year."
+    },
+    {
+      "id": "patient-details/death_date",
+      "number": 12,
+      "name": "Death Date",
+      "type": "date",
+      "section": "patient-details",
+      "cell": "L",
+      "format": "DD/MM/YYYY",
+      "notes": "Mandatory if patient dies from any cause in audit year. Important to collect to establish mortality rates in children and young people with diabetes."
+    },
+    {
+      "id": "patient-details/gp_practice_code",
+      "number": 13,
+      "name": "GP Practice Code",
+      "type": "text",
+      "section": "patient-details",
+      "cell": "M",
+      "format": "X99999",
+      "notes": "Format X99999 where X can be A-H, J-N or P. Necessary to produce an atlas of variation for outcomes for GP practices across England and Wales and for reporting at ICB level in England and Health Board level in Wales."
+    },
+    {
+      "id": "patient-details/pdu_number",
+      "number": 14,
+      "name": "PDU Number",
+      "type": "text",
+      "section": "patient-details",
+      "cell": "N",
+      "format": "000",
+      "notes": "3-digit numeric organisation code used on the NPDA registration form (previously PZ XXX) and on the NPDA login. Reference list available on the NPDA website under 'NPDA PZ numbers list'."
+    },
+    {
+      "id": "patient-details/visit_date",
+      "number": 15,
+      "name": "Visit/Appointment Date",
+      "type": "date",
+      "section": "patient-details",
+      "cell": "O",
+      "format": "DD/MM/YYYY",
+      "notes": "Defines a row of data by a visit date. N.B. the date of any care process or outcome measure within a row may not always be identical to the visit date."
+    },
+    {
+      "id": "routine-measurements/patient_height_cm",
+      "number": 16,
+      "name": "Patient Height (cm)",
+      "type": "number",
+      "section": "routine-measurements",
+      "cell": "P",
+      "unit": "cm",
+      "format": "999.9",
+      "notes": "At least one height/weight measurement should be recorded during the audit year. BMI will be calculated centrally. [NG18: 1.2.46 / 1.3.21] At each clinic visit measure height and weight and plot on an appropriate growth chart."
+    },
+    {
+      "id": "routine-measurements/patient_weight_kg",
+      "number": 17,
+      "name": "Patient Weight (kg)",
+      "type": "number",
+      "section": "routine-measurements",
+      "cell": "Q",
+      "unit": "kg",
+      "format": "999.9",
+      "notes": "At least one height/weight measurement should be recorded during the audit year. Combined observation date for height and weight. If only height or weight measured still enter date."
+    },
+    {
+      "id": "routine-measurements/height_weight_date",
+      "number": 18,
+      "name": "Observation Date (Height and weight)",
+      "type": "date",
+      "section": "routine-measurements",
+      "cell": "R",
+      "format": "DD/MM/YYYY",
+      "notes": "Combined observation date for height and weight. If only height or weight measured still enter date."
+    },
+    {
+      "id": "routine-measurements/hba1c_value",
+      "number": 19,
+      "name": "HbA1c Value",
+      "type": "number",
+      "section": "routine-measurements",
+      "cell": "S",
+      "unit": "mmol/mol",
+      "format": "999.9",
+      "notes": "Collect and submit ALL measurements with dates throughout the audit cycle, one row per measurement. Values between 3.98 and <20 will be treated as %; values between 20 and 195 will be treated as mmol/mol. Date performed (within audit year) is mandatory if value provided. [NG18: 1.2.80 / 1.3.35] Measure HbA1c every 3-4 months."
+    },
+    {
+      "id": "routine-measurements/hba1c_date",
+      "number": 20,
+      "name": "Observation Date: HbA1c Value",
+      "type": "date",
+      "section": "routine-measurements",
+      "cell": "T",
+      "format": "DD/MM/YYYY",
+      "notes": "Mandatory if HbA1c value provided. Must fall within the audit year."
+    },
+    {
+      "id": "treatment-monitoring/insulin_regime",
+      "number": 21,
+      "name": "Insulin regime at time of visit",
+      "type": "category",
+      "section": "treatment-monitoring",
+      "cell": "U",
+      "permitted_values": {
+        "1": "No insulin",
+        "2": "One - three injections/day",
+        "3": "Four or more injections/day",
+        "4": "Insulin pump (standalone)",
+        "5": "Hybrid closed loop",
+        "99": "Unknown"
+      },
+      "notes": "Answered for all children and young people for all types of diabetes. Important to relate intensification of insulin regime and delivery method to outcomes. Use of insulin as a treatment modality is no longer confined to just Type 1 diabetes."
+    },
+    {
+      "id": "treatment-monitoring/non_insulin_medication",
+      "number": 22,
+      "name": "Other (non-insulin) blood glucose lowering medication at time of visit",
+      "type": "category",
+      "section": "treatment-monitoring",
+      "cell": "V",
+      "permitted_values": {
+        "1": "No medication",
+        "2": "Metformin only",
+        "3": "GLP-1 agonists",
+        "4": "SGLT2 inhibitors",
+        "5": "Other",
+        "99": "Unknown"
+      },
+      "notes": "Usually relates to children and young people with type 2 diabetes. GLP-1 agonists include liraglutide, dulaglutide, semaglutide, tirzepatide, exenatide, lixisenatide. SGLT2 inhibitors include empagliflozin, dapagliflozin, canagliflozin, ertugliflozin. [NG18: 1.3.24, 1.3.26]"
+    },
+    {
+      "id": "treatment-monitoring/lifestyle_modification_recommended",
+      "number": 23,
+      "name": "Has lifestyle and dietary modification been recommended to reduce blood glucose levels?",
+      "type": "category",
+      "section": "treatment-monitoring",
+      "cell": "W",
+      "permitted_values": {
+        "1": "Yes",
+        "2": "No",
+        "99": "Unknown"
+      },
+      "notes": "Usually relates to children and young people with Type 2 and other forms of diabetes. Does NOT refer to dietary advice related to carbohydrate counting and insulin dose adjustment. [NG18: 1.3.24]"
+    },
+    {
+      "id": "treatment-monitoring/cgm_in_use",
+      "number": 24,
+      "name": "Was the patient using a continuous glucose monitor (CGM) at time of visit?",
+      "type": "category",
+      "section": "treatment-monitoring",
+      "cell": "X",
+      "permitted_values": {
+        "1": "Yes",
+        "2": "No",
+        "99": "Unknown"
+      },
+      "notes": "Answered for all children and young people for all types of diabetes. Includes all types of CGM which allow real time functionality. [NG18: 1.2.60 / 1.2.61]"
+    },
+    {
+      "id": "treatment-monitoring/blood_ketone_testing",
+      "number": 25,
+      "name": "Was the patient using (or trained to use) blood ketone testing equipment at time of visit?",
+      "type": "category",
+      "section": "treatment-monitoring",
+      "cell": "Y",
+      "permitted_values": {
+        "1": "Yes",
+        "2": "No",
+        "99": "Unknown"
+      },
+      "notes": "Data can be entered if collected at a video/telephone appointment. [NG18: 1.2.83] Offer children and young people with type 1 diabetes blood ketone testing strips and a meter."
+    },
+    {
+      "id": "treatment-monitoring/immunotherapy_received",
+      "number": 26,
+      "name": "Did the patient receive immunotherapy prior to or after the diagnosis of stage 3 Type 1 diabetes?",
+      "type": "category",
+      "section": "treatment-monitoring",
+      "cell": "Z",
+      "permitted_values": {
+        "1": "Yes",
+        "2": "No",
+        "99": "Not known"
+      },
+      "notes": "Complete for all newly diagnosed patients with Type 1 diabetes. Answer 'Yes' if immunotherapy was provided before or shortly after stage 3 diagnosis, including as part of a trial or early adoption scheme. If part of a double-blind trial and the team is unaware whether drug or placebo was received, select 99 = Not known; updatable on unblinding. [GID-TA10981] NICE appraisal of teplizumab."
+    },
+    {
+      "id": "treatment-monitoring/immunotherapy_start_date",
+      "number": 27,
+      "name": "Date immunotherapy started",
+      "type": "date",
+      "section": "treatment-monitoring",
+      "cell": "AA",
+      "format": "DD/MM/YYYY",
+      "notes": "Mandatory if immunotherapy received."
+    },
+    {
+      "id": "health-checks/systolic_bp",
+      "number": 28,
+      "name": "Systolic Blood Pressure",
+      "type": "number",
+      "section": "health-checks",
+      "cell": "AB",
+      "unit": "mmHg",
+      "format": "999",
+      "notes": "Mandatory for Blood Pressure care process completion. Use methodology from 'Diagnosis, Evaluation, and Treatment of High Blood Pressure in Children and Adolescents' Report if performed. [NG18: 1.2.119 / 1.3.74] Offer annual hypertension monitoring from 12 years (type 1) / from diagnosis (type 2)."
+    },
+    {
+      "id": "health-checks/diastolic_bp",
+      "number": 29,
+      "name": "Diastolic Blood pressure",
+      "type": "number",
+      "section": "health-checks",
+      "cell": "AC",
+      "unit": "mmHg",
+      "format": "999",
+      "notes": "Enter Diastolic BP (if collected). Observation date relates to both systolic AND/OR diastolic measurement."
+    },
+    {
+      "id": "health-checks/bp_observation_date",
+      "number": 30,
+      "name": "Observation Date (Blood Pressure)",
+      "type": "date",
+      "section": "health-checks",
+      "cell": "AD",
+      "format": "DD/MM/YYYY",
+      "notes": "Provide an observation date within the audit period. Date relates to both systolic AND/OR diastolic pressure measurement."
+    },
+    {
+      "id": "health-checks/foot_assessment_date",
+      "number": 31,
+      "name": "Foot Assessment/Examination Date",
+      "type": "date",
+      "section": "health-checks",
+      "cell": "AE",
+      "format": "DD/MM/YYYY",
+      "notes": "Complete only if screen performed. Mandatory care process if 12 years or older. [NG19: 1.3.2] The paediatric care team should assess feet annually for young people aged 12-17 years."
+    },
+    {
+      "id": "health-checks/retinal_screening_date",
+      "number": 32,
+      "name": "Retinal Screening date",
+      "type": "date",
+      "section": "health-checks",
+      "cell": "AF",
+      "format": "DD/MM/YYYY",
+      "notes": "Complete only if screen performed. Mandatory care process if 12 years or older. [NG18: 1.2.120 / 1.3.76] Refer for diabetic retinopathy screening from 12 years."
+    },
+    {
+      "id": "health-checks/retinal_screening_result",
+      "number": 33,
+      "name": "Retinal Screening Result",
+      "type": "category",
+      "section": "health-checks",
+      "cell": "AG",
+      "permitted_values": {
+        "1": "Normal",
+        "2": "Abnormal",
+        "99": "Unknown"
+      },
+      "notes": "Provide a result only if screen performed. Abnormal is defined as any level of retinopathy in either eye."
+    },
+    {
+      "id": "health-checks/urinary_acr",
+      "number": 34,
+      "name": "Urinary Albumin Level (ACR)",
+      "type": "number",
+      "section": "health-checks",
+      "cell": "AH",
+      "unit": "mg/mmol",
+      "format": "9999.9",
+      "notes": "Mandatory for children with type 1 diabetes aged 12 years and above (optional before 12). Mandatory for type 2 from diagnosis. Submit interpretation based on local laboratory reference ranges. [NG18: 1.2.119 / 1.3.74] Annual monitoring for moderately increased albuminuria (ACR 3-30 mg/mmol)."
+    },
+    {
+      "id": "health-checks/acr_observation_date",
+      "number": 35,
+      "name": "Observation Date: Urinary Albumin Level",
+      "type": "date",
+      "section": "health-checks",
+      "cell": "AI",
+      "format": "DD/MM/YYYY",
+      "notes": "Mandatory if ACR level submitted."
+    },
+    {
+      "id": "health-checks/albuminuria_stage",
+      "number": 36,
+      "name": "Albuminuria Stage",
+      "type": "category",
+      "section": "health-checks",
+      "cell": "AJ",
+      "permitted_values": {
+        "1": "Normoalbuminuria",
+        "2": "Microalbuminuria",
+        "3": "Macroalbuminuria",
+        "99": "Unknown"
+      },
+      "notes": "Submit interpretation of the urinary albumin level based on your local laboratory reference ranges."
+    },
+    {
+      "id": "health-checks/total_cholesterol",
+      "number": 37,
+      "name": "Total Cholesterol Level (mmol/l)",
+      "type": "number",
+      "section": "health-checks",
+      "cell": "AK",
+      "unit": "mmol/l",
+      "format": "99.9",
+      "notes": "Mandatory only for children with type 2 diabetes annually from diagnosis. For type 1, entry is optional and is reported as an outcome measure (not an essential care process). Observation date mandatory if value provided. [NG18: 1.3.74] Annual monitoring for dyslipidaemia in type 2 from diagnosis."
+    },
+    {
+      "id": "health-checks/cholesterol_observation_date",
+      "number": 38,
+      "name": "Observation Date: Total Cholesterol level",
+      "type": "date",
+      "section": "health-checks",
+      "cell": "AL",
+      "format": "DD/MM/YYYY",
+      "notes": "Mandatory if cholesterol value provided."
+    },
+    {
+      "id": "health-checks/thyroid_function_date",
+      "number": 39,
+      "name": "Observation Date: Thyroid Function",
+      "type": "date",
+      "section": "health-checks",
+      "cell": "AM",
+      "format": "DD/MM/YYYY",
+      "notes": "For all children with type 1 diabetes annually. Mandatory to provide an observation date if performed. [NG18: 1.2.119] Offer monitoring for thyroid disease at diagnosis and annually thereafter until transfer to adult services."
+    },
+    {
+      "id": "health-checks/thyroid_treatment",
+      "number": 40,
+      "name": "At time of, or following measurement of thyroid function, was the patient prescribed any thyroid treatment?",
+      "type": "category",
+      "section": "health-checks",
+      "cell": "AN",
+      "permitted_values": {
+        "1": "No thyroid therapy",
+        "2": "Thyroxine for hypothyroidism",
+        "3": "Antithyroid medication for hyperthyroidism",
+        "99": "Unknown"
+      },
+      "notes": "Mandatory if thyroid testing performed. Allows prevalence of thyroid autoimmunity associated with Type 1 diabetes to be calculated."
+    },
+    {
+      "id": "health-checks/coeliac_screening_date",
+      "number": 41,
+      "name": "Observation Date: Coeliac Disease Screening",
+      "type": "date",
+      "section": "health-checks",
+      "cell": "AO",
+      "format": "DD/MM/YYYY",
+      "notes": "Date of coeliac disease screening only to be completed if patient was diagnosed within audit year. Process complete if date is within 90 days of diagnosis for patient with Type 1 diabetes. Provide dietary status for all patients at least once per audit year. [NG20: 1.1.1] Offer serological testing for coeliac disease to people with Type 1 diabetes at diagnosis."
+    },
+    {
+      "id": "health-checks/gluten_free_diet",
+      "number": 42,
+      "name": "Has the patient been recommended/prescribed a Gluten-free diet?",
+      "type": "category",
+      "section": "health-checks",
+      "cell": "AP",
+      "permitted_values": {
+        "1": "Yes",
+        "2": "No",
+        "99": "Unknown"
+      },
+      "notes": "A 'yes' response will be interpreted as the patient having a diagnosis of coeliac disease."
+    },
+    {
+      "id": "health-checks/smoking_vaping_status",
+      "number": 43,
+      "name": "Does the patient smoke and/or vape?",
+      "type": "category",
+      "section": "health-checks",
+      "cell": "AQ",
+      "permitted_values": {
+        "1": "Non-smoker and non-vaper",
+        "2": "Current smoker, non-vaper",
+        "3": "Current vaper, non-smoker",
+        "4": "Current smoker and vaper",
+        "99": "Unknown"
+      },
+      "notes": "Smoking plays a significant contribution to micro- and macrovascular disease development. Data can be entered if collected at a video/telephone appointment."
+    },
+    {
+      "id": "health-checks/smoking_cessation_date",
+      "number": 44,
+      "name": "Date of offer of smoking cessation advice (if patient is a current smoker)",
+      "type": "date",
+      "section": "health-checks",
+      "cell": "AR",
+      "format": "DD/MM/YYYY",
+      "notes": "Complete if smoking cessation service referral or advice was offered, even if not completed. [NG18: 1.2.14 / 1.3.12] Offer smoking cessation programmes."
+    },
+    {
+      "id": "health-checks/influenza_immunisation_date",
+      "number": 45,
+      "name": "Date that Influenza immunisation was recommended",
+      "type": "date",
+      "section": "health-checks",
+      "cell": "AS",
+      "format": "DD/MM/YYYY",
+      "notes": "If no date entered during the audit year then an assumption of incomplete care process will be made. [NG18: 1.2.16 / 1.3.14] UK Health Security Agency Green Book recommends annual influenza immunisation from 6 months of age."
+    },
+    {
+      "id": "health-checks/sick_day_rules_date",
+      "number": 46,
+      "name": "Date of provision of advice ('sick-day rules') about managing diabetes during intercurrent illness or episodes of hyperglycaemia",
+      "type": "date",
+      "section": "health-checks",
+      "cell": "AT",
+      "format": "DD/MM/YYYY",
+      "notes": "Applies to patients with Type 1 and Type 2 diabetes. If no date entered during the audit year then an assumption of incomplete care process will be made. [NG18: 1.2.82] Revisit the advice at least annually."
+    },
+    {
+      "id": "psychology/psychological_screening_date",
+      "number": 47,
+      "name": "Date of Annual Psychological Screening Assessment",
+      "type": "date",
+      "section": "psychology",
+      "cell": "AU",
+      "format": "DD/MM/YYYY",
+      "notes": "Enter a date that a formal assessment has taken place for the 'need of additional psychological support' (beyond that routinely provided within clinic). Only include assessments performed by a member of the paediatric diabetes MDT. This is a process measure. [NG18: 1.2.103-1.2.107 / 1.3.64-1.3.68]"
+    },
+    {
+      "id": "psychology/additional_psych_support_needed",
+      "number": 48,
+      "name": "Following annual psychological screening, was the patient assessed as requiring additional psychological support outside of routine care?",
+      "type": "category",
+      "section": "psychology",
+      "cell": "AV",
+      "permitted_values": {
+        "1": "Yes",
+        "2": "No",
+        "99": "Unknown"
+      },
+      "notes": "Complete if annual psychological screening was performed at visit. Outcome measure following the process measure above (item 47). [NHS England BPT] Discussion of mental health and wellbeing should be an integral part of MDT review."
+    },
+    {
+      "id": "psychology/mental_health_appointment",
+      "number": 49,
+      "name": "Was the patient offered an additional appointment with a mental health professional as part of the diabetes MDT?",
+      "type": "category",
+      "section": "psychology",
+      "cell": "AW",
+      "permitted_values": {
+        "1": "Offered and attended",
+        "2": "Offered and did not attend",
+        "3": "Offered and declined",
+        "4": "Not offered",
+        "5": "Mental health support accessed elsewhere",
+        "99": "Unknown"
+      },
+      "notes": "Only include appointments scheduled for this audit year. Mental health professionals as part of the diabetes MDT can include clinical/counselling/neuropsychologists, psychotherapists, CBT therapists and family therapists. Does NOT include school counsellors or educational psychologists."
+    },
+    {
+      "id": "dietetics/carb_counting_date",
+      "number": 50,
+      "name": "Date Level 3 carbohydrate counting education received",
+      "type": "date",
+      "section": "dietetics",
+      "cell": "AX",
+      "format": "DD/MM/YYYY",
+      "notes": "Level 3 carbohydrate counting is defined as carbohydrate counting with adjustment of insulin dosage according to an insulin:carbohydrate ratio. Process complete if date is within 14 days of diagnosis for patient with Type 1 diabetes. [NG18: 1.2.38]"
+    },
+    {
+      "id": "dietetics/dietitian_appointment_offered",
+      "number": 51,
+      "name": "Was the patient offered an additional appointment with a paediatric dietitian during the audit year?",
+      "type": "category",
+      "section": "dietetics",
+      "cell": "AY",
+      "permitted_values": {
+        "1": "Yes",
+        "2": "No",
+        "99": "Not known"
+      },
+      "notes": "Annual requirement. The additional appointment could be 1:1 or group session, via phone call, video call or face-to-face. [NHS England BPT]"
+    },
+    {
+      "id": "dietetics/dietitian_appointment_date",
+      "number": 52,
+      "name": "Date of additional appointment with dietitian",
+      "type": "date",
+      "section": "dietetics",
+      "cell": "AZ",
+      "format": "DD/MM/YYYY",
+      "notes": "Leave blank if appointment not attended."
+    },
+    {
+      "id": "admissions/admission_start_date",
+      "number": 53,
+      "name": "Start date (Hospital Provider Spell)",
+      "type": "date",
+      "section": "admissions",
+      "cell": "BA",
+      "format": "DD/MM/YYYY",
+      "notes": "Enter every diabetes-related hospital admission the patient has had (day case or longer) on separate rows. Includes admissions for stabilisation, DKA, ketosis without acidosis, hypoglycaemia, surgical procedures or other causes."
+    },
+    {
+      "id": "admissions/discharge_date",
+      "number": 54,
+      "name": "Discharge date (Hospital provider spell)",
+      "type": "date",
+      "section": "admissions",
+      "cell": "BB",
+      "format": "DD/MM/YYYY",
+      "notes": "For calculating number of bed days."
+    },
+    {
+      "id": "admissions/admission_reason",
+      "number": 55,
+      "name": "Reason for admission",
+      "type": "category",
+      "section": "admissions",
+      "cell": "BC",
+      "permitted_values": {
+        "1": "Acute DKA",
+        "2": "Acute but not in DKA",
+        "3": "Hypoglycaemia",
+        "4": "Surgical procedure",
+        "5": "Routine admission for stabilisation/education",
+        "6": "Other causes"
+      },
+      "notes": "Record all diabetes related admissions. Option 2 includes vomiting, diarrhoea, ketosis without acidosis, and unable to manage a sick child with diabetes at home. Option 4 includes acute or routine surgical admissions (e.g. endoscopy for coeliac disease confirmation)."
+    },
+    {
+      "id": "admissions/admission_reason_other",
+      "number": 56,
+      "name": "Only complete if OTHER selected: Reason for admission (free text)",
+      "type": "text",
+      "section": "admissions",
+      "cell": "BD",
+      "notes": "Mandatory only if 'Other causes' selected as Reason for admission."
+    },
+    {
+      "id": "admissions/dka_therapies",
+      "number": 57,
+      "name": "Only complete if DKA selected in previous question: During this DKA admission did the patient receive any of the following therapies?",
+      "type": "category",
+      "section": "admissions",
+      "cell": "BE",
+      "permitted_values": {
+        "1": "Hypertonic saline",
+        "2": "Mannitol",
+        "3": "Bicarbonate infusion",
+        "4": "None of the above"
+      },
+      "notes": "Mandatory only if 'DKA' (option 1) selected as Reason for admission. To assess if cerebral oedema in DKA was suspected."
+    },
+    {
+      "id": "admissions/initial_ph",
+      "number": 58,
+      "name": "Initial pH at admission",
+      "type": "number",
+      "section": "admissions",
+      "cell": "BF",
+      "format": "0.00",
+      "notes": "If a blood gas was performed during the admission (in DKA or not), enter the initial (first recorded during this admission) pH. If multiple blood gas tests were performed, please enter the first one. To assess whether an admission meets DKA diagnostic criteria and the level of severity of DKA."
+    },
+    {
+      "id": "admissions/initial_bicarbonate",
+      "number": 59,
+      "name": "Initial Standard bicarbonate at admission (mmol/l)",
+      "type": "number",
+      "section": "admissions",
+      "cell": "BG",
+      "unit": "mmol/l",
+      "format": "00.0",
+      "notes": "If a blood gas was performed during the admission, enter the initial (first recorded) standard bicarbonate. To assess severity of DKA."
+    }
+  ],
+  "inclusion_criteria": [
+    {
+      "id": "diabetes_type",
+      "label": "Diabetes type",
+      "type": "category",
+      "suggested": true,
+      "default": null
+    },
+    {
+      "id": "age_years",
+      "label": "Age at audit year (years)",
+      "type": "number",
+      "suggested": true,
+      "default": null
+    },
+    {
+      "id": "audit_year",
+      "label": "Audit year (visit date range)",
+      "type": "date",
+      "suggested": true,
+      "default": null
+    },
+    {
+      "id": "pdu_number",
+      "label": "Paediatric Diabetes Unit (PDU) number",
+      "type": "text",
+      "suggested": true,
+      "default": null
+    },
+    {
+      "id": "insulin_regime",
+      "label": "Insulin regime",
+      "type": "category",
+      "suggested": true,
+      "default": null
+    }
+  ]
+}

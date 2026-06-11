@@ -1,0 +1,1597 @@
+{
+  "schema_version": "1",
+  "audit": "npda",
+  "databases": [
+    "npda-demographics",
+    "npda-clinical"
+  ],
+  "description": "npda-clinical.clinic_visits is the primary entity (one row per visit), joined to npda-demographics by NHS number. Demographics (A\u2013E, M\u2013N) and registration data (F\u2013H, I\u2013L) come from npda-demographics.patients and registrations. Visit date (O) comes from clinic_visits. Clinical measurements (P\u2013T, AB\u2013AL) are drawn from npda-clinical.measurements, selecting by measurement_type. Annual care-process dates and results (AE\u2013AG, AM\u2013AO, AS) come from npda-clinical.screening_results, selecting by screening_type. Treatment and technology snapshots (U\u2013Z, AA, AN, AP) come from npda-clinical.technology. Psychology and dietetics (AU\u2013AZ) come from npda-clinical.psychology. Hospital-admission details (BA\u2013BG), smoking status (AQ\u2013AR), sick-day rules (AT), and any values missing from structured fields are extracted from free-text clinical_notes and registration_notes.",
+  "identity": {
+    "anchor": "npda-clinical -> clinic_visits.visit_id",
+    "grain": "one row per patient visit or appointment, including outpatient clinic visits, inpatient admissions and transition final visits",
+    "keys": [
+      "npda-clinical -> clinic_visits.visit_id",
+      "npda-clinical -> clinic_visits.patient_ref",
+      "npda-demographics -> patients.nhs_number"
+    ],
+    "patient_grain_rule": "Patient-level attributes are joined via clinic_visits.patient_ref = patients.nhs_number; demographic and registration criteria are applied through an EXISTS or IN subquery over the anchor visit to avoid inflating the visit count."
+  },
+  "regions": [
+    {
+      "id": "ALL",
+      "sheet": "NPDA Core Dataset",
+      "kind": "row_per_entity",
+      "data_range": "A2:BG500",
+      "row_id": {
+        "cell": "A",
+        "header": "NHS Number"
+      }
+    }
+  ],
+  "fields": [
+    {
+      "region": "ALL",
+      "cell": "A",
+      "header": "NHS Number",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> patients.nhs_number"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "B",
+      "header": "Date of Birth",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> patients.date_of_birth"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "C",
+      "header": "Postcode of usual address",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> patients.postcode"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "D",
+      "header": "Sex assigned at birth",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> patients.sex_code"
+      ],
+      "code": {
+        "1": "Male",
+        "2": "Female",
+        "3": "Not specified",
+        "99": "Unknown"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "E",
+      "header": "Ethnic Category",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> patients.ethnicity_code"
+      ],
+      "code": {
+        "A": "White - British",
+        "B": "White - Irish",
+        "C": "White - Any other White background",
+        "D": "Mixed - White and Black Caribbean",
+        "E": "Mixed - White and Black African",
+        "F": "Mixed - White and Asian",
+        "G": "Mixed - Any other Mixed background",
+        "H": "Asian - Indian",
+        "J": "Asian - Pakistani",
+        "K": "Asian - Bangladeshi",
+        "L": "Asian - Any other Asian background",
+        "M": "Black - Caribbean",
+        "N": "Black - African",
+        "P": "Black - Any other Black background",
+        "R": "Chinese",
+        "S": "Other - Any other ethnic group",
+        "Z": "Not stated",
+        "99": "Not Known"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "F",
+      "header": "Has the patient had a diagnosis of Attention Deficit Hyperactivity Disorder (ADHD) or Autism Spectrum Disorder (ASD)?",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> registrations.adhd_asd_status"
+      ],
+      "code": {
+        "ADHD": "Yes, ADHD",
+        "ASD": "Yes, ASD",
+        "both": "Yes, both ADHD and ASD"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "G",
+      "header": "Does the patient have a diagnosis of a learning disability?",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> registrations.learning_disability_flag"
+      ],
+      "code": {
+        "Y": "Yes",
+        "N": "No"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "H",
+      "header": "Diabetes Type",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> registrations.diabetes_type_code"
+      ],
+      "code": {
+        "1": "Type 1 Diabetes Mellitus",
+        "2": "Type 2 Diabetes Mellitus",
+        "3": "Cystic Fibrosis Related Diabetes",
+        "4": "MODY (monogenic forms of diabetes)",
+        "5": "Other specified Diabetes Mellitus",
+        "99": "Unknown/unspecified"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "I",
+      "header": "Date of Diabetes Diagnosis",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> registrations.diagnosis_date"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "J",
+      "header": "Date of leaving service",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> registrations.leaving_date"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "K",
+      "header": "Reason for leaving service",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> registrations.leaving_reason_code"
+      ],
+      "code": {
+        "1": "Transitioned to adult diabetes service",
+        "2": "Moved out of area",
+        "3": "Other"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "L",
+      "header": "Death Date",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> registrations.deceased_date"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "M",
+      "header": "GP Practice Code",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> patients.gp_practice_code"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "N",
+      "header": "PDU Number",
+      "kind": "direct",
+      "sources": [
+        "npda-demographics -> patients.pdu_number"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "O",
+      "header": "Visit/Appointment Date",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> clinic_visits.visit_date"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "P",
+      "header": "Patient Height (cm)",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> measurements.value",
+        "npda-clinical -> measurements.measurement_type",
+        "npda-clinical -> measurements.units"
+      ],
+      "how_to_combine": "Select measurements.value where measurement_type = 'height' and units = 'cm' for the visit; if multiple, use the one recorded on the visit date."
+    },
+    {
+      "region": "ALL",
+      "cell": "Q",
+      "header": "Patient Weight (kg)",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> measurements.value",
+        "npda-clinical -> measurements.measurement_type",
+        "npda-clinical -> measurements.units"
+      ],
+      "how_to_combine": "Select measurements.value where measurement_type = 'weight' and units = 'kg' for the visit."
+    },
+    {
+      "region": "ALL",
+      "cell": "R",
+      "header": "Observation Date (Height and weight)",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> measurements.measurement_date",
+        "npda-clinical -> measurements.measurement_type"
+      ],
+      "how_to_combine": "Use measurements.measurement_date where measurement_type is 'height' or 'weight' for the visit; if both differ, use the date of the weight measurement or the single available date."
+    },
+    {
+      "region": "ALL",
+      "cell": "S",
+      "header": "HbA1c Value",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> measurements.value",
+        "npda-clinical -> measurements.measurement_type",
+        "npda-clinical -> measurements.units",
+        "npda-clinical -> clinical_notes.text"
+      ],
+      "how_to_combine": "Select measurements.value where measurement_type = 'hba1c' for the visit, respecting units ('%' or 'mmol/mol'). If the structured measurement is missing (e.g. capillary cartridge reading or offline machine), extract the value from clinical_notes.text."
+    },
+    {
+      "region": "ALL",
+      "cell": "T",
+      "header": "Observation Date: HbA1c Value",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> measurements.measurement_date",
+        "npda-clinical -> measurements.measurement_type",
+        "npda-clinical -> clinical_notes.note_date"
+      ],
+      "how_to_combine": "Use measurements.measurement_date where measurement_type = 'hba1c'; if the value was extracted from clinical_notes, use the note_date."
+    },
+    {
+      "region": "ALL",
+      "cell": "U",
+      "header": "Insulin regime at time of visit",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> technology.insulin_regimen"
+      ],
+      "code": {
+        "none": "No insulin",
+        "MDI_1_to_3": "One - three injections/day",
+        "MDI_4_or_more": "Four or more injections/day",
+        "insulin_pump": "Insulin pump (standalone)",
+        "hybrid_closed_loop": "Hybrid closed loop"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "V",
+      "header": "Other (non-insulin) blood glucose lowering medication at time of visit",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> technology.non_insulin_med"
+      ],
+      "code": {
+        "none": "No medication",
+        "metformin_only": "Metformin only",
+        "glp1": "GLP-1 agonists",
+        "sglt2": "SGLT2 inhibitors",
+        "metformin_glp1": "Other",
+        "other": "Other"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "W",
+      "header": "Has lifestyle and dietary modification been recommended to reduce blood glucose levels?",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> technology.lifestyle_advice_given"
+      ],
+      "code": {
+        "yes": "Yes"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "X",
+      "header": "Was the patient using a continuous glucose monitor (CGM) at time of visit?",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> technology.cgm_in_use"
+      ],
+      "code": {
+        "yes": "Yes",
+        "no": "No"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "Y",
+      "header": "Was the patient using (or trained to use) blood ketone testing equipment at time of visit?",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> technology.blood_ketone_testing"
+      ],
+      "code": {
+        "yes": "Yes",
+        "no": "No"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "Z",
+      "header": "Did the patient receive immunotherapy prior to or after the diagnosis of stage 3 Type 1 diabetes?",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> technology.immunotherapy_received"
+      ],
+      "code": {
+        "yes": "Yes",
+        "no": "No"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "AA",
+      "header": "Date immunotherapy started",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> technology.immunotherapy_start_date"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AB",
+      "header": "Systolic Blood Pressure",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> measurements.value",
+        "npda-clinical -> measurements.measurement_type",
+        "npda-clinical -> measurements.units"
+      ],
+      "how_to_combine": "Select measurements.value where measurement_type = 'systolic_bp' and units = 'mmHg' for the visit."
+    },
+    {
+      "region": "ALL",
+      "cell": "AC",
+      "header": "Diastolic Blood pressure",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> measurements.value",
+        "npda-clinical -> measurements.measurement_type",
+        "npda-clinical -> measurements.units"
+      ],
+      "how_to_combine": "Select measurements.value where measurement_type = 'diastolic_bp' and units = 'mmHg' for the visit."
+    },
+    {
+      "region": "ALL",
+      "cell": "AD",
+      "header": "Observation Date (Blood Pressure)",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> measurements.measurement_date",
+        "npda-clinical -> measurements.measurement_type"
+      ],
+      "how_to_combine": "Use measurements.measurement_date where measurement_type is 'systolic_bp' or 'diastolic_bp' for the visit."
+    },
+    {
+      "region": "ALL",
+      "cell": "AE",
+      "header": "Foot Assessment/Examination Date",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> screening_results.screening_date",
+        "npda-clinical -> screening_results.screening_type"
+      ],
+      "how_to_combine": "Select screening_results.screening_date where screening_type = 'foot' for the patient in the audit year."
+    },
+    {
+      "region": "ALL",
+      "cell": "AF",
+      "header": "Retinal Screening date",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> screening_results.screening_date",
+        "npda-clinical -> screening_results.screening_type"
+      ],
+      "how_to_combine": "Select screening_results.screening_date where screening_type = 'retinal' for the patient in the audit year."
+    },
+    {
+      "region": "ALL",
+      "cell": "AG",
+      "header": "Retinal Screening Result",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> screening_results.result_code",
+        "npda-clinical -> screening_results.screening_type",
+        "npda-clinical -> screening_results.result_text"
+      ],
+      "how_to_combine": "Select result_code where screening_type = 'retinal'. Map 'normal' to Normal and 'abnormal' to Abnormal. If result_code is blank (e.g. result awaited), derive from result_text or mark as Unknown.",
+      "code": {
+        "normal": "Normal",
+        "abnormal": "Abnormal"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "AH",
+      "header": "Urinary Albumin Level (ACR)",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> measurements.value",
+        "npda-clinical -> measurements.measurement_type",
+        "npda-clinical -> measurements.units"
+      ],
+      "how_to_combine": "Select measurements.value where measurement_type = 'acr' and units = 'mg/mmol' for the visit."
+    },
+    {
+      "region": "ALL",
+      "cell": "AI",
+      "header": "Observation Date: Urinary Albumin Level",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> measurements.measurement_date",
+        "npda-clinical -> measurements.measurement_type"
+      ],
+      "how_to_combine": "Use measurements.measurement_date where measurement_type = 'acr' for the visit."
+    },
+    {
+      "region": "ALL",
+      "cell": "AJ",
+      "header": "Albuminuria Stage",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> measurements.value",
+        "npda-clinical -> measurements.measurement_type",
+        "npda-clinical -> measurements.units",
+        "npda-clinical -> clinical_notes.text"
+      ],
+      "how_to_combine": "Derive the albuminuria stage from the ACR value and local laboratory reference ranges, or extract the stage from clinical_notes.text.",
+      "code": {
+        "1": "Normoalbuminuria",
+        "2": "Microalbuminuria",
+        "3": "Macroalbuminuria",
+        "99": "Unknown"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "AK",
+      "header": "Total Cholesterol Level (mmol/l)",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> measurements.value",
+        "npda-clinical -> measurements.measurement_type",
+        "npda-clinical -> measurements.units"
+      ],
+      "how_to_combine": "Select measurements.value where measurement_type = 'cholesterol' and units = 'mmol/l' for the visit."
+    },
+    {
+      "region": "ALL",
+      "cell": "AL",
+      "header": "Observation Date: Total Cholesterol level",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> measurements.measurement_date",
+        "npda-clinical -> measurements.measurement_type"
+      ],
+      "how_to_combine": "Use measurements.measurement_date where measurement_type = 'cholesterol' for the visit."
+    },
+    {
+      "region": "ALL",
+      "cell": "AM",
+      "header": "Observation Date: Thyroid Function",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> screening_results.screening_date",
+        "npda-clinical -> screening_results.screening_type"
+      ],
+      "how_to_combine": "Select screening_results.screening_date where screening_type = 'thyroid' for the patient in the audit year."
+    },
+    {
+      "region": "ALL",
+      "cell": "AN",
+      "header": "At time of, or following measurement of thyroid function, was the patient prescribed any thyroid treatment?",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> technology.thyroid_treatment"
+      ],
+      "code": {
+        "none": "No thyroid therapy",
+        "levothyroxine": "Thyroxine for hypothyroidism",
+        "antithyroid": "Antithyroid medication for hyperthyroidism"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "AO",
+      "header": "Observation Date: Coeliac Disease Screening",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> screening_results.screening_date",
+        "npda-clinical -> screening_results.screening_type"
+      ],
+      "how_to_combine": "Select screening_results.screening_date where screening_type = 'coeliac' for the patient in the audit year."
+    },
+    {
+      "region": "ALL",
+      "cell": "AP",
+      "header": "Has the patient been recommended/prescribed a Gluten-free diet?",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> screening_results.result_code",
+        "npda-clinical -> screening_results.screening_type",
+        "npda-clinical -> screening_results.result_text",
+        "npda-clinical -> clinical_notes.text"
+      ],
+      "how_to_combine": "Infer from coeliac screening result_code ('positive' indicates coeliac disease and therefore GFD recommendation), coeliac_dietary_status result_code ('no' means no GFD), or free-text notes. Output 'Yes' if a GFD is documented, 'No' if explicitly absent, otherwise 'Unknown'.",
+      "code": {
+        "1": "Yes",
+        "2": "No",
+        "99": "Unknown"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "AQ",
+      "header": "Does the patient smoke and/or vape?",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> clinical_notes.text"
+      ],
+      "how_to_combine": "Extract smoking and/or vaping status from free-text clinic letters and admission summaries.",
+      "code": {
+        "1": "Non-smoker and non-vaper",
+        "2": "Current smoker, non-vaper",
+        "3": "Current vaper, non-smoker",
+        "4": "Current smoker and vaper",
+        "99": "Unknown"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "AR",
+      "header": "Date of offer of smoking cessation advice (if patient is a current smoker)",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> clinical_notes.text",
+        "npda-clinical -> clinical_notes.note_date"
+      ],
+      "how_to_combine": "Extract the date smoking cessation advice was offered from free-text clinical notes; use the note_date if the exact advice date is not specified."
+    },
+    {
+      "region": "ALL",
+      "cell": "AS",
+      "header": "Date that Influenza immunisation was recommended",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> screening_results.screening_date",
+        "npda-clinical -> screening_results.screening_type"
+      ],
+      "how_to_combine": "Select screening_results.screening_date where screening_type = 'influenza_immunisation' for the patient in the audit year."
+    },
+    {
+      "region": "ALL",
+      "cell": "AT",
+      "header": "Date of provision of advice ('sick-day rules') about managing diabetes during intercurrent illness or episodes of hyperglycaemia",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> clinical_notes.text",
+        "npda-clinical -> clinical_notes.note_date"
+      ],
+      "how_to_combine": "Extract the date sick-day rules advice was provided from free-text clinical notes; use note_date if the specific advice date is not recorded."
+    },
+    {
+      "region": "ALL",
+      "cell": "AU",
+      "header": "Date of Annual Psychological Screening Assessment",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> psychology.screening_date"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AV",
+      "header": "Following annual psychological screening, was the patient assessed as requiring additional psychological support outside of routine care?",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> psychology.additional_support_needed"
+      ],
+      "code": {
+        "yes": "Yes",
+        "no": "No"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "AW",
+      "header": "Was the patient offered an additional appointment with a mental health professional as part of the diabetes MDT?",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> psychology.mental_health_appointment_status"
+      ],
+      "code": {
+        "offered_attended": "Offered and attended",
+        "offered_did_not_attend": "Offered and did not attend",
+        "offered_declined": "Offered and declined",
+        "not_offered": "Not offered",
+        "accessed_elsewhere": "Mental health support accessed elsewhere"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "AX",
+      "header": "Date Level 3 carbohydrate counting education received",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> psychology.carb_counting_education_date"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "AY",
+      "header": "Was the patient offered an additional appointment with a paediatric dietitian during the audit year?",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> psychology.dietitian_appointment_offered"
+      ],
+      "code": {
+        "yes": "Yes",
+        "no": "No"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "AZ",
+      "header": "Date of additional appointment with dietitian",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> psychology.dietitian_appointment_date"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "BA",
+      "header": "Start date (Hospital Provider Spell)",
+      "kind": "direct",
+      "sources": [
+        "npda-clinical -> clinic_visits.visit_date"
+      ]
+    },
+    {
+      "region": "ALL",
+      "cell": "BB",
+      "header": "Discharge date (Hospital provider spell)",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> clinical_notes.text",
+        "npda-clinical -> clinical_notes.note_date"
+      ],
+      "how_to_combine": "Extract the discharge date from free-text admission letters and summaries; use note_date as a fallback if the discharge date is not explicitly stated."
+    },
+    {
+      "region": "ALL",
+      "cell": "BC",
+      "header": "Reason for admission",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> clinical_notes.text"
+      ],
+      "how_to_combine": "Categorise the reason for admission documented in free-text admission notes into the NPDA categories.",
+      "code": {
+        "1": "Acute DKA",
+        "2": "Acute but not in DKA",
+        "3": "Hypoglycaemia",
+        "4": "Surgical procedure",
+        "5": "Routine admission for stabilisation/education",
+        "6": "Other causes"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "BD",
+      "header": "Only complete if OTHER selected: Reason for admission (free text)",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> clinical_notes.text"
+      ],
+      "how_to_combine": "Extract the free-text reason for admission from clinical notes when the categorised reason is 'Other causes'."
+    },
+    {
+      "region": "ALL",
+      "cell": "BE",
+      "header": "Only complete if DKA selected in previous question: During this DKA admission did the patient receive any of the following therapies?",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> clinical_notes.text"
+      ],
+      "how_to_combine": "Identify whether hypertonic saline, mannitol, bicarbonate infusion, or none were administered during the DKA admission from free-text admission summaries.",
+      "code": {
+        "1": "Hypertonic saline",
+        "2": "Mannitol",
+        "3": "Bicarbonate infusion",
+        "4": "None of the above"
+      }
+    },
+    {
+      "region": "ALL",
+      "cell": "BF",
+      "header": "Initial pH at admission",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> clinical_notes.text"
+      ],
+      "how_to_combine": "Extract the initial (first recorded) pH value from blood gas results documented in free-text admission letters and summaries."
+    },
+    {
+      "region": "ALL",
+      "cell": "BG",
+      "header": "Initial Standard bicarbonate at admission (mmol/l)",
+      "kind": "interpret",
+      "sources": [
+        "npda-clinical -> clinical_notes.text"
+      ],
+      "how_to_combine": "Extract the initial standard bicarbonate value (mmol/l) from blood gas results documented in free-text admission letters and summaries."
+    }
+  ],
+  "criteria_bindings": [
+    {
+      "criterion_id": "diabetes_type",
+      "label": "Diabetes type",
+      "source": "npda-demographics -> registrations.diabetes_type_code",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> patients.nhs_number; patients.patient_id -> registrations.patient_id",
+      "grain_rule": "the patient has >=1 matching registration row with the specified diabetes type code",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "age_years",
+      "label": "Age at audit year (years)",
+      "source": "npda-demographics -> patients.date_of_birth",
+      "type": "date",
+      "join_path": "clinic_visits.patient_ref -> patients.nhs_number",
+      "grain_rule": "the patient has >=1 matching demographics row with date of birth yielding the target age range at the audit year",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "audit_year",
+      "label": "Audit year (visit date range)",
+      "source": "npda-clinical -> clinic_visits.visit_date",
+      "type": "date",
+      "join_path": "direct column on the anchor row (no join)",
+      "grain_rule": "the visit date falls within the specified audit year date range",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "pdu_number",
+      "label": "Paediatric Diabetes Unit (PDU) number",
+      "source": "npda-demographics -> patients.pdu_number",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> patients.nhs_number",
+      "grain_rule": "the patient has >=1 matching demographics row with the specified PDU number",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "insulin_regime",
+      "label": "Insulin regime",
+      "source": "npda-clinical -> technology.insulin_regimen",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
+      "grain_rule": "the patient has >=1 technology snapshot row with the specified insulin regimen",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "sex_assigned_at_birth",
+      "label": "Sex assigned at birth",
+      "source": "npda-demographics -> patients.sex_code",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> patients.nhs_number",
+      "grain_rule": "the patient has >=1 matching demographics row with the specified sex code",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "ethnic_category",
+      "label": "Ethnic Category",
+      "source": "npda-demographics -> patients.ethnicity_code",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> patients.nhs_number",
+      "grain_rule": "the patient has >=1 matching demographics row with the specified ethnicity code",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "patient_postcode",
+      "label": "Postcode of usual address",
+      "source": "npda-demographics -> patients.postcode",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> patients.nhs_number",
+      "grain_rule": "the patient has >=1 matching demographics row with the specified postcode",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "gp_practice_code",
+      "label": "GP Practice Code",
+      "source": "npda-demographics -> patients.gp_practice_code",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> patients.nhs_number",
+      "grain_rule": "the patient has >=1 matching demographics row with the specified GP practice code",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "adhd_asd_diagnosis",
+      "label": "ADHD or ASD diagnosis",
+      "source": "npda-demographics -> registrations.adhd_asd_status",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> patients.nhs_number; patients.patient_id -> registrations.patient_id",
+      "grain_rule": "the patient has >=1 matching registration row with the specified ADHD/ASD status",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "learning_disability",
+      "label": "Learning disability",
+      "source": "npda-demographics -> registrations.learning_disability_flag",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> patients.nhs_number; patients.patient_id -> registrations.patient_id",
+      "grain_rule": "the patient has >=1 matching registration row with the specified learning disability flag",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "diabetes_diagnosis_date",
+      "label": "Date of Diabetes Diagnosis",
+      "source": "npda-demographics -> registrations.diagnosis_date",
+      "type": "date",
+      "join_path": "clinic_visits.patient_ref -> patients.nhs_number; patients.patient_id -> registrations.patient_id",
+      "grain_rule": "the patient has >=1 matching registration row with diagnosis date in range",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "leaving_service_date",
+      "label": "Date of leaving service",
+      "source": "npda-demographics -> registrations.leaving_date",
+      "type": "date",
+      "join_path": "clinic_visits.patient_ref -> patients.nhs_number; patients.patient_id -> registrations.patient_id",
+      "grain_rule": "the patient has >=1 matching registration row with leaving date in range",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "leaving_service_reason",
+      "label": "Reason for leaving service",
+      "source": "npda-demographics -> registrations.leaving_reason_code",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> patients.nhs_number; patients.patient_id -> registrations.patient_id",
+      "grain_rule": "the patient has >=1 matching registration row with the specified leaving reason code",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "visit_type",
+      "label": "Visit type",
+      "source": "npda-clinical -> clinic_visits.visit_type",
+      "type": "category",
+      "join_path": "direct column on the anchor row (no join)",
+      "grain_rule": "the anchor visit row has the specified visit type",
+      "from": "db_column"
+    },
+    {
+      "criterion_id": "visit_clinician",
+      "label": "Clinician",
+      "source": "npda-clinical -> clinic_visits.clinician",
+      "type": "category",
+      "join_path": "direct column on the anchor row (no join)",
+      "grain_rule": "the anchor visit row has the specified clinician",
+      "from": "db_column"
+    },
+    {
+      "criterion_id": "hba1c_value",
+      "label": "HbA1c Value",
+      "source": "npda-clinical -> measurements.value",
+      "type": "number",
+      "join_path": "clinic_visits.visit_id -> measurements.visit_ref",
+      "grain_rule": "the visit has >=1 measurement row with measurement_type = 'hba1c' and value in range",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "systolic_bp",
+      "label": "Systolic Blood Pressure",
+      "source": "npda-clinical -> measurements.value",
+      "type": "number",
+      "join_path": "clinic_visits.visit_id -> measurements.visit_ref",
+      "grain_rule": "the visit has >=1 measurement row with measurement_type = 'systolic_bp' and value in range",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "urinary_acr",
+      "label": "Urinary Albumin Level (ACR)",
+      "source": "npda-clinical -> measurements.value",
+      "type": "number",
+      "join_path": "clinic_visits.visit_id -> measurements.visit_ref",
+      "grain_rule": "the visit has >=1 measurement row with measurement_type = 'acr' and value in range",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "total_cholesterol",
+      "label": "Total Cholesterol Level",
+      "source": "npda-clinical -> measurements.value",
+      "type": "number",
+      "join_path": "clinic_visits.visit_id -> measurements.visit_ref",
+      "grain_rule": "the visit has >=1 measurement row with measurement_type = 'cholesterol' and value in range",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "cgm_in_use",
+      "label": "Continuous glucose monitor in use",
+      "source": "npda-clinical -> technology.cgm_in_use",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
+      "grain_rule": "the patient has >=1 technology snapshot row with the specified CGM use status",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "blood_ketone_testing",
+      "label": "Blood ketone testing",
+      "source": "npda-clinical -> technology.blood_ketone_testing",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
+      "grain_rule": "the patient has >=1 technology snapshot row with the specified blood ketone testing status",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "non_insulin_medication",
+      "label": "Non-insulin blood glucose lowering medication",
+      "source": "npda-clinical -> technology.non_insulin_med",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
+      "grain_rule": "the patient has >=1 technology snapshot row with the specified non-insulin medication",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "immunotherapy_received",
+      "label": "Immunotherapy received",
+      "source": "npda-clinical -> technology.immunotherapy_received",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
+      "grain_rule": "the patient has >=1 technology snapshot row with the specified immunotherapy status",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "thyroid_treatment",
+      "label": "Thyroid treatment",
+      "source": "npda-clinical -> technology.thyroid_treatment",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
+      "grain_rule": "the patient has >=1 technology snapshot row with the specified thyroid treatment",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "lifestyle_modification_recommended",
+      "label": "Lifestyle and dietary modification recommended",
+      "source": "npda-clinical -> technology.lifestyle_advice_given",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
+      "grain_rule": "the patient has >=1 technology snapshot row indicating lifestyle advice was given",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "psychological_screening_date",
+      "label": "Date of Annual Psychological Screening Assessment",
+      "source": "npda-clinical -> psychology.screening_date",
+      "type": "date",
+      "join_path": "clinic_visits.patient_ref -> psychology.patient_ref",
+      "grain_rule": "the patient has >=1 psychology row with screening date in range",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "additional_psych_support_needed",
+      "label": "Additional psychological support needed",
+      "source": "npda-clinical -> psychology.additional_support_needed",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> psychology.patient_ref",
+      "grain_rule": "the patient has >=1 psychology row with the specified additional support status",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "mental_health_appointment",
+      "label": "Mental health appointment status",
+      "source": "npda-clinical -> psychology.mental_health_appointment_status",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> psychology.patient_ref",
+      "grain_rule": "the patient has >=1 psychology row with the specified mental health appointment status",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "carb_counting_date",
+      "label": "Date Level 3 carbohydrate counting education received",
+      "source": "npda-clinical -> psychology.carb_counting_education_date",
+      "type": "date",
+      "join_path": "clinic_visits.patient_ref -> psychology.patient_ref",
+      "grain_rule": "the patient has >=1 psychology row with carbohydrate counting education date in range",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "dietitian_appointment_offered",
+      "label": "Dietitian appointment offered",
+      "source": "npda-clinical -> psychology.dietitian_appointment_offered",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> psychology.patient_ref",
+      "grain_rule": "the patient has >=1 psychology row indicating a dietitian appointment was offered",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "retinal_screening_date",
+      "label": "Retinal Screening date",
+      "source": "npda-clinical -> screening_results.screening_date",
+      "type": "date",
+      "join_path": "clinic_visits.patient_ref -> screening_results.patient_ref",
+      "grain_rule": "the patient has >=1 screening result row with screening_type = 'retinal' and screening date in range",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "foot_assessment_date",
+      "label": "Foot Assessment/Examination Date",
+      "source": "npda-clinical -> screening_results.screening_date",
+      "type": "date",
+      "join_path": "clinic_visits.patient_ref -> screening_results.patient_ref",
+      "grain_rule": "the patient has >=1 screening result row with screening_type = 'foot' and screening date in range",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "influenza_immunisation_date",
+      "label": "Influenza immunisation date",
+      "source": "npda-clinical -> screening_results.screening_date",
+      "type": "date",
+      "join_path": "clinic_visits.patient_ref -> screening_results.patient_ref",
+      "grain_rule": "the patient has >=1 screening result row with screening_type = 'influenza_immunisation' and screening date in range",
+      "from": "audit_field+db_column"
+    },
+    {
+      "criterion_id": "retinal_screening_result",
+      "label": "Retinal Screening Result",
+      "source": "npda-clinical -> screening_results.result_code",
+      "type": "category",
+      "join_path": "clinic_visits.patient_ref -> screening_results.patient_ref",
+      "grain_rule": "the patient has >=1 screening result row with screening_type = 'retinal' and result code matching",
+      "from": "audit_field+db_column"
+    }
+  ],
+  "fixed_criteria": [],
+  "not_expressible": [
+    {
+      "criterion_id": "death_date",
+      "label": "Death Date",
+      "source": "npda-demographics -> registrations.deceased_date",
+      "reason": "column is marked not filterable (reference)"
+    },
+    {
+      "criterion_id": "admission_reason",
+      "label": "Reason for admission",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes; no structured admission reason column"
+    },
+    {
+      "criterion_id": "initial_ph",
+      "label": "Initial pH at admission",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes; no structured column"
+    },
+    {
+      "criterion_id": "initial_bicarbonate",
+      "label": "Initial Standard bicarbonate at admission",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes; no structured column"
+    },
+    {
+      "criterion_id": "dka_therapies",
+      "label": "DKA therapies received",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes; no structured column"
+    },
+    {
+      "criterion_id": "smoking_vaping_status",
+      "label": "Smoking and/or vaping status",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes; no structured column"
+    },
+    {
+      "criterion_id": "smoking_cessation_date",
+      "label": "Date of offer of smoking cessation advice",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes; no structured column"
+    },
+    {
+      "criterion_id": "sick_day_rules_date",
+      "label": "Date of provision of sick-day rules advice",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes; no structured column"
+    },
+    {
+      "criterion_id": "discharge_date",
+      "label": "Discharge date (Hospital provider spell)",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes; no structured discharge date column"
+    },
+    {
+      "criterion_id": "albuminuria_stage",
+      "label": "Albuminuria Stage",
+      "source": "npda-clinical -> measurements.value",
+      "reason": "no structured column for albuminuria stage; only numeric ACR values exist"
+    },
+    {
+      "criterion_id": "gluten_free_diet",
+      "label": "Gluten-free diet recommended/prescribed",
+      "source": "npda-clinical -> screening_results.result_code",
+      "reason": "structured column captures 'no' only; 'yes' is not coded separately"
+    }
+  ],
+  "executable": {
+    "schema_version": "2",
+    "audit_id": "npda",
+    "workbook": "workbook.xlsx",
+    "identity_keys": [
+      "visit_id"
+    ],
+    "cohort": {
+      "database": "npda-clinical",
+      "from": "clinic_visits b JOIN technology t ON b.patient_ref = t.patient_ref JOIN measurements m ON b.visit_id = m.visit_ref JOIN psychology p ON b.patient_ref = p.patient_ref JOIN screening_results s ON b.patient_ref = s.patient_ref",
+      "identity_select": "b.visit_id AS visit_id",
+      "where": []
+    },
+    "regions": [
+      {
+        "id": "ALL-direct",
+        "sheet": "NPDA Core Dataset",
+        "kind": "direct",
+        "queries": [
+          {
+            "database": "npda-demographics",
+            "sql": "SELECT p.nhs_number, p.date_of_birth, p.postcode, p.sex_code, p.ethnicity_code, p.gp_practice_code, p.pdu_number FROM patients p WHERE p.nhs_number IN (:cohort)",
+            "key_column": "nhs_number"
+          },
+          {
+            "database": "npda-clinical",
+            "sql": "SELECT c.visit_id, c.visit_date FROM clinic_visits c WHERE c.visit_id IN (:cohort)"
+          },
+          {
+            "database": "npda-clinical",
+            "sql": "SELECT t.visit_id, t.insulin_regimen, t.non_insulin_med, t.lifestyle_advice_given, t.cgm_in_use, t.blood_ketone_testing, t.immunotherapy_received, t.immunotherapy_start_date, t.thyroid_treatment FROM technology t WHERE t.visit_id IN (:cohort)"
+          },
+          {
+            "database": "npda-clinical",
+            "sql": "SELECT p.visit_id, p.screening_date, p.additional_support_needed, p.mental_health_appointment_status, p.carb_counting_education_date, p.dietitian_appointment_offered, p.dietitian_appointment_date FROM psychology p WHERE p.visit_id IN (:cohort)"
+          }
+        ],
+        "row_anchor": "visit_id",
+        "cell_map": [
+          {
+            "field": "nhs_number",
+            "column": "nhs_number",
+            "table": "patients",
+            "cell_template": "{col:A}{row}"
+          },
+          {
+            "field": "date_of_birth",
+            "column": "date_of_birth",
+            "table": "patients",
+            "cell_template": "{col:B}{row}"
+          },
+          {
+            "field": "postcode_of_usual_address",
+            "column": "postcode",
+            "table": "patients",
+            "cell_template": "{col:C}{row}"
+          },
+          {
+            "field": "sex_assigned_at_birth",
+            "column": "sex_code",
+            "table": "patients",
+            "cell_template": "{col:D}{row}",
+            "translate": "sex_code"
+          },
+          {
+            "field": "ethnic_category",
+            "column": "ethnicity_code",
+            "table": "patients",
+            "cell_template": "{col:E}{row}",
+            "translate": "ethnicity_code"
+          },
+          {
+            "field": "gp_practice_code",
+            "column": "gp_practice_code",
+            "table": "patients",
+            "cell_template": "{col:M}{row}"
+          },
+          {
+            "field": "pdu_number",
+            "column": "pdu_number",
+            "table": "patients",
+            "cell_template": "{col:N}{row}"
+          },
+          {
+            "field": "visit_appointment_date",
+            "column": "visit_date",
+            "table": "clinic_visits",
+            "cell_template": "{col:O}{row}"
+          },
+          {
+            "field": "insulin_regime_at_time_of_visit",
+            "column": "insulin_regimen",
+            "table": "technology",
+            "cell_template": "{col:U}{row}",
+            "translate": "insulin_regimen"
+          },
+          {
+            "field": "other_non_insulin_blood_glucose_lowering_medication_at_time_of_visit",
+            "column": "non_insulin_med",
+            "table": "technology",
+            "cell_template": "{col:V}{row}",
+            "translate": "non_insulin_med"
+          },
+          {
+            "field": "has_lifestyle_and_dietary_modification_been_recommended_to_reduce_blood_glucose_levels",
+            "column": "lifestyle_advice_given",
+            "table": "technology",
+            "cell_template": "{col:W}{row}",
+            "translate": "lifestyle_advice_given"
+          },
+          {
+            "field": "was_the_patient_using_a_continuous_glucose_monitor_cgm_at_time_of_visit",
+            "column": "cgm_in_use",
+            "table": "technology",
+            "cell_template": "{col:X}{row}",
+            "translate": "cgm_in_use"
+          },
+          {
+            "field": "was_the_patient_using_or_trained_to_use_blood_ketone_testing_equipment_at_time_of_visit",
+            "column": "blood_ketone_testing",
+            "table": "technology",
+            "cell_template": "{col:Y}{row}",
+            "translate": "blood_ketone_testing"
+          },
+          {
+            "field": "did_the_patient_receive_immunotherapy_prior_to_or_after_the_diagnosis_of_stage_3_type_1_diabetes",
+            "column": "immunotherapy_received",
+            "table": "technology",
+            "cell_template": "{col:Z}{row}",
+            "translate": "immunotherapy_received"
+          },
+          {
+            "field": "date_immunotherapy_started",
+            "column": "immunotherapy_start_date",
+            "table": "technology",
+            "cell_template": "{col:AA}{row}"
+          },
+          {
+            "field": "at_time_of_or_following_measurement_of_thyroid_function_was_the_patient_prescribed_any_thyroid_treatment",
+            "column": "thyroid_treatment",
+            "table": "technology",
+            "cell_template": "{col:AN}{row}",
+            "translate": "thyroid_treatment"
+          },
+          {
+            "field": "date_of_annual_psychological_screening_assessment",
+            "column": "screening_date",
+            "table": "psychology",
+            "cell_template": "{col:AU}{row}"
+          },
+          {
+            "field": "following_annual_psychological_screening_was_the_patient_assessed_as_requiring_additional_psychological_support_outside_of_routine_care",
+            "column": "additional_support_needed",
+            "table": "psychology",
+            "cell_template": "{col:AV}{row}",
+            "translate": "additional_support_needed"
+          },
+          {
+            "field": "was_the_patient_offered_an_additional_appointment_with_a_mental_health_professional_as_part_of_the_diabetes_mdt",
+            "column": "mental_health_appointment_status",
+            "table": "psychology",
+            "cell_template": "{col:AW}{row}",
+            "translate": "mental_health_appointment_status"
+          },
+          {
+            "field": "date_level_3_carbohydrate_counting_education_received",
+            "column": "carb_counting_education_date",
+            "table": "psychology",
+            "cell_template": "{col:AX}{row}"
+          },
+          {
+            "field": "was_the_patient_offered_an_additional_appointment_with_a_paediatric_dietitian_during_the_audit_year",
+            "column": "dietitian_appointment_offered",
+            "table": "psychology",
+            "cell_template": "{col:AY}{row}",
+            "translate": "dietitian_appointment_offered"
+          },
+          {
+            "field": "date_of_additional_appointment_with_dietitian",
+            "column": "dietitian_appointment_date",
+            "table": "psychology",
+            "cell_template": "{col:AZ}{row}"
+          },
+          {
+            "field": "start_date_hospital_provider_spell",
+            "column": "visit_date",
+            "table": "clinic_visits",
+            "cell_template": "{col:BA}{row}"
+          }
+        ]
+      },
+      {
+        "id": "ALL-interpret",
+        "sheet": "NPDA Core Dataset",
+        "kind": "interpret",
+        "queries": [
+          {
+            "database": "npda-clinical",
+            "sql": "SELECT m.visit_id, m.value, m.measurement_type, m.units, m.measurement_date FROM measurements m WHERE m.visit_id IN (:cohort)"
+          },
+          {
+            "database": "npda-clinical",
+            "sql": "SELECT c.visit_id, c.text, c.note_date FROM clinical_notes c WHERE c.visit_id IN (:cohort)"
+          },
+          {
+            "database": "npda-clinical",
+            "sql": "SELECT s.visit_id, s.screening_date, s.screening_type, s.result_code, s.result_text FROM screening_results s WHERE s.visit_id IN (:cohort)"
+          }
+        ],
+        "row_anchor": "visit_id",
+        "cell_map": [
+          {
+            "field": "has_the_patient_had_a_diagnosis_of_attention_deficit_hyperactivity_disorder_adhd_or_autism_spectrum_disorder_asd",
+            "cell_template": "{col:F}{row}"
+          },
+          {
+            "field": "does_the_patient_have_a_diagnosis_of_a_learning_disability",
+            "cell_template": "{col:G}{row}"
+          },
+          {
+            "field": "diabetes_type",
+            "cell_template": "{col:H}{row}"
+          },
+          {
+            "field": "date_of_diabetes_diagnosis",
+            "cell_template": "{col:I}{row}"
+          },
+          {
+            "field": "date_of_leaving_service",
+            "cell_template": "{col:J}{row}"
+          },
+          {
+            "field": "reason_for_leaving_service",
+            "cell_template": "{col:K}{row}"
+          },
+          {
+            "field": "death_date",
+            "cell_template": "{col:L}{row}"
+          },
+          {
+            "field": "patient_height_cm",
+            "cell_template": "{col:P}{row}"
+          },
+          {
+            "field": "patient_weight_kg",
+            "cell_template": "{col:Q}{row}"
+          },
+          {
+            "field": "observation_date_height_and_weight",
+            "cell_template": "{col:R}{row}"
+          },
+          {
+            "field": "hba1c_value",
+            "cell_template": "{col:S}{row}"
+          },
+          {
+            "field": "observation_date_hba1c_value",
+            "cell_template": "{col:T}{row}"
+          },
+          {
+            "field": "systolic_blood_pressure",
+            "cell_template": "{col:AB}{row}"
+          },
+          {
+            "field": "diastolic_blood_pressure",
+            "cell_template": "{col:AC}{row}"
+          },
+          {
+            "field": "observation_date_blood_pressure",
+            "cell_template": "{col:AD}{row}"
+          },
+          {
+            "field": "foot_assessment_examination_date",
+            "cell_template": "{col:AE}{row}"
+          },
+          {
+            "field": "retinal_screening_date",
+            "cell_template": "{col:AF}{row}"
+          },
+          {
+            "field": "retinal_screening_result",
+            "cell_template": "{col:AG}{row}"
+          },
+          {
+            "field": "urinary_albumin_level_acr",
+            "cell_template": "{col:AH}{row}"
+          },
+          {
+            "field": "observation_date_urinary_albumin_level",
+            "cell_template": "{col:AI}{row}"
+          },
+          {
+            "field": "albuminuria_stage",
+            "cell_template": "{col:AJ}{row}"
+          },
+          {
+            "field": "total_cholesterol_level_mmol_l",
+            "cell_template": "{col:AK}{row}"
+          },
+          {
+            "field": "observation_date_total_cholesterol_level",
+            "cell_template": "{col:AL}{row}"
+          },
+          {
+            "field": "observation_date_thyroid_function",
+            "cell_template": "{col:AM}{row}"
+          },
+          {
+            "field": "observation_date_coeliac_disease_screening",
+            "cell_template": "{col:AO}{row}"
+          },
+          {
+            "field": "has_the_patient_been_recommended_prescribed_a_gluten_free_diet",
+            "cell_template": "{col:AP}{row}"
+          },
+          {
+            "field": "does_the_patient_smoke_and_or_vape",
+            "cell_template": "{col:AQ}{row}"
+          },
+          {
+            "field": "date_of_offer_of_smoking_cessation_advice_if_patient_is_a_current_smoker",
+            "cell_template": "{col:AR}{row}"
+          },
+          {
+            "field": "date_that_influenza_immunisation_was_recommended",
+            "cell_template": "{col:AS}{row}"
+          },
+          {
+            "field": "date_of_provision_of_advice_sick_day_rules_about_managing_diabetes_during_intercurrent_illness_or_episodes_of_hyperglycaemia",
+            "cell_template": "{col:AT}{row}"
+          },
+          {
+            "field": "discharge_date_hospital_provider_spell",
+            "cell_template": "{col:BB}{row}"
+          },
+          {
+            "field": "reason_for_admission",
+            "cell_template": "{col:BC}{row}"
+          },
+          {
+            "field": "only_complete_if_other_selected_reason_for_admission_free_text",
+            "cell_template": "{col:BD}{row}"
+          },
+          {
+            "field": "only_complete_if_dka_selected_in_previous_question_during_this_dka_admission_did_the_patient_receive_any_of_the_following_therapies",
+            "cell_template": "{col:BE}{row}"
+          },
+          {
+            "field": "initial_ph_at_admission",
+            "cell_template": "{col:BF}{row}"
+          },
+          {
+            "field": "initial_standard_bicarbonate_at_admission_mmol_l",
+            "cell_template": "{col:BG}{row}"
+          }
+        ]
+      }
+    ],
+    "code_sets": {
+      "sex_code": {
+        "Male": "1",
+        "Female": "2",
+        "Not specified": "3",
+        "Unknown": "99"
+      },
+      "ethnicity_code": {
+        "White - British": "A",
+        "White - Irish": "B",
+        "White - Any other White background": "C",
+        "Mixed - White and Black Caribbean": "D",
+        "Mixed - White and Black African": "E",
+        "Mixed - White and Asian": "F",
+        "Mixed - Any other Mixed background": "G",
+        "Asian - Indian": "H",
+        "Asian - Pakistani": "J",
+        "Asian - Bangladeshi": "K",
+        "Asian - Any other Asian background": "L",
+        "Black - Caribbean": "M",
+        "Black - African": "N",
+        "Black - Any other Black background": "P",
+        "Chinese": "R",
+        "Other - Any other ethnic group": "S",
+        "Not stated": "Z",
+        "Not Known": "99"
+      },
+      "insulin_regimen": {
+        "No insulin": "none",
+        "One - three injections/day": "MDI_1_to_3",
+        "Four or more injections/day": "MDI_4_or_more",
+        "Insulin pump (standalone)": "insulin_pump",
+        "Hybrid closed loop": "hybrid_closed_loop"
+      },
+      "non_insulin_med": {
+        "No medication": "none",
+        "Metformin only": "metformin_only",
+        "GLP-1 agonists": "glp1",
+        "SGLT2 inhibitors": "sglt2",
+        "Other": "other"
+      },
+      "lifestyle_advice_given": {
+        "Yes": "yes"
+      },
+      "cgm_in_use": {
+        "Yes": "yes",
+        "No": "no"
+      },
+      "blood_ketone_testing": {
+        "Yes": "yes",
+        "No": "no"
+      },
+      "immunotherapy_received": {
+        "Yes": "yes",
+        "No": "no"
+      },
+      "thyroid_treatment": {
+        "No thyroid therapy": "none",
+        "Thyroxine for hypothyroidism": "levothyroxine",
+        "Antithyroid medication for hyperthyroidism": "antithyroid"
+      },
+      "additional_support_needed": {
+        "Yes": "yes",
+        "No": "no"
+      },
+      "mental_health_appointment_status": {
+        "Offered and attended": "offered_attended",
+        "Offered and did not attend": "offered_did_not_attend",
+        "Offered and declined": "offered_declined",
+        "Not offered": "not_offered",
+        "Mental health support accessed elsewhere": "accessed_elsewhere"
+      },
+      "dietitian_appointment_offered": {
+        "Yes": "yes",
+        "No": "no"
+      }
+    },
+    "identity_bridges": [
+      {
+        "database": "npda-demographics",
+        "key_column": "nhs_number",
+        "via": {
+          "table": "clinic_visits",
+          "anchor_column": "visit_id",
+          "bridge_column": "patient_ref"
+        }
+      }
+    ]
+  }
+}

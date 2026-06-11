@@ -1,0 +1,10 @@
+{
+  "schema_version": "1",
+  "stages": {
+    "index_audit": { "provider": "ollama", "model": "qwen3:32b", "endpoint": "http://localhost:11434/v1" },
+    "index_db":    { "provider": "ollama", "model": "qwen3:32b", "endpoint": "http://localhost:11434/v1" },
+    "mapping":     { "provider": "ollama", "model": "qwen3:32b", "endpoint": "http://localhost:11434/v1" },
+    "tier2":       { "provider": "ollama", "model": "qwen3:8b",  "endpoint": "http://localhost:11434/v1" },
+    "tier3_agent": { "provider": "ollama", "model": "qwen3:32b", "endpoint": "http://localhost:11434/v1" }
+  }
+}

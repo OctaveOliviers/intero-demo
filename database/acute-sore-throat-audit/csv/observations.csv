@@ -1,0 +1,260 @@
+DATE,PATIENT,ENCOUNTER,CATEGORY,CODE,DESCRIPTION,VALUE,UNITS,TYPE
+2026-01-06T09:14:00Z,ast-pat-001,ast-enc-001,vital-signs,8310-5,Body temperature,37.8,C,numeric
+2026-01-06T09:14:00Z,ast-pat-001,ast-enc-001,vital-signs,8867-4,Heart rate,92,/min,numeric
+2026-01-06T09:14:00Z,ast-pat-001,ast-enc-001,survey,AST-FEVERPAIN,FeverPAIN score,2,{score},numeric
+2026-01-06T09:14:00Z,ast-pat-001,ast-enc-001,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-01-06T09:14:00Z,ast-pat-001,ast-enc-001,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-01-06T09:14:00Z,ast-pat-001,ast-enc-001,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-01-06T09:14:00Z,ast-pat-001,ast-enc-001,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-01-06T09:14:00Z,ast-pat-001,ast-enc-001,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,no,,text
+2026-01-06T09:14:00Z,ast-pat-001,ast-enc-001,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-01-06T09:14:00Z,ast-pat-001,ast-enc-001,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,vital-signs,8310-5,Body temperature,38.5,C,numeric
+2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,vital-signs,8867-4,Heart rate,118,/min,numeric
+2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,survey,AST-FEVERPAIN,FeverPAIN score,5,{score},numeric
+2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,survey,AST-CENTOR,Centor score,4,{score},numeric
+2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-01-09T15:48:00Z,ast-pat-002,ast-enc-002,laboratory,AST-RADT,Rapid group A strep antigen test,positive,,text
+2026-01-18T11:22:00Z,ast-pat-003,ast-enc-003,vital-signs,8310-5,Body temperature,37.4,C,numeric
+2026-01-18T11:22:00Z,ast-pat-003,ast-enc-003,vital-signs,8867-4,Heart rate,88,/min,numeric
+2026-01-18T11:22:00Z,ast-pat-003,ast-enc-003,survey,AST-FEVERPAIN,FeverPAIN score,3,{score},numeric
+2026-01-18T11:22:00Z,ast-pat-003,ast-enc-003,survey,AST-CENTOR,Centor score,2,{score},numeric
+2026-01-18T11:22:00Z,ast-pat-003,ast-enc-003,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-01-18T11:22:00Z,ast-pat-003,ast-enc-003,survey,AST-SAFETYNET,Safety-netting advice documented,no,,text
+2026-01-18T11:22:00Z,ast-pat-003,ast-enc-003,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,no,,text
+2026-01-18T11:22:00Z,ast-pat-003,ast-enc-003,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-01-18T11:22:00Z,ast-pat-003,ast-enc-003,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,no,,text
+2026-01-18T11:22:00Z,ast-pat-003,ast-enc-003,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,no,,text
+2026-01-18T11:22:00Z,ast-pat-003,ast-enc-003,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-02-03T08:40:00Z,ast-pat-004,ast-enc-004,vital-signs,8310-5,Body temperature,36.9,C,numeric
+2026-02-03T08:40:00Z,ast-pat-004,ast-enc-004,vital-signs,8867-4,Heart rate,76,/min,numeric
+2026-02-03T08:40:00Z,ast-pat-004,ast-enc-004,survey,AST-FEVERPAIN,FeverPAIN score,0,{score},numeric
+2026-02-03T08:40:00Z,ast-pat-004,ast-enc-004,survey,AST-CENTOR,Centor score,0,{score},numeric
+2026-02-03T08:40:00Z,ast-pat-004,ast-enc-004,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-02-03T08:40:00Z,ast-pat-004,ast-enc-004,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-02-03T08:40:00Z,ast-pat-004,ast-enc-004,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-02-03T08:40:00Z,ast-pat-004,ast-enc-004,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-02-03T08:40:00Z,ast-pat-004,ast-enc-004,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,no,,text
+2026-02-03T08:40:00Z,ast-pat-004,ast-enc-004,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-02-03T08:40:00Z,ast-pat-004,ast-enc-004,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-02-07T10:11:00Z,ast-pat-005,ast-enc-005,vital-signs,8310-5,Body temperature,,C,numeric
+2026-02-07T10:11:00Z,ast-pat-005,ast-enc-005,vital-signs,8867-4,Heart rate,96,/min,numeric
+2026-02-07T10:11:00Z,ast-pat-005,ast-enc-005,survey,AST-FEVERPAIN,FeverPAIN score,4,{score},numeric
+2026-02-07T10:11:00Z,ast-pat-005,ast-enc-005,survey,AST-CENTOR,Centor score,3,{score},numeric
+2026-02-07T10:11:00Z,ast-pat-005,ast-enc-005,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-02-07T10:11:00Z,ast-pat-005,ast-enc-005,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-02-07T10:11:00Z,ast-pat-005,ast-enc-005,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-02-07T10:11:00Z,ast-pat-005,ast-enc-005,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-02-07T10:11:00Z,ast-pat-005,ast-enc-005,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-02-07T10:11:00Z,ast-pat-005,ast-enc-005,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,no,,text
+2026-02-07T10:11:00Z,ast-pat-005,ast-enc-005,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-02-09T13:05:00Z,ast-pat-006,ast-enc-006,vital-signs,8310-5,Body temperature,37.2,C,numeric
+2026-02-09T13:05:00Z,ast-pat-006,ast-enc-006,vital-signs,8867-4,Heart rate,102,/min,numeric
+2026-02-09T13:05:00Z,ast-pat-006,ast-enc-006,survey,AST-FEVERPAIN,FeverPAIN score,,{score},numeric
+2026-02-09T13:05:00Z,ast-pat-006,ast-enc-006,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,no,,text
+2026-02-09T13:05:00Z,ast-pat-006,ast-enc-006,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-02-09T13:05:00Z,ast-pat-006,ast-enc-006,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-02-09T13:05:00Z,ast-pat-006,ast-enc-006,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-02-09T13:05:00Z,ast-pat-006,ast-enc-006,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,no,,text
+2026-02-09T13:05:00Z,ast-pat-006,ast-enc-006,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-02-09T13:05:00Z,ast-pat-006,ast-enc-006,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-02-21T17:12:00Z,ast-pat-007,ast-enc-007,vital-signs,8310-5,Body temperature,38.1,C,numeric
+2026-02-21T17:12:00Z,ast-pat-007,ast-enc-007,vital-signs,8867-4,Heart rate,98,/min,numeric
+2026-02-21T17:12:00Z,ast-pat-007,ast-enc-007,survey,AST-FEVERPAIN,FeverPAIN score,3,{score},numeric
+2026-02-21T17:12:00Z,ast-pat-007,ast-enc-007,survey,AST-CENTOR,Centor score,2,{score},numeric
+2026-02-21T17:12:00Z,ast-pat-007,ast-enc-007,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-02-21T17:12:00Z,ast-pat-007,ast-enc-007,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-02-21T17:12:00Z,ast-pat-007,ast-enc-007,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-02-21T17:12:00Z,ast-pat-007,ast-enc-007,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-02-21T17:12:00Z,ast-pat-007,ast-enc-007,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-02-21T17:12:00Z,ast-pat-007,ast-enc-007,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-02-21T17:12:00Z,ast-pat-007,ast-enc-007,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,vital-signs,8310-5,Body temperature,39.0,C,numeric
+2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,vital-signs,8867-4,Heart rate,104,/min,numeric
+2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,survey,AST-FEVERPAIN,FeverPAIN score,5,{score},numeric
+2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,survey,AST-CENTOR,Centor score,4,{score},numeric
+2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-03-02T14:26:00Z,ast-pat-008,ast-enc-008,laboratory,AST-RADT,Rapid group A strep antigen test,positive,,text
+2026-03-11T09:05:00Z,ast-pat-009,ast-enc-009,vital-signs,8310-5,Body temperature,38.9,C,numeric
+2026-03-11T09:05:00Z,ast-pat-009,ast-enc-009,vital-signs,8867-4,Heart rate,110,/min,numeric
+2026-03-11T09:05:00Z,ast-pat-009,ast-enc-009,survey,AST-FEVERPAIN,FeverPAIN score,4,{score},numeric
+2026-03-11T09:05:00Z,ast-pat-009,ast-enc-009,survey,AST-CENTOR,Centor score,3,{score},numeric
+2026-03-11T09:05:00Z,ast-pat-009,ast-enc-009,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-03-11T09:05:00Z,ast-pat-009,ast-enc-009,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-03-11T09:05:00Z,ast-pat-009,ast-enc-009,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-03-11T09:05:00Z,ast-pat-009,ast-enc-009,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-03-11T09:05:00Z,ast-pat-009,ast-enc-009,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-03-11T09:05:00Z,ast-pat-009,ast-enc-009,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-03-11T09:05:00Z,ast-pat-009,ast-enc-009,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-03-17T16:42:00Z,ast-pat-010,ast-enc-010,vital-signs,8310-5,Body temperature,37.6,C,numeric
+2026-03-17T16:42:00Z,ast-pat-010,ast-enc-010,vital-signs,8867-4,Heart rate,84,/min,numeric
+2026-03-17T16:42:00Z,ast-pat-010,ast-enc-010,survey,AST-FEVERPAIN,FeverPAIN score,2,{score},numeric
+2026-03-17T16:42:00Z,ast-pat-010,ast-enc-010,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-03-17T16:42:00Z,ast-pat-010,ast-enc-010,survey,AST-SAFETYNET,Safety-netting advice documented,unknown,,text
+2026-03-17T16:42:00Z,ast-pat-010,ast-enc-010,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,no,,text
+2026-03-17T16:42:00Z,ast-pat-010,ast-enc-010,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-03-17T16:42:00Z,ast-pat-010,ast-enc-010,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,no,,text
+2026-03-17T16:42:00Z,ast-pat-010,ast-enc-010,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,no,,text
+2026-03-17T16:42:00Z,ast-pat-010,ast-enc-010,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-01-14T10:02:00Z,ast-pat-013,ast-enc-011,vital-signs,8310-5,Body temperature,36.8,C,numeric
+2026-01-14T10:02:00Z,ast-pat-013,ast-enc-011,vital-signs,8867-4,Heart rate,72,/min,numeric
+2026-01-14T10:02:00Z,ast-pat-013,ast-enc-011,survey,AST-FEVERPAIN,FeverPAIN score,1,{score},numeric
+2026-01-14T10:02:00Z,ast-pat-013,ast-enc-011,survey,AST-CENTOR,Centor score,1,{score},numeric
+2026-01-14T10:02:00Z,ast-pat-013,ast-enc-011,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-01-14T10:02:00Z,ast-pat-013,ast-enc-011,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-01-14T10:02:00Z,ast-pat-013,ast-enc-011,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-01-14T10:02:00Z,ast-pat-013,ast-enc-011,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-01-14T10:02:00Z,ast-pat-013,ast-enc-011,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,no,,text
+2026-01-14T10:02:00Z,ast-pat-013,ast-enc-011,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-01-14T10:02:00Z,ast-pat-013,ast-enc-011,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-01-23T14:18:00Z,ast-pat-014,ast-enc-012,vital-signs,8310-5,Body temperature,37.9,C,numeric
+2026-01-23T14:18:00Z,ast-pat-014,ast-enc-012,vital-signs,8867-4,Heart rate,89,/min,numeric
+2026-01-23T14:18:00Z,ast-pat-014,ast-enc-012,survey,AST-FEVERPAIN,FeverPAIN score,3,{score},numeric
+2026-01-23T14:18:00Z,ast-pat-014,ast-enc-012,survey,AST-CENTOR,Centor score,2,{score},numeric
+2026-01-23T14:18:00Z,ast-pat-014,ast-enc-012,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-01-23T14:18:00Z,ast-pat-014,ast-enc-012,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-01-23T14:18:00Z,ast-pat-014,ast-enc-012,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-01-23T14:18:00Z,ast-pat-014,ast-enc-012,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-01-23T14:18:00Z,ast-pat-014,ast-enc-012,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-01-23T14:18:00Z,ast-pat-014,ast-enc-012,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-01-23T14:18:00Z,ast-pat-014,ast-enc-012,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-01-31T09:35:00Z,ast-pat-015,ast-enc-013,vital-signs,8310-5,Body temperature,38.7,C,numeric
+2026-01-31T09:35:00Z,ast-pat-015,ast-enc-013,vital-signs,8867-4,Heart rate,116,/min,numeric
+2026-01-31T09:35:00Z,ast-pat-015,ast-enc-013,survey,AST-FEVERPAIN,FeverPAIN score,4,{score},numeric
+2026-01-31T09:35:00Z,ast-pat-015,ast-enc-013,survey,AST-CENTOR,Centor score,3,{score},numeric
+2026-01-31T09:35:00Z,ast-pat-015,ast-enc-013,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-01-31T09:35:00Z,ast-pat-015,ast-enc-013,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-01-31T09:35:00Z,ast-pat-015,ast-enc-013,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-01-31T09:35:00Z,ast-pat-015,ast-enc-013,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-01-31T09:35:00Z,ast-pat-015,ast-enc-013,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-01-31T09:35:00Z,ast-pat-015,ast-enc-013,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-01-31T09:35:00Z,ast-pat-015,ast-enc-013,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-02-02T11:10:00Z,ast-pat-016,ast-enc-014,vital-signs,8310-5,Body temperature,37.1,C,numeric
+2026-02-02T11:10:00Z,ast-pat-016,ast-enc-014,vital-signs,8867-4,Heart rate,80,/min,numeric
+2026-02-02T11:10:00Z,ast-pat-016,ast-enc-014,survey,AST-FEVERPAIN,FeverPAIN score,,{score},numeric
+2026-02-02T11:10:00Z,ast-pat-016,ast-enc-014,survey,AST-CENTOR,Centor score,2,{score},numeric
+2026-02-02T11:10:00Z,ast-pat-016,ast-enc-014,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-02-02T11:10:00Z,ast-pat-016,ast-enc-014,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-02-02T11:10:00Z,ast-pat-016,ast-enc-014,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-02-02T11:10:00Z,ast-pat-016,ast-enc-014,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-02-02T11:10:00Z,ast-pat-016,ast-enc-014,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,no,,text
+2026-02-02T11:10:00Z,ast-pat-016,ast-enc-014,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-02-02T11:10:00Z,ast-pat-016,ast-enc-014,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-02-12T15:22:00Z,ast-pat-017,ast-enc-015,vital-signs,8310-5,Body temperature,38.4,C,numeric
+2026-02-12T15:22:00Z,ast-pat-017,ast-enc-015,vital-signs,8867-4,Heart rate,95,/min,numeric
+2026-02-12T15:22:00Z,ast-pat-017,ast-enc-015,survey,AST-FEVERPAIN,FeverPAIN score,,{score},numeric
+2026-02-12T15:22:00Z,ast-pat-017,ast-enc-015,survey,AST-CENTOR,Centor score,4,{score},numeric
+2026-02-12T15:22:00Z,ast-pat-017,ast-enc-015,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-02-12T15:22:00Z,ast-pat-017,ast-enc-015,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-02-12T15:22:00Z,ast-pat-017,ast-enc-015,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-02-12T15:22:00Z,ast-pat-017,ast-enc-015,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-02-12T15:22:00Z,ast-pat-017,ast-enc-015,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-02-12T15:22:00Z,ast-pat-017,ast-enc-015,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,no,,text
+2026-02-12T15:22:00Z,ast-pat-017,ast-enc-015,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-02-18T12:08:00Z,ast-pat-018,ast-enc-016,vital-signs,8310-5,Body temperature,37.5,C,numeric
+2026-02-18T12:08:00Z,ast-pat-018,ast-enc-016,vital-signs,8867-4,Heart rate,82,/min,numeric
+2026-02-18T12:08:00Z,ast-pat-018,ast-enc-016,survey,AST-FEVERPAIN,FeverPAIN score,2,{score},numeric
+2026-02-18T12:08:00Z,ast-pat-018,ast-enc-016,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-02-18T12:08:00Z,ast-pat-018,ast-enc-016,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-02-18T12:08:00Z,ast-pat-018,ast-enc-016,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,no,,text
+2026-02-18T12:08:00Z,ast-pat-018,ast-enc-016,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-02-18T12:08:00Z,ast-pat-018,ast-enc-016,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,no,,text
+2026-02-18T12:08:00Z,ast-pat-018,ast-enc-016,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,no,,text
+2026-02-18T12:08:00Z,ast-pat-018,ast-enc-016,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-02-24T16:01:00Z,ast-pat-019,ast-enc-017,vital-signs,8310-5,Body temperature,36.7,C,numeric
+2026-02-24T16:01:00Z,ast-pat-019,ast-enc-017,vital-signs,8867-4,Heart rate,78,/min,numeric
+2026-02-24T16:01:00Z,ast-pat-019,ast-enc-017,survey,AST-FEVERPAIN,FeverPAIN score,1,{score},numeric
+2026-02-24T16:01:00Z,ast-pat-019,ast-enc-017,survey,AST-CENTOR,Centor score,1,{score},numeric
+2026-02-24T16:01:00Z,ast-pat-019,ast-enc-017,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-02-24T16:01:00Z,ast-pat-019,ast-enc-017,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-02-24T16:01:00Z,ast-pat-019,ast-enc-017,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-02-24T16:01:00Z,ast-pat-019,ast-enc-017,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-02-24T16:01:00Z,ast-pat-019,ast-enc-017,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,no,,text
+2026-02-24T16:01:00Z,ast-pat-019,ast-enc-017,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,no,,text
+2026-02-24T16:01:00Z,ast-pat-019,ast-enc-017,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-03-04T08:55:00Z,ast-pat-020,ast-enc-018,vital-signs,8310-5,Body temperature,38.8,C,numeric
+2026-03-04T08:55:00Z,ast-pat-020,ast-enc-018,vital-signs,8867-4,Heart rate,100,/min,numeric
+2026-03-04T08:55:00Z,ast-pat-020,ast-enc-018,survey,AST-FEVERPAIN,FeverPAIN score,5,{score},numeric
+2026-03-04T08:55:00Z,ast-pat-020,ast-enc-018,survey,AST-CENTOR,Centor score,4,{score},numeric
+2026-03-04T08:55:00Z,ast-pat-020,ast-enc-018,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-03-04T08:55:00Z,ast-pat-020,ast-enc-018,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-03-04T08:55:00Z,ast-pat-020,ast-enc-018,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-03-04T08:55:00Z,ast-pat-020,ast-enc-018,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-03-04T08:55:00Z,ast-pat-020,ast-enc-018,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-03-04T08:55:00Z,ast-pat-020,ast-enc-018,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-03-04T08:55:00Z,ast-pat-020,ast-enc-018,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-03-06T13:44:00Z,ast-pat-021,ast-enc-019,vital-signs,8310-5,Body temperature,37.7,C,numeric
+2026-03-06T13:44:00Z,ast-pat-021,ast-enc-019,vital-signs,8867-4,Heart rate,86,/min,numeric
+2026-03-06T13:44:00Z,ast-pat-021,ast-enc-019,survey,AST-FEVERPAIN,FeverPAIN score,3,{score},numeric
+2026-03-06T13:44:00Z,ast-pat-021,ast-enc-019,survey,AST-CENTOR,Centor score,2,{score},numeric
+2026-03-06T13:44:00Z,ast-pat-021,ast-enc-019,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-03-06T13:44:00Z,ast-pat-021,ast-enc-019,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-03-06T13:44:00Z,ast-pat-021,ast-enc-019,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-03-06T13:44:00Z,ast-pat-021,ast-enc-019,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-03-06T13:44:00Z,ast-pat-021,ast-enc-019,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-03-06T13:44:00Z,ast-pat-021,ast-enc-019,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-03-06T13:44:00Z,ast-pat-021,ast-enc-019,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-03-09T10:28:00Z,ast-pat-022,ast-enc-020,vital-signs,8310-5,Body temperature,38.3,C,numeric
+2026-03-09T10:28:00Z,ast-pat-022,ast-enc-020,vital-signs,8867-4,Heart rate,112,/min,numeric
+2026-03-09T10:28:00Z,ast-pat-022,ast-enc-020,survey,AST-FEVERPAIN,FeverPAIN score,4,{score},numeric
+2026-03-09T10:28:00Z,ast-pat-022,ast-enc-020,survey,AST-CENTOR,Centor score,3,{score},numeric
+2026-03-09T10:28:00Z,ast-pat-022,ast-enc-020,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-03-09T10:28:00Z,ast-pat-022,ast-enc-020,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-03-09T10:28:00Z,ast-pat-022,ast-enc-020,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-03-09T10:28:00Z,ast-pat-022,ast-enc-020,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-03-09T10:28:00Z,ast-pat-022,ast-enc-020,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-03-09T10:28:00Z,ast-pat-022,ast-enc-020,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-03-09T10:28:00Z,ast-pat-022,ast-enc-020,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-03-13T09:49:00Z,ast-pat-023,ast-enc-021,vital-signs,8310-5,Body temperature,36.5,C,numeric
+2026-03-13T09:49:00Z,ast-pat-023,ast-enc-021,vital-signs,8867-4,Heart rate,74,/min,numeric
+2026-03-13T09:49:00Z,ast-pat-023,ast-enc-021,survey,AST-FEVERPAIN,FeverPAIN score,0,{score},numeric
+2026-03-13T09:49:00Z,ast-pat-023,ast-enc-021,survey,AST-CENTOR,Centor score,0,{score},numeric
+2026-03-13T09:49:00Z,ast-pat-023,ast-enc-021,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-03-13T09:49:00Z,ast-pat-023,ast-enc-021,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-03-13T09:49:00Z,ast-pat-023,ast-enc-021,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-03-13T09:49:00Z,ast-pat-023,ast-enc-021,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-03-13T09:49:00Z,ast-pat-023,ast-enc-021,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-03-13T09:49:00Z,ast-pat-023,ast-enc-021,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-03-13T09:49:00Z,ast-pat-023,ast-enc-021,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-03-19T15:06:00Z,ast-pat-024,ast-enc-022,vital-signs,8310-5,Body temperature,37.9,C,numeric
+2026-03-19T15:06:00Z,ast-pat-024,ast-enc-022,vital-signs,8867-4,Heart rate,90,/min,numeric
+2026-03-19T15:06:00Z,ast-pat-024,ast-enc-022,survey,AST-FEVERPAIN,FeverPAIN score,3,{score},numeric
+2026-03-19T15:06:00Z,ast-pat-024,ast-enc-022,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-03-19T15:06:00Z,ast-pat-024,ast-enc-022,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-03-19T15:06:00Z,ast-pat-024,ast-enc-022,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-03-19T15:06:00Z,ast-pat-024,ast-enc-022,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-03-19T15:06:00Z,ast-pat-024,ast-enc-022,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-03-19T15:06:00Z,ast-pat-024,ast-enc-022,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,no,,text
+2026-03-19T15:06:00Z,ast-pat-024,ast-enc-022,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-03-24T11:40:00Z,ast-pat-025,ast-enc-023,vital-signs,8310-5,Body temperature,38.6,C,numeric
+2026-03-24T11:40:00Z,ast-pat-025,ast-enc-023,vital-signs,8867-4,Heart rate,101,/min,numeric
+2026-03-24T11:40:00Z,ast-pat-025,ast-enc-023,survey,AST-FEVERPAIN,FeverPAIN score,5,{score},numeric
+2026-03-24T11:40:00Z,ast-pat-025,ast-enc-023,survey,AST-CENTOR,Centor score,4,{score},numeric
+2026-03-24T11:40:00Z,ast-pat-025,ast-enc-023,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-03-24T11:40:00Z,ast-pat-025,ast-enc-023,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-03-24T11:40:00Z,ast-pat-025,ast-enc-023,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-03-24T11:40:00Z,ast-pat-025,ast-enc-023,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-03-24T11:40:00Z,ast-pat-025,ast-enc-023,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,no,,text
+2026-03-24T11:40:00Z,ast-pat-025,ast-enc-023,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,no,,text
+2026-03-24T11:40:00Z,ast-pat-025,ast-enc-023,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text
+2026-03-30T17:20:00Z,ast-pat-026,ast-enc-024,vital-signs,8310-5,Body temperature,38.2,C,numeric
+2026-03-30T17:20:00Z,ast-pat-026,ast-enc-024,vital-signs,8867-4,Heart rate,94,/min,numeric
+2026-03-30T17:20:00Z,ast-pat-026,ast-enc-024,survey,AST-FEVERPAIN,FeverPAIN score,4,{score},numeric
+2026-03-30T17:20:00Z,ast-pat-026,ast-enc-024,survey,AST-CENTOR,Centor score,3,{score},numeric
+2026-03-30T17:20:00Z,ast-pat-026,ast-enc-024,survey,AST-SCORE-TOOL-USED,FeverPAIN or Centor used,yes,,text
+2026-03-30T17:20:00Z,ast-pat-026,ast-enc-024,survey,AST-SAFETYNET,Safety-netting advice documented,yes,,text
+2026-03-30T17:20:00Z,ast-pat-026,ast-enc-024,survey,AST-NATURAL-HISTORY,Natural history and average illness length advice documented,yes,,text
+2026-03-30T17:20:00Z,ast-pat-026,ast-enc-024,survey,AST-SELF-CARE,Self-care and fever advice documented,yes,,text
+2026-03-30T17:20:00Z,ast-pat-026,ast-enc-024,survey,AST-ANTIBIOTIC-RESISTANCE,Antibiotic use and resistance advice documented,yes,,text
+2026-03-30T17:20:00Z,ast-pat-026,ast-enc-024,survey,AST-TARGET-LEAFLET,TARGET treating your infection leaflet shared,yes,,text
+2026-03-30T17:20:00Z,ast-pat-026,ast-enc-024,laboratory,AST-RADT,Rapid group A strep antigen test,not_done,,text

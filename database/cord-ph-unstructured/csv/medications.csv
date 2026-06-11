@@ -1,0 +1,5 @@
+START,STOP,PATIENT,PAYER,ENCOUNTER,CODE,DESCRIPTION,BASE_COST,PAYER_COVERAGE,DISPENSES,TOTALCOST,REASONCODE,REASONDESCRIPTION
+2026-04-04T18:52:00Z,2026-04-04T18:53:00Z,cph-baby-002,cph-payer-001,cph-enc-birth-002,387362001,Epinephrine neonatal resuscitation dose,18.00,18.00,1,18.00,230690007,Neonatal encephalopathy
+2026-04-08T22:23:00Z,2026-04-08T22:24:00Z,cph-baby-004,cph-payer-001,cph-enc-birth-004,387362001,Epinephrine neonatal resuscitation dose,18.00,18.00,2,36.00,230690007,Neonatal encephalopathy
+2026-04-13T01:55:00Z,2026-04-13T08:00:00Z,cph-mother-006,cph-payer-001,cph-enc-birth-006,372729009,Broad spectrum intrapartum antibiotics,42.00,42.00,1,42.00,23835007,Chorioamnionitis
+2026-04-23T09:43:00Z,2026-04-23T09:44:00Z,cph-baby-009,cph-payer-001,cph-enc-birth-009,387362001,Epinephrine neonatal resuscitation dose,18.00,18.00,1,18.00,12867002,Neonatal seizure

@@ -1,0 +1,352 @@
+{
+  "schema_version": "1",
+  "database": "npda-demographics",
+  "title": "Northway PDU Demographics & Registration System",
+  "description": "Patient-administration / registration database for the Northway Paediatric Diabetes Unit (PDU). Captures demographic identity (NHS number, name, date of birth, sex, ethnicity, postcode, GP practice), diabetes-service registration (registration date, diabetes type, diagnosis date, care unit, comorbidities such as ADHD/ASD or learning disability) and service-exit (leaving date and reason, deceased date). Joined to the clinical EPR (npda-clinical) by NHS number. Free-text referral letters, registration notes and MDT summaries are held in registration_notes; some clinically relevant information (e.g. diabetes type and diagnosis date for one newly diagnosed patient, comorbidity flags) is only mentioned in those notes and not in structured columns.",
+  "identity_links": [
+    {
+      "column": "patients.nhs_number",
+      "target": "npda-clinical -> psychology.patient_ref",
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "patients.nhs_number",
+      "target": "npda-clinical -> technology.patient_ref",
+      "evidence": "10/10 sampled values found in target"
+    }
+  ],
+  "tables": [
+    {
+      "name": "patients",
+      "description": "Patient demographics record. One row per registered patient \u2014 holds NHS number (the join key to the clinical EPR), name, date of birth, sex assigned at birth, ethnicity (as recorded at registration), postcode, registered GP practice code and the PDU number.",
+      "columns": [
+        {
+          "name": "patient_id",
+          "type": "text",
+          "description": "Local identifier used by this registration system (format NORTH-YYYY-NNN) to refer to the patient.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "nhs_number",
+          "type": "text",
+          "description": "Ten-digit NHS number \u2014 the canonical UK patient identifier and the join key to the npda-clinical EPR (patient_ref).",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "given_name",
+          "type": "text",
+          "description": "Patient's first / given name.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "family_name",
+          "type": "text",
+          "description": "Patient's family / last name.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "date_of_birth",
+          "type": "text",
+          "description": "Patient's date of birth, recorded in DD/MM/YYYY format as displayed by the registration UI.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "01/02/2009",
+            "max": "11/04/2020"
+          }
+        },
+        {
+          "name": "sex_code",
+          "type": "text",
+          "description": "Sex assigned at birth as a coded value: 1 = Male, 2 = Female, 3 = Not specified, 99 = Unknown. Matches the NPDA permitted values directly.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "1",
+            "2"
+          ],
+          "codes": {
+            "1": "Male",
+            "2": "Female",
+            "3": "Not specified",
+            "99": "Unknown"
+          }
+        },
+        {
+          "name": "ethnicity_code",
+          "type": "text",
+          "description": "Self-reported ethnic category as recorded at registration, using the NHS Data Dictionary single-letter codes (A, B, C, D, E, F, G, H, J, K, L, M, N, P, R, S, Z, 99). One patient (Sumaiya Begum) has a different ethnicity code recorded on the clinical system (npda-clinical.clinic_visits.ethnicity_recorded), creating a known cross-source conflict.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "A",
+            "F",
+            "H",
+            "J",
+            "K",
+            "M",
+            "N",
+            "R"
+          ],
+          "codes": {
+            "A": "White - British",
+            "F": "Mixed - White and Asian",
+            "H": "Asian - Indian",
+            "J": "Asian - Pakistani",
+            "K": "Asian - Bangladeshi",
+            "M": "Black - Caribbean",
+            "N": "Black - African",
+            "R": "Chinese"
+          }
+        },
+        {
+          "name": "postcode",
+          "type": "text",
+          "description": "Patient's usual-address full UK postcode (upper case, with single space) \u2014 used to derive deprivation and Local Authority statistics.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "B15 2TT",
+            "BD3 9AE",
+            "BS5 6JT",
+            "E13 0RJ",
+            "G42 9TY",
+            "L17 4AN",
+            "LS2 7EZ",
+            "M14 5QT",
+            "NE3 4BG",
+            "S2 4SU"
+          ]
+        },
+        {
+          "name": "gp_practice_code",
+          "type": "text",
+          "description": "Registered GP practice code in X99999 format (NHS Organisation Data Service), e.g. L83012. Used for ICB/Health Board-level reporting.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "A82011",
+            "B82015",
+            "B86023",
+            "C84008",
+            "C88027",
+            "F84016",
+            "L81045",
+            "L83012",
+            "M82001",
+            "N81069"
+          ]
+        },
+        {
+          "name": "pdu_number",
+          "type": "text",
+          "description": "3-digit Paediatric Diabetes Unit (PDU) number \u2014 the audit-submission organisational identifier (Northway PDU = 157).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "157"
+          ]
+        }
+      ],
+      "row_count": 10
+    },
+    {
+      "name": "registrations",
+      "description": "Per-patient diabetes-service registration record. One row per patient capturing diabetes type, diagnosis date, registering care unit, structured comorbidity flags (ADHD/ASD status, learning disability) and any service-exit (leaving date and reason, deceased date). For one newly diagnosed patient (Ethan Brookes) the diagnosis_date is blank in this table \u2014 it is only recorded in npda-clinical.clinical_notes (admission summary) and the demographics-side registration_notes referral letter.",
+      "columns": [
+        {
+          "name": "registration_id",
+          "type": "text",
+          "description": "Identifier of the registration record.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "patient_id",
+          "type": "text",
+          "description": "Reference to patients.patient_id.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "registration_date",
+          "type": "text",
+          "description": "Date the patient was registered with the PDU (ISO yyyy-mm-dd from this back-office system).",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2014-02-25",
+            "max": "2026-06-12"
+          }
+        },
+        {
+          "name": "diabetes_type_code",
+          "type": "text",
+          "description": "Diabetes type as recorded at registration, matching the NPDA Diabetes Type permitted values: 1 = Type 1, 2 = Type 2, 3 = CF-related, 4 = MODY, 5 = Other specified, 99 = Unknown/unspecified.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "1",
+            "2",
+            "4"
+          ],
+          "codes": {
+            "1": "Type 1 Diabetes Mellitus",
+            "2": "Type 2 Diabetes Mellitus",
+            "3": "Cystic Fibrosis Related Diabetes",
+            "4": "MODY (monogenic forms of diabetes)",
+            "5": "Other specified Diabetes Mellitus",
+            "99": "Unknown/unspecified"
+          }
+        },
+        {
+          "name": "diagnosis_date",
+          "type": "text",
+          "description": "Date the patient was diagnosed with diabetes, in DD/MM/YYYY format. Blank for one patient (Ethan Brookes, REG-003) whose diagnosis date is documented only in the registration-side referral letter (registration_notes.RNOTE-001) and the clinical EPR admission summary.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "22/02/2014",
+            "max": "07/11/2025"
+          }
+        },
+        {
+          "name": "care_unit",
+          "type": "text",
+          "description": "Name of the registering paediatric diabetes care unit.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Northway PDU"
+          ]
+        },
+        {
+          "name": "adhd_asd_status",
+          "type": "text",
+          "description": "Structured comorbidity flag for Attention Deficit Hyperactivity Disorder / Autism Spectrum Disorder, free-text drawn from the registration form's tick-boxes (one of 'ADHD', 'ASD', 'both', or blank if neither / not asked).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "ADHD"
+          ]
+        },
+        {
+          "name": "learning_disability_flag",
+          "type": "text",
+          "description": "Y/N flag for confirmed diagnosis of a learning disability.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "N"
+          ]
+        },
+        {
+          "name": "leaving_date",
+          "type": "text",
+          "description": "Date the patient left the PDU during the audit year (DD/MM/YYYY), or blank if still under PDU care.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "12/01/2027",
+            "max": "12/01/2027"
+          }
+        },
+        {
+          "name": "leaving_reason_code",
+          "type": "text",
+          "description": "Coded reason for leaving the service: 1 = Transitioned to adult diabetes service, 2 = Moved out of area, 3 = Other.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "1"
+          ],
+          "codes": {
+            "1": "Transitioned to adult diabetes service",
+            "2": "Moved out of area",
+            "3": "Other"
+          }
+        },
+        {
+          "name": "deceased_date",
+          "type": "text",
+          "description": "Date of death of the patient (DD/MM/YYYY), or blank if alive.",
+          "filterable": false,
+          "reason": "reference"
+        }
+      ],
+      "row_count": 10
+    },
+    {
+      "name": "registration_notes",
+      "description": "Free-text registration-side notes: GP referral letters, registration summaries from the diabetes nurse, MDT summaries, genetics letters and transition-planning notes. Carries clinically important content not held in structured columns: e.g. RNOTE-001 is the GP referral letter that records Ethan Brookes' diagnosis date and Type 1 status (absent from the registrations row), RNOTE-005 records the transition-final-visit date for Aisha Khan.",
+      "columns": [
+        {
+          "name": "note_id",
+          "type": "text",
+          "description": "Identifier of the note (e.g. RNOTE-001).",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "patient_id",
+          "type": "text",
+          "description": "Reference to patients.patient_id.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "note_date",
+          "type": "text",
+          "description": "Date the note was authored (ISO yyyy-mm-dd).",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2015-06-22",
+            "max": "2026-12-15"
+          }
+        },
+        {
+          "name": "note_type",
+          "type": "text",
+          "description": "Kind of registration-side note: referral_letter, registration, mdt_summary, genetics_letter or transition_planning.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "genetics_letter",
+            "mdt_summary",
+            "referral_letter",
+            "registration",
+            "transition_planning"
+          ]
+        },
+        {
+          "name": "author",
+          "type": "text",
+          "description": "Author of the note (clinician name and role).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Diabetes MDT",
+            "Diabetes Nurse Specialist K Murray",
+            "Dr A Iqbal",
+            "Dr H Morgan, GP",
+            "Dr S Bardsley, Clinical Genetics",
+            "Sister J Adamson"
+          ]
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "description": "Free-text body of the note.",
+          "filterable": false,
+          "reason": "free-text"
+        }
+      ],
+      "row_count": 6
+    }
+  ]
+}

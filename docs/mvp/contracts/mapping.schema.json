@@ -1,0 +1,419 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intero.local/contracts/mapping.schema.json",
+  "title": "Mapping (mapping.json)",
+  "description": "The MAPPING: the audit<->database bindings. Binds one audit to its database(s) — the single source of truth for WHERE every audit concept lives and HOW each value is obtained. This is where `kind` (direct/interpret) is decided, because only here is it known what the database holds. Renamed from the old mapping.md (one mapping.json per audit, multi-DB). PURELY REGENERABLE — no user-set state (defaults live in audit.json, §6). References are written as \"<database_id> -> <table>.<column>\" so a multi-database audit is unambiguous. TWO INTERNAL PHASES IN ONE FILE (A4): the MATCH (the judgment fields above — `identity`/`regions`/`fields`/`criteria_bindings`/`fixed_criteria`, an LLM/reasoning step; `fixed_criteria` is the audit's fixed cohort and is the ONE place the library lets a user edit inclusion criteria) and the derived `executable` (the deterministic Tier-1 plan, compiled from the match by build_populate_spec.py — NEVER hand-authored, regenerated on every match change). The old standalone populate.json is retired; its v2 spec now lives under `executable`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "audit", "databases", "description", "identity", "regions", "fields", "criteria_bindings", "fixed_criteria"],
+  "properties": {
+    "schema_version": {
+      "description": "Schema version of this document. Required so consumers can migrate. Currently always \"1\".",
+      "type": "string",
+      "const": "1"
+    },
+    "audit": {
+      "description": "Slug of the audit this mapping is for (matches spec.json's `audit`). Required.",
+      "type": "string",
+      "minLength": 1
+    },
+    "databases": {
+      "description": "The database slugs this audit is bound to (matches each model.json's `database`). Required — one audit may draw from several databases; the `identity` block records how they join.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "database_summaries": {
+      "description": "Optional map database_id -> one TEMPLATE-SPECIFIC sentence describing what this audit draws from that database (e.g. \"Demographics and admission dates for the cohort join.\"). Written by the mapping LLM call (which sees exactly which tables/columns it bound) and rendered on the library audit-detail database chips (doc 9); the generic model.json `summary` is the fallback when an entry (or the whole map) is absent. Regenerated with the mapping; never hand-authored.",
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "description": {
+      "description": "One-paragraph prose summary of the binding: which database/table holds the primary entity and where each major group of fields comes from. Required.",
+      "type": "string",
+      "minLength": 1
+    },
+    "identity": {
+      "description": "The cohort identity + cross-database join keys, scoped to THIS audit (there is no global registry of which DB holds what — the audit records it here when it binds its databases). Required. This is the only cross-database resolution.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["anchor", "grain", "keys", "patient_grain_rule"],
+      "properties": {
+        "anchor": {
+          "description": "The anchor reference defining one cohort member, as \"<db> -> <table>.<column>\" (e.g. \"cord-ph -> cord_ph_birth_records.patient_code\"). Required — every criterion is evaluated relative to this.",
+          "type": "string",
+          "minLength": 1
+        },
+        "grain": {
+          "description": "Prose statement of the identity grain (e.g. \"one patient per birth record\"). Required.",
+          "type": "string",
+          "minLength": 1
+        },
+        "keys": {
+          "description": "The join keys used to tie records across tables/databases back to the anchor, each as \"<db> -> <table>.<column>\". Required (at least the anchor key).",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "patient_grain_rule": {
+          "description": "The rule that keeps cohort counting correct: how a criterion is applied without inflating the count (e.g. \"every criterion = this patient has >=1 matching row (EXISTS/IN over the anchor), never a count-inflating join\"). Required.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "regions": {
+      "description": "The workbook regions the populate run writes to. Required. Each region is a contiguous block on a sheet with a row-identity column.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "sheet", "kind"],
+        "properties": {
+          "id": {
+            "description": "Stable id of the region (e.g. \"ALL\"), referenced by fields[].region. Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "sheet": {
+            "description": "The workbook sheet name the region lives on (e.g. \"ALL\"). Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "description": "The region's shape. \"row_per_entity\" = one data row per cohort member. MVP CONSTRAINT: only \"row_per_entity\" is supported in the MVP — summary, pivot, and other region kinds are not. Extend this enum when additional shapes are implemented.",
+            "type": "string",
+            "enum": ["row_per_entity"]
+          },
+          "data_range": {
+            "description": "The A1 range of the data body (e.g. \"A2:AQ500\"). Optional — present once the grid skeleton is known.",
+            "type": "string"
+          },
+          "row_id": {
+            "description": "Which column identifies each data row. Optional but recommended for row_per_entity regions.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "cell": {
+                "description": "Column letter of the row-id within the region (e.g. \"A\").",
+                "type": "string"
+              },
+              "header": {
+                "description": "Header text of the row-id column (e.g. \"Patient code\").",
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "fields": {
+      "description": "THE populate mapping: one record per audit field, binding it to its DB source(s) and stating HOW the value is obtained. Required. `kind` is decided here now that the database is known.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["region", "cell", "header", "kind", "sources"],
+        "properties": {
+          "region": {
+            "description": "Id of the region (regions[].id) this field is written into. Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "cell": {
+            "description": "Column letter the field is written to within the region (e.g. \"T\"). Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "header": {
+            "description": "The field's header text (e.g. \"Delivery\"), matching the audit field name. Required for human/LLM legibility.",
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "description": "HOW the value is obtained, decided here because the DB is now known. \"direct\" = copied from a column (optionally translated via `code`); \"interpret\" = no structured column holds it, so the agent reads evidence and derives it. Required.",
+            "type": "string",
+            "enum": ["direct", "interpret"]
+          },
+          "sources": {
+            "description": "The DB source column(s) the value is drawn from, each as \"<db> -> <table>.<column>\". Required (a list — a value may draw on several columns). For interpret fields these are the evidence columns to read.",
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "how_to_combine": {
+            "description": "Prose instruction for deriving the value from the sources (e.g. \"read the urinary albumin level and decide the stage per local ranges\"). Optional — primarily for interpret fields (and for direct fields drawing on multiple sources).",
+            "type": "string"
+          },
+          "code": {
+            "description": "OPTIONAL on ANY field: the code -> meaning encoding the cell's value MUST use (operationalises the audit field's permitted_values against THIS database). If present, the value must be one of these codes — for a direct field the executor maps the source value onto the matching code; for an interpret field the agent must output one of the codes — `write_cell` rejects off-code writes (run-population-redesign.md §2 / §5). If absent, the value is filled as-is.",
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      }
+    },
+    "criteria_bindings": {
+      "description": "Bindings of the audit's inclusion criteria (audit.json) to real DB columns, plus any DB-only dimensions reachable by join. Required. This is the backing SEARCH SPACE that \"add filter\" looks through and B6's grounding — NOT a list shown wholesale to the user. Built at mapping by the LLM (A6.1) selecting audit-relevant dimensions from audit.json fields and database.json columns and linking each to the cohort identity.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["criterion_id", "label", "source", "type", "join_path", "grain_rule", "from"],
+        "properties": {
+          "criterion_id": {
+            "description": "The bound criterion id. For an audit-derived dimension this matches audit.json's inclusion_criteria[].id; for a DB-only dimension it is a fresh slug. Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "description": "Human-readable label for the dimension (e.g. \"Mode of delivery\"). Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "description": "The real DB column backing the criterion, as \"<db> -> <table>.<column>\". Required. The authoritative type/values come from database.json (referenced, not copied; the renderer joins them).",
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "description": "The dimension's filter type (\"category\"/\"number\"/\"date\"), aligned with database.json's filter_type for the source column. Required.",
+            "type": "string",
+            "enum": ["category", "number", "date"]
+          },
+          "join_path": {
+            "description": "How the source column reaches the cohort anchor (e.g. \"direct column on the anchor row (no join)\" or \"cord_ph_birth_records.baby_patient -> patients.id\"). Required — the renderer/executor builds the EXISTS/IN over the anchor from this.",
+            "type": "string",
+            "minLength": 1
+          },
+          "grain_rule": {
+            "description": "How a value on this dimension is interpreted against the cohort member at the patient grain (e.g. \"the baby has a birthdate in the implied range\"). Required — prevents count-inflating joins.",
+            "type": "string",
+            "minLength": 1
+          },
+          "from": {
+            "description": "Provenance of the dimension. \"audit_field\" = derived from an audit field only; \"db_column\" = a DB-only filter (not an audit field); \"audit_field+db_column\" = an audit criterion matched to a DB column. Required.",
+            "type": "string",
+            "enum": ["audit_field", "db_column", "audit_field+db_column"]
+          }
+        }
+      }
+    },
+    "fixed_criteria": {
+      "description": "The audit's FIXED inclusion criteria: the patient filters that define this (national) audit's cohort. Distinct from `criteria_bindings` — that block is the available SEARCH SPACE (what you CAN filter), whereas this block is what this audit DOES filter by default. Required (may be an empty array). For the standard national audits these are auto-extracted at mapping build (build_criteria.py) and persisted; they are the canonical default cohort B6 applies when no per-run criteria are given. EDITABLE ONLY IN THE LIBRARY (audit-detail page): a user add/remove/edit writes this array back via the audit-mapping PATCH endpoint; every change is re-validated against this schema. Each `criterion_id` MUST exist in `criteria_bindings[]` (structured-only; free-text dimensions stay in `not_expressible`).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["criterion_id", "label", "type", "predicate", "display"],
+        "properties": {
+          "criterion_id": {
+            "description": "References a criteria_bindings[].criterion_id — the bound dimension this fixed filter applies to. Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "description": "Human-readable label for the dimension (mirrors the binding's label, e.g. \"Gestation (completed weeks)\"). Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "description": "The dimension's filter type, mirroring criteria_bindings[].type. Required.",
+            "type": "string",
+            "enum": ["category", "number", "date"]
+          },
+          "predicate": {
+            "description": "The fixed filter this audit applies on the dimension. Required.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["op", "value"],
+            "properties": {
+              "op": {
+                "description": "The comparison. category: \"in\"/\"eq\"; number: \"gte\"/\"lte\"/\"between\"/\"eq\"; date: \"between\"/\"gte\"/\"lte\".",
+                "type": "string",
+                "enum": ["in", "eq", "gte", "lte", "between"]
+              },
+              "value": {
+                "description": "The fixed value(s): a scalar for eq/gte/lte, or an array for in (category members) and between (two bounds [lo, hi])."
+              },
+              "unit": {
+                "description": "Optional unit for number dimensions (e.g. \"weeks\").",
+                "type": "string"
+              }
+            }
+          },
+          "display": {
+            "description": "Human-readable one-line rendering of the fixed filter for the library (e.g. \"Gestation ≥ 37 weeks\"). Required.",
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "not_expressible": {
+      "description": "Audit criteria the database can satisfy only from free-text — DEFERRED (P1), never invented. Optional. Recorded so the concept is not silently dropped.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["criterion_id", "label", "source", "reason"],
+        "properties": {
+          "criterion_id": {
+            "description": "The criterion that cannot be expressed structurally. Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "description": "Human-readable label for the criterion. Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "description": "Where the only evidence lives, as \"<db> -> <table>.<column>\" (typically a free-text column). Required.",
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "description": "Why it is not expressible structurally (e.g. \"only in free-text; no structured column\"). Required.",
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "executable": {
+      "description": "PHASE 2 — the derived Tier-1 plan (the old standalone populate.json v2 spec, folded in by A4). DERIVED BUILD OUTPUT, never hand-authored: build_populate_spec.py compiles it mechanically from the match above (identity + regions + fields + criteria_bindings). `kind` and the Tier-1 code translation are computed HERE, killing the old three-places duplication. Regenerate it on any match change; never hand-edit. Optional in the document so a match-only skeleton (mid-build, before Phase 2 runs) stays schema-valid; a complete, runnable mapping carries it. The shape below is the frozen v2 contract (docs/mvp/contracts/runtime-shapes.md §3) enforced by build_populate_spec.validate_populate_spec.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "audit_id", "workbook", "identity_keys", "cohort", "regions", "code_sets"],
+      "properties": {
+        "schema_version": {
+          "description": "Version of the executable (populate) sub-contract. Always \"2\" — v1 (per-region filter binds) is rejected.",
+          "type": "string",
+          "const": "2"
+        },
+        "audit_id": {
+          "description": "Slug of the audit this executable belongs to (matches the parent mapping's `audit`).",
+          "type": "string",
+          "minLength": 1
+        },
+        "workbook": {
+          "description": "The workbook filename the run writes to (e.g. \"audit.xlsx\").",
+          "type": "string",
+          "minLength": 1
+        },
+        "identity_keys": {
+          "description": "The distinct identity column names (anchor first) Tier 1 joins per-database results on. Required, non-empty.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "identity_bridges": {
+          "description": "Cross-database identity bridges (A3), one per FOREIGN database, derived deterministically from the match's identity.keys. Each records how the anchor identity translates into that database's key: the executor reads `via.bridge_column` alongside `via.anchor_column` from `via.table` in the cohort database, binds the foreign query's `:cohort` with the translated key set, and joins the rows back in Python — cross-database SQL never runs. Optional: absent on single-database mappings (which compile unchanged).",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["database", "key_column", "via"],
+            "properties": {
+              "database": { "description": "The foreign database slug this bridge keys.", "type": "string", "minLength": 1 },
+              "key_column": { "description": "The foreign database's identity column (e.g. \"nhs_number\").", "type": "string", "minLength": 1 },
+              "via": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["table", "anchor_column", "bridge_column"],
+                "properties": {
+                  "table": { "description": "The cohort-database table carrying the translation (the anchor table).", "type": "string", "minLength": 1 },
+                  "anchor_column": { "description": "The anchor identity column on `via.table`.", "type": "string", "minLength": 1 },
+                  "bridge_column": { "description": "The `via.table` column whose values equal the foreign database's key.", "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        },
+        "cohort": {
+          "description": "The joinable cohort base: SELECTs the identity keys; resolved inclusion conditions are ANDed into `where` at run time (B6/B7). The precompiled file ships `where: []`.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["database", "from", "identity_select", "where"],
+          "properties": {
+            "database": { "description": "The cohort's source database slug.", "type": "string", "minLength": 1 },
+            "from": { "description": "The FROM clause (anchor table + every join a criterion needs to reach the anchor).", "type": "string", "minLength": 1 },
+            "identity_select": { "description": "The SELECT projecting the anchor identity (e.g. \"b.patient_code AS patient_code\").", "type": "string", "minLength": 1 },
+            "where": { "description": "Inclusion conditions ANDed at run time; empty ([]) in the precompiled spec.", "type": "array" }
+          }
+        },
+        "regions": {
+          "description": "One executable region per (sheet × effective kind): a cohort-scoped query per source table plus the cell map. A multi-source field is forced to `interpret`, so one match region can yield both a direct and an interpret executable region.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "sheet", "kind", "queries", "row_anchor", "cell_map"],
+            "properties": {
+              "id": { "description": "Executable region id (e.g. \"ALL\" or \"ALL-interpret\").", "type": "string", "minLength": 1 },
+              "sheet": { "description": "The workbook sheet this region writes to.", "type": "string", "minLength": 1 },
+              "kind": {
+                "description": "\"direct\" = straight per-column copy (Tier 1); \"interpret\" = evidence fetch for Tier 2/3.",
+                "type": "string",
+                "enum": ["direct", "interpret"]
+              },
+              "queries": {
+                "description": "One read-only, cohort-scoped query per Tier-1-reachable source (database, table) — `... IN (:cohort)`; the cohort bind is the only permitted bind. A direct region carries >=1 query (validator-enforced); an interpret region may carry none when its evidence lives on tables Tier 1 cannot key (the higher tiers fetch it from the match's per-field sources).",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["database", "sql"],
+                  "properties": {
+                    "database": { "type": "string", "minLength": 1 },
+                    "sql": { "type": "string", "minLength": 1 },
+                    "key_column": { "description": "Present on a FOREIGN-database query (A3): the column that keys this database's rows — the executor binds `:cohort` with the bridged key set (see identity_bridges) instead of the anchor identities. Absent on anchor-database queries.", "type": "string", "minLength": 1 }
+                  }
+                }
+              },
+              "row_anchor": {
+                "description": "The identity column that anchors a data row within the region.",
+                "type": "string",
+                "minLength": 1
+              },
+              "cell_map": {
+                "description": "Per cell slot: the audit `field` id + workbook `cell_template`. A `direct` entry also carries the source `column`/`table` (so try_direct stamps `field` and builds the narrowed per-cell query without re-parsing the wide SQL) and an optional `translate` (a code_sets key); an `interpret` entry carries only `field` + `cell_template`.",
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["field", "cell_template"],
+                  "properties": {
+                    "field": { "type": "string", "minLength": 1 },
+                    "column": { "type": "string", "minLength": 1 },
+                    "table": { "type": "string", "minLength": 1 },
+                    "cell_template": { "type": "string", "minLength": 1 },
+                    "translate": {
+                      "description": "Key into `code_sets`: the DB→audit code translation applied to this column. Direct entries only.",
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "code_sets": {
+          "description": "Named DB-value → audit-code maps referenced by cell_map `translate`. Derived from each field's `code` (inverted). May be empty.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

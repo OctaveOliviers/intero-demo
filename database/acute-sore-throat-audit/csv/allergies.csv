@@ -1,0 +1,4 @@
+START,STOP,PATIENT,ENCOUNTER,CODE,SYSTEM,DESCRIPTION,TYPE,CATEGORY,REACTION1,DESCRIPTION1,SEVERITY1,REACTION2,DESCRIPTION2,SEVERITY2
+2020-06-04,,ast-pat-003,ast-enc-003,91936005,SNOMED-CT,Penicillin allergy,allergy,medication,247472004,Urticarial rash,MODERATE,,,
+2019-04-12,,ast-pat-017,ast-enc-015,91936005,SNOMED-CT,Penicillin allergy,allergy,medication,271807003,Eruption of skin,MODERATE,,,
+2017-11-18,,ast-pat-008,ast-enc-008,300913006,SNOMED-CT,Shellfish allergy,allergy,food,39579001,Anaphylaxis,SEVERE,,,

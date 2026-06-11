@@ -1,0 +1,3 @@
+Id,NAME,ADDRESS,CITY,STATE,ZIP,LAT,LON,PHONE,REVENUE,UTILIZATION
+cph-org-001,Northbank Women and Children's Hospital,100 River Road,Cambridge,Massachusetts,02139,42.366,-71.105,555-410-1000,12500000,1420
+cph-org-002,Northbank Neonatal Network,102 River Road,Cambridge,Massachusetts,02139,42.367,-71.104,555-410-2000,6800000,520

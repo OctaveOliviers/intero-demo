@@ -1,0 +1,21 @@
+Id,BIRTHDATE,DEATHDATE,SSN,DRIVERS,PASSPORT,PREFIX,FIRST,LAST,SUFFIX,MAIDEN,MARITAL,RACE,ETHNICITY,GENDER,BIRTHPLACE,ADDRESS,CITY,STATE,COUNTY,ZIP,LAT,LON,HEALTHCARE_EXPENSES,HEALTHCARE_COVERAGE
+cph-baby-001,2026-04-02,,999-92-1001,,,Baby,Ava,Ellis,,,,white,nonhispanic,F,Cambridge Massachusetts US,21 Cedar Street,Cambridge,Massachusetts,Middlesex County,02139,42.358,-71.106,1840.00,1840.00
+cph-baby-002,2026-04-04,,999-92-1002,,,Baby,Noah,Kim,,,,asian,nonhispanic,M,Newton Massachusetts US,22 Cedar Street,Newton,Massachusetts,Middlesex County,02459,42.330,-71.192,6250.00,6100.00
+cph-baby-003,2026-04-06,,999-92-1003,,,Baby,Maya,Harris,,,,black,nonhispanic,F,Boston Massachusetts US,23 Cedar Street,Boston,Massachusetts,Suffolk County,02118,42.338,-71.076,2390.00,2320.00
+cph-baby-004,2026-04-08,,999-92-1004,,,Baby,Leo,Patel,,,,asian,nonhispanic,M,Quincy Massachusetts US,24 Cedar Street,Quincy,Massachusetts,Norfolk County,02169,42.252,-71.002,14150.00,13925.00
+cph-baby-005,2026-04-11,,999-92-1005,,,Baby,Sofia,Rivera,,,,white,hispanic,F,Somerville Massachusetts US,25 Cedar Street,Somerville,Massachusetts,Middlesex County,02143,42.381,-71.099,4180.00,4020.00
+cph-baby-006,2026-04-13,,999-92-1006,,,Baby,Oliver,Bennett,,,,white,nonhispanic,M,Medford Massachusetts US,26 Cedar Street,Medford,Massachusetts,Middlesex County,02155,42.419,-71.107,10120.00,9890.00
+cph-baby-007,2026-04-16,,999-92-1007,,,Baby,Isla,Nguyen,,,,asian,nonhispanic,F,Malden Massachusetts US,27 Cedar Street,Malden,Massachusetts,Middlesex County,02148,42.426,-71.066,3540.00,3420.00
+cph-baby-008,2026-04-20,,999-92-1008,,,Baby,Ethan,Walker,,,,black,nonhispanic,M,Cambridge Massachusetts US,28 Cedar Street,Cambridge,Massachusetts,Middlesex County,02140,42.389,-71.124,2680.00,2600.00
+cph-baby-009,2026-04-23,,999-92-1009,,,Baby,Grace,O'Connor,,,,white,nonhispanic,F,Arlington Massachusetts US,29 Cedar Street,Arlington,Massachusetts,Middlesex County,02474,42.416,-71.156,7600.00,7425.00
+cph-baby-010,2026-04-27,,999-92-1010,,,Baby,Lucas,Mbatha,,,,black,nonhispanic,M,Waltham Massachusetts US,30 Cedar Street,Waltham,Massachusetts,Middlesex County,02453,42.376,-71.236,1990.00,1940.00
+cph-mother-001,1994-08-12,,999-92-2001,S99200001,X99200001X,Ms.,Emily,Ellis,,,M,white,nonhispanic,F,Cambridge Massachusetts US,21 Cedar Street,Cambridge,Massachusetts,Middlesex County,02139,42.358,-71.106,4200.00,3900.00
+cph-mother-002,1989-02-04,,999-92-2002,S99200002,X99200002X,Ms.,Jiwoo,Kim,,,M,asian,nonhispanic,F,Newton Massachusetts US,22 Cedar Street,Newton,Massachusetts,Middlesex County,02459,42.330,-71.192,5300.00,5150.00
+cph-mother-003,1998-06-18,,999-92-2003,S99200003,X99200003X,Ms.,Nadia,Harris,,,S,black,nonhispanic,F,Boston Massachusetts US,23 Cedar Street,Boston,Massachusetts,Suffolk County,02118,42.338,-71.076,3800.00,3700.00
+cph-mother-004,1986-12-29,,999-92-2004,S99200004,X99200004X,Ms.,Anika,Patel,,,M,asian,nonhispanic,F,Quincy Massachusetts US,24 Cedar Street,Quincy,Massachusetts,Norfolk County,02169,42.252,-71.002,8700.00,8400.00
+cph-mother-005,1992-03-25,,999-92-2005,S99200005,X99200005X,Ms.,Elena,Rivera,,,M,white,hispanic,F,Somerville Massachusetts US,25 Cedar Street,Somerville,Massachusetts,Middlesex County,02143,42.381,-71.099,4550.00,4360.00
+cph-mother-006,1984-07-09,,999-92-2006,S99200006,X99200006X,Ms.,Claire,Bennett,,,M,white,nonhispanic,F,Medford Massachusetts US,26 Cedar Street,Medford,Massachusetts,Middlesex County,02155,42.419,-71.107,6900.00,6610.00
+cph-mother-007,1996-11-14,,999-92-2007,S99200007,X99200007X,Ms.,Linh,Nguyen,,,S,asian,nonhispanic,F,Malden Massachusetts US,27 Cedar Street,Malden,Massachusetts,Middlesex County,02148,42.426,-71.066,3900.00,3800.00
+cph-mother-008,1990-01-20,,999-92-2008,S99200008,X99200008X,Ms.,Aaliyah,Walker,,,M,black,nonhispanic,F,Cambridge Massachusetts US,28 Cedar Street,Cambridge,Massachusetts,Middlesex County,02140,42.389,-71.124,4100.00,3975.00
+cph-mother-009,1988-10-01,,999-92-2009,S99200009,X99200009X,Ms.,Maeve,O'Connor,,,M,white,nonhispanic,F,Arlington Massachusetts US,29 Cedar Street,Arlington,Massachusetts,Middlesex County,02474,42.416,-71.156,5700.00,5530.00
+cph-mother-010,1997-05-06,,999-92-2010,S99200010,X99200010X,Ms.,Zanele,Mbatha,,,S,black,nonhispanic,F,Waltham Massachusetts US,30 Cedar Street,Waltham,Massachusetts,Middlesex County,02453,42.376,-71.236,3700.00,3610.00

@@ -1,0 +1,27 @@
+visit_id,patient_ref,visit_date,visit_type,clinician,ethnicity_recorded,diabetes_type_recorded
+V0001,9874123001,2026-04-22,outpatient,Dr R Singh,H,1
+V0002,9874123001,2026-08-19,outpatient,Dr R Singh,H,1
+V0003,9874123001,2026-12-09,outpatient,DSN K Murray,H,1
+V0004,9874123002,2026-05-14,outpatient,Dr P Edwards,A,1
+V0005,9874123002,2026-09-03,outpatient,Dr P Edwards,A,1
+V0006,9874123002,2027-01-20,outpatient,Dr P Edwards,A,1
+V0007,9874123003,2026-06-18,outpatient,Dr R Singh,A,1
+V0008,9874123003,2026-07-30,outpatient,DSN K Murray,A,1
+V0009,9874123003,2026-12-04,outpatient,Dr R Singh,A,1
+V0010,9874123004,2026-05-02,outpatient,Dr P Edwards,L,2
+V0011,9874123004,2026-10-15,outpatient,Dr P Edwards,L,2
+V0012,9874123005,2026-04-30,outpatient,Dr R Singh,N,1
+V0013,9874123005,2026-09-26,outpatient,Dr R Singh,N,1
+V0014,9874123006,2026-06-04,outpatient,Dr P Edwards,F,4
+V0015,9874123006,2026-12-10,outpatient,Dr P Edwards,F,4
+V0016,9874123007,2026-05-21,outpatient,Dr P Edwards,J,1
+V0017,9874123007,2026-09-18,outpatient,Dr P Edwards,J,1
+V0018,9874123007,2027-01-12,transition_final,Dr P Edwards,J,1
+V0019,9874123008,2026-04-24,outpatient,Dr R Singh,A,1
+V0020,9874123008,2026-08-12,outpatient,Dr R Singh,A,1
+V0021,9874123008,2026-12-15,outpatient,Dr R Singh,A,1
+V0022,9874123009,2026-05-09,outpatient,Dr P Edwards,R,1
+V0023,9874123009,2026-11-22,inpatient,Dr P Edwards,R,1
+V0024,9874123009,2027-01-08,outpatient,Dr P Edwards,R,1
+V0025,9874123010,2026-06-12,outpatient,Dr R Singh,M,1
+V0026,9874123010,2026-10-08,outpatient,Dr R Singh,M,1

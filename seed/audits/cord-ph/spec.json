@@ -1,0 +1,489 @@
+{
+  "schema_version": "1",
+  "audit": "cord-ph",
+  "databases": [
+    "cord-ph"
+  ],
+  "title": "Cord pH Audit",
+  "description": "This audit measures the quality and adherence to protocols regarding cord care, including cord pH, delivery management, and neonatal outcomes in the Neonatal Intensive Care Unit (NICU). The data provenance is derived from patient records and clinical documentation.",
+  "deadline": "2026-07-07",
+  "grain": "one row per patient record",
+  "fields": [
+    {
+      "number": 1,
+      "name": "Patient code",
+      "type": "text",
+      "section": "ALL",
+      "cell": "A",
+      "notes": "Unique identifier for the patient record.",
+      "id": "all/patient_code"
+    },
+    {
+      "number": 2,
+      "name": "Gestation (weeks)",
+      "type": "number",
+      "section": "ALL",
+      "cell": "B",
+      "unit": "weeks",
+      "id": "all/gestation_weeks"
+    },
+    {
+      "number": 3,
+      "name": "Gestation (days)",
+      "type": "number",
+      "section": "ALL",
+      "cell": "C",
+      "unit": "days",
+      "id": "all/gestation_days"
+    },
+    {
+      "number": 4,
+      "name": "Maternal age",
+      "type": "number",
+      "section": "ALL",
+      "cell": "D",
+      "unit": "years",
+      "id": "all/maternal_age"
+    },
+    {
+      "number": 5,
+      "name": "Parity",
+      "type": "number",
+      "section": "ALL",
+      "cell": "E",
+      "id": "all/parity"
+    },
+    {
+      "number": 6,
+      "name": "Foetal movements",
+      "type": "text",
+      "section": "ALL",
+      "cell": "G",
+      "id": "all/foetal_movements"
+    },
+    {
+      "number": 7,
+      "name": "Maternal comorbidities",
+      "type": "text",
+      "section": "ALL",
+      "cell": "H",
+      "id": "all/maternal_comorbidities"
+    },
+    {
+      "number": 8,
+      "name": "Maternal comorbidities Other",
+      "type": "text",
+      "section": "ALL",
+      "cell": "I",
+      "id": "all/maternal_comorbidities_other"
+    },
+    {
+      "number": 9,
+      "name": "Normal scans",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "J",
+      "id": "all/normal_scans"
+    },
+    {
+      "number": 10,
+      "name": "Normal dopplers",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "K",
+      "id": "all/normal_dopplers"
+    },
+    {
+      "number": 11,
+      "name": "CTG done",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "M",
+      "id": "all/ctg_done"
+    },
+    {
+      "number": 12,
+      "name": "Liquor- meconium",
+      "type": "text",
+      "section": "ALL",
+      "cell": "N",
+      "id": "all/liquor_meconium"
+    },
+    {
+      "number": 13,
+      "name": "Chorioamnionitis",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "O",
+      "id": "all/chorioamnionitis"
+    },
+    {
+      "number": 14,
+      "name": "PROM (>18hours)",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "P",
+      "id": "all/prom_18hours"
+    },
+    {
+      "number": 15,
+      "name": "RFFS",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "Q",
+      "id": "all/rffs"
+    },
+    {
+      "number": 16,
+      "name": "Sentinel event",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "R",
+      "id": "all/sentinel_event"
+    },
+    {
+      "number": 17,
+      "name": "Delivery",
+      "type": "text",
+      "section": "ALL",
+      "cell": "T",
+      "id": "all/delivery"
+    },
+    {
+      "number": 18,
+      "name": "Birth weight (grams)",
+      "type": "number",
+      "section": "ALL",
+      "cell": "U",
+      "unit": "grams",
+      "id": "all/birth_weight_grams"
+    },
+    {
+      "number": 19,
+      "name": "Apgars 1",
+      "type": "number",
+      "section": "ALL",
+      "cell": "V",
+      "id": "all/apgars_1"
+    },
+    {
+      "number": 20,
+      "name": "Apgars 5",
+      "type": "number",
+      "section": "ALL",
+      "cell": "W",
+      "id": "all/apgars_5"
+    },
+    {
+      "number": 21,
+      "name": "Apgars 10",
+      "type": "number",
+      "section": "ALL",
+      "cell": "X",
+      "id": "all/apgars_10"
+    },
+    {
+      "number": 22,
+      "name": "Delayed cord clamping",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "Y",
+      "id": "all/delayed_cord_clamping"
+    },
+    {
+      "number": 23,
+      "name": "Cord arterial pH",
+      "type": "number",
+      "section": "ALL",
+      "cell": "Z",
+      "id": "all/cord_arterial_ph"
+    },
+    {
+      "number": 24,
+      "name": "Cord arterial BE",
+      "type": "number",
+      "section": "ALL",
+      "cell": "AA",
+      "id": "all/cord_arterial_be"
+    },
+    {
+      "number": 25,
+      "name": "Cord arterial lactate",
+      "type": "number",
+      "section": "ALL",
+      "cell": "AB",
+      "id": "all/cord_arterial_lactate"
+    },
+    {
+      "number": 26,
+      "name": "Intubated at delivery",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "AD",
+      "id": "all/intubated_at_delivery"
+    },
+    {
+      "number": 27,
+      "name": "Cardiac compressions",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "AE",
+      "id": "all/cardiac_compressions"
+    },
+    {
+      "number": 28,
+      "name": "Drugs given",
+      "type": "text",
+      "section": "ALL",
+      "cell": "AF",
+      "id": "all/drugs_given"
+    },
+    {
+      "number": 29,
+      "name": "Ward",
+      "type": "text",
+      "section": "ALL",
+      "cell": "AG",
+      "id": "all/ward"
+    },
+    {
+      "number": 30,
+      "name": "Gas repeated?",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "AH",
+      "id": "all/gas_repeated"
+    },
+    {
+      "number": 31,
+      "name": "Age at repeated gas (hours)",
+      "type": "number",
+      "section": "ALL",
+      "cell": "AI",
+      "unit": "hours",
+      "id": "all/age_at_repeated_gas_hours"
+    },
+    {
+      "number": 32,
+      "name": "Repeated lactate",
+      "type": "number",
+      "section": "ALL",
+      "cell": "AJ",
+      "id": "all/repeated_lactate"
+    },
+    {
+      "number": 33,
+      "name": "Age gas normalised (hours)",
+      "type": "number",
+      "section": "ALL",
+      "cell": "AK",
+      "unit": "hours",
+      "id": "all/age_gas_normalised_hours"
+    },
+    {
+      "number": 34,
+      "name": "Hypoglycaemia",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "AL",
+      "id": "all/hypoglycaemia"
+    },
+    {
+      "number": 35,
+      "name": "Admitted to NICU",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "AM",
+      "id": "all/admitted_to_nicu"
+    },
+    {
+      "number": 36,
+      "name": "Age at discharge home (days)",
+      "type": "number",
+      "section": "ALL",
+      "cell": "AN",
+      "unit": "days",
+      "id": "all/age_at_discharge_home_days"
+    },
+    {
+      "number": 37,
+      "name": "Unit level questionnaire filled",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "AO",
+      "id": "all/unit_level_questionnaire_filled"
+    },
+    {
+      "number": 38,
+      "name": "Local guideline for cord gas sampling available",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "AP",
+      "id": "all/local_guideline_for_cord_gas_sampling_available"
+    },
+    {
+      "number": 39,
+      "name": "Local guideline for fetal acidosis available",
+      "type": "boolean",
+      "section": "ALL",
+      "cell": "AQ",
+      "id": "all/local_guideline_for_fetal_acidosis_available"
+    },
+    {
+      "number": 40,
+      "name": "Age (hours) at NNU admission",
+      "type": "number",
+      "section": "NICU",
+      "cell": "A",
+      "unit": "hours",
+      "id": "nicu/age_hours_at_nnu_admission"
+    },
+    {
+      "number": 41,
+      "name": "Cooled",
+      "type": "boolean",
+      "section": "NICU",
+      "cell": "B",
+      "id": "nicu/cooled"
+    },
+    {
+      "number": 42,
+      "name": "Age at cooling (hours)",
+      "type": "number",
+      "section": "NICU",
+      "cell": "C",
+      "unit": "hours",
+      "id": "nicu/age_at_cooling_hours"
+    },
+    {
+      "number": 43,
+      "name": "Transferred out",
+      "type": "boolean",
+      "section": "NICU",
+      "cell": "D",
+      "id": "nicu/transferred_out"
+    },
+    {
+      "number": 44,
+      "name": "CFM",
+      "type": "text",
+      "section": "NICU",
+      "cell": "E",
+      "id": "nicu/cfm"
+    },
+    {
+      "number": 45,
+      "name": "Seizures",
+      "type": "boolean",
+      "section": "NICU",
+      "cell": "F",
+      "id": "nicu/seizures"
+    },
+    {
+      "number": 46,
+      "name": "Clinical seizures",
+      "type": "boolean",
+      "section": "NICU",
+      "cell": "G",
+      "id": "nicu/clinical_seizures"
+    },
+    {
+      "number": 47,
+      "name": "Electrographic seizure",
+      "type": "boolean",
+      "section": "NICU",
+      "cell": "H",
+      "id": "nicu/electrographic_seizure"
+    },
+    {
+      "number": 48,
+      "name": "MRI injury",
+      "type": "boolean",
+      "section": "NICU",
+      "cell": "I",
+      "id": "nicu/mri_injury"
+    },
+    {
+      "number": 49,
+      "name": "Duration of admission in NICU (days)",
+      "type": "number",
+      "section": "NICU",
+      "cell": "K",
+      "unit": "days",
+      "id": "nicu/duration_of_admission_in_nicu_days"
+    },
+    {
+      "number": 50,
+      "name": "Age at discharge home (days)",
+      "type": "number",
+      "section": "NICU",
+      "cell": "L",
+      "unit": "days",
+      "id": "nicu/age_at_discharge_home_days"
+    },
+    {
+      "number": 51,
+      "name": "Feeding on discharge",
+      "type": "text",
+      "section": "NICU",
+      "cell": "M",
+      "id": "nicu/feeding_on_discharge"
+    },
+    {
+      "number": 52,
+      "name": "Abnormal neurology at discharge",
+      "type": "text",
+      "section": "NICU",
+      "cell": "N",
+      "id": "nicu/abnormal_neurology_at_discharge"
+    }
+  ],
+  "inclusion_criteria": [
+    {
+      "id": "gestation_weeks",
+      "label": "Gestation in weeks",
+      "type": "number",
+      "suggested": true,
+      "default": null
+    },
+    {
+      "id": "delivery_mode",
+      "label": "Mode of delivery",
+      "type": "category",
+      "suggested": true,
+      "default": null
+    },
+    {
+      "id": "cord_ph",
+      "label": "Cord arterial pH",
+      "type": "number",
+      "suggested": true,
+      "default": null
+    },
+    {
+      "id": "apgar_score",
+      "label": "Apgar scores",
+      "type": "number",
+      "suggested": true,
+      "default": null
+    },
+    {
+      "id": "nicu_admission",
+      "label": "NICU admission status",
+      "type": "boolean",
+      "suggested": true,
+      "default": null
+    }
+  ],
+  "version": "1.0",
+  "sections": [
+    {
+      "id": "ALL",
+      "name": "Cord assessment and delivery (ALL sheet)"
+    },
+    {
+      "id": "NICU",
+      "name": "NICU course (NICU sheet)"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+# Local environment
+.env
+.env.*
+!.env.example
+.local/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Generated outputs
+tmp/
+var/
+/agent/runs
+test/generated/
+app/static/assets/
+app/static/index.html
+
+# Python caches and build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Editor and local tool state
+.codex/
+.cursor/
+.claude/*
+# Exception: shared thread personas + assignments (used by /sync) travel via git
+# so editing on one worktree applies everywhere after a pull.
+!.claude/personas/
+.claude/personas/spec.md
+.vscode/
+.idea/
+.obsidian/
+.worktrees/
+
+# OS files
+.DS_Store
+
+# Node.js
+node_modules/
+
+# Logs
+*.log
+
+# Generated SQLite databases
+database/*/sql/
+
+.gstack/
+
+# Cross-session thread coordination (per-worktree roster + personas, local only)
+.threads/
+.claude/
+models.local.json

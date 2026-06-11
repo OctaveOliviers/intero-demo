@@ -1,0 +1,11 @@
+tech_id,patient_ref,as_of_date,insulin_regimen,non_insulin_med,cgm_in_use,blood_ketone_testing,immunotherapy_received,immunotherapy_start_date,thyroid_treatment,lifestyle_advice_given
+T0001,9874123001,2026-04-22,MDI_4_or_more,none,yes,yes,no,,none,
+T0002,9874123002,2026-05-14,insulin_pump,none,yes,yes,no,,none,
+T0003,9874123003,2026-06-18,MDI_4_or_more,none,yes,yes,yes,26/06/2026,none,
+T0004,9874123004,2026-05-02,none,metformin_glp1,no,no,no,,none,yes
+T0005,9874123005,2026-04-30,MDI_4_or_more,none,yes,yes,no,,none,
+T0006,9874123006,2026-06-04,none,none,no,no,no,,none,yes
+T0007,9874123007,2026-05-21,insulin_pump,none,yes,yes,no,,levothyroxine,
+T0008,9874123008,2026-04-24,hybrid_closed_loop,none,yes,yes,no,,none,
+T0009,9874123009,2026-05-09,MDI_1_to_3,none,no,yes,no,,none,
+T0010,9874123010,2026-06-12,MDI_4_or_more,none,yes,yes,no,,none,

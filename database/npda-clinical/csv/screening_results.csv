@@ -1,0 +1,46 @@
+screening_id,patient_ref,screening_type,screening_date,result_code,result_text
+S0001,9874123001,foot,2026-08-19,normal,"Foot pulses palpable, sensation intact"
+S0002,9874123001,retinal,2026-08-19,normal,No diabetic retinopathy detected
+S0003,9874123001,thyroid,2026-04-22,normal,"TSH 2.1, free T4 normal"
+S0004,9874123001,coeliac,2019-03-10,negative,Anti-TTG negative at diagnosis
+S0005,9874123001,influenza_immunisation,2026-10-12,given,Recommended; given by GP
+S0006,9874123002,foot,2026-09-03,normal,Foot exam unremarkable
+S0007,9874123002,retinal,2026-09-03,abnormal,Mild non-proliferative retinopathy R eye
+S0008,9874123002,thyroid,2026-09-03,normal,"TSH 1.8, free T4 normal"
+S0009,9874123002,coeliac_dietary_status,2026-09-03,no,No coeliac diagnosis; eating normal diet
+S0010,9874123002,influenza_immunisation,2026-11-04,given,Given at school flu clinic
+S0011,9874123003,coeliac,2026-08-04,negative,Anti-TTG negative; screened within 90 days of dx
+S0012,9874123003,thyroid,2026-06-18,normal,"TSH 2.4, free T4 normal"
+S0013,9874123003,influenza_immunisation,2026-10-21,given,
+S0014,9874123004,foot,2026-10-15,normal,
+S0015,9874123004,retinal,2026-10-15,normal,
+S0016,9874123004,thyroid,2026-05-02,normal,
+S0017,9874123004,coeliac_dietary_status,2026-05-02,no,Normal diet
+S0018,9874123004,influenza_immunisation,2026-11-19,given,
+S0019,9874123005,foot,2026-09-26,normal,
+S0020,9874123005,retinal,2026-09-26,normal,No retinopathy
+S0021,9874123005,thyroid,2026-04-30,normal,
+S0022,9874123005,coeliac,2026-06-12,positive,Anti-TTG strongly positive; biopsy confirmed coeliac disease
+S0023,9874123005,influenza_immunisation,2026-10-09,given,
+S0024,9874123006,foot,2026-12-10,normal,
+S0025,9874123006,retinal,2026-12-10,normal,
+S0026,9874123006,coeliac_dietary_status,2026-06-04,no,Normal diet
+S0027,9874123006,influenza_immunisation,2026-10-30,given,
+S0028,9874123007,foot,2026-09-18,normal,
+S0029,9874123007,retinal,2026-09-18,normal,
+S0030,9874123007,thyroid,2026-05-21,treated,On levothyroxine; TSH well-controlled
+S0031,9874123007,coeliac_dietary_status,2026-05-21,no,
+S0032,9874123007,influenza_immunisation,2026-10-02,given,
+S0033,9874123008,thyroid,2026-08-12,normal,
+S0034,9874123008,coeliac_dietary_status,2026-04-24,no,
+S0035,9874123008,influenza_immunisation,2026-10-16,given,
+S0036,9874123009,foot,2026-05-09,normal,
+S0037,9874123009,retinal,2026-05-09,normal,
+S0038,9874123009,thyroid,2026-05-09,normal,
+S0039,9874123009,coeliac_dietary_status,2026-05-09,no,
+S0040,9874123009,influenza_immunisation,2026-10-25,given,
+S0041,9874123010,foot,2026-10-08,normal,
+S0042,9874123010,retinal,2026-10-08,,Booked at hospital diabetic eye screening service; result awaited at time of audit
+S0043,9874123010,thyroid,2026-06-12,normal,
+S0044,9874123010,coeliac_dietary_status,2026-06-12,no,
+S0045,9874123010,influenza_immunisation,2026-10-30,given,

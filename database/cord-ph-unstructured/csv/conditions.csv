@@ -1,0 +1,17 @@
+START,STOP,PATIENT,ENCOUNTER,CODE,DESCRIPTION
+2026-04-02T03:12:00Z,,cph-baby-001,cph-enc-birth-001,44223004,Liveborn singleton delivered vaginally
+2026-04-04T18:46:00Z,,cph-baby-002,cph-enc-birth-002,237311001,Meconium in amniotic fluid
+2026-04-04T18:46:00Z,,cph-baby-002,cph-enc-birth-002,230690007,Neonatal encephalopathy
+2026-04-04T19:18:00Z,,cph-baby-002,cph-enc-nicu-002,230690007,Neonatal encephalopathy
+2026-04-06T07:28:00Z,,cph-baby-003,cph-enc-birth-003,48194001,Prolonged rupture of membranes
+2026-04-08T22:14:00Z,,cph-baby-004,cph-enc-birth-004,11612004,Placental abruption
+2026-04-08T22:14:00Z,,cph-baby-004,cph-enc-birth-004,230690007,Neonatal encephalopathy
+2026-04-08T22:38:00Z,,cph-baby-004,cph-enc-nicu-004,230690007,Neonatal encephalopathy
+2026-04-11T12:03:00Z,,cph-baby-005,cph-enc-birth-005,69874008,Shoulder dystocia
+2026-04-13T02:37:00Z,,cph-baby-006,cph-enc-birth-006,23835007,Chorioamnionitis
+2026-04-13T03:25:00Z,,cph-baby-006,cph-enc-nicu-006,77206006,Respiratory distress of newborn
+2026-04-16T16:51:00Z,,cph-baby-007,cph-enc-birth-007,249166005,Reduced fetal movements
+2026-04-20T05:09:00Z,,cph-baby-008,cph-enc-birth-008,44223004,Liveborn singleton delivered vaginally
+2026-04-23T09:35:00Z,,cph-baby-009,cph-enc-birth-009,34486009,Uterine rupture
+2026-04-23T10:20:00Z,,cph-baby-009,cph-enc-nicu-009,12867002,Neonatal seizure
+2026-04-27T21:18:00Z,,cph-baby-010,cph-enc-birth-010,44223004,Liveborn singleton delivered vaginally

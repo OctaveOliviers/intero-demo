@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "intero/runtime-events.schema.json",
+  "title": "Run-stream events (strict v2)",
+  "description": "Machine contract for the SSE run stream (doc 5 §Streaming; prose companion: runtime-shapes.md §1). Wire format is message-only SSE framing: each message carries one of these JSON objects on `data:`, discriminated by `type`. Exactly seven event types; no aliases, fallback names, or mixed shapes. Ordering: activity* -> workbook_created -> (activity | cell_update)* -> review_summary -> [refresh_summary, refresh executions only] -> done; error is terminal and replaces review_summary/done.",
+  "oneOf": [
+    { "$ref": "#/$defs/activity" },
+    { "$ref": "#/$defs/workbook_created" },
+    { "$ref": "#/$defs/cell_update" },
+    { "$ref": "#/$defs/review_summary" },
+    { "$ref": "#/$defs/refresh_summary" },
+    { "$ref": "#/$defs/done" },
+    { "$ref": "#/$defs/error" }
+  ],
+  "$defs": {
+    "activity": {
+      "type": "object",
+      "description": "One feed entry. `headline` is required and non-empty (the collapsed status line); no legacy alias keys (`summary`, `message`) are ever emitted.",
+      "required": ["type", "headline"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "activity" },
+        "headline": { "type": "string", "minLength": 1 },
+        "detail": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["running", "ok", "error"] }
+      }
+    },
+    "workbook_created": {
+      "type": "object",
+      "description": "Exactly once, before any cell_update. Ships the structured, body-empty workbook with rows pre-allocated for the resolved cohort (cell_update writes land only on existing rows).",
+      "required": ["type", "label", "sheets", "cellMetadata"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "workbook_created" },
+        "label": { "type": "string", "minLength": 1 },
+        "sheets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "data"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "data": {
+                "description": "2-D cell grid; row 0 is the header row, rows 1..N are the pre-allocated cohort rows.",
+                "type": "array",
+                "items": { "type": "array" }
+              },
+              "meta": { "type": "object" }
+            }
+          }
+        },
+        "cellMetadata": {
+          "description": "Per-cell metadata map keyed \"<Sheet>!<A1>\" (empty at creation; populated client-side from cell_update).",
+          "type": "object"
+        }
+      }
+    },
+    "cell_update": {
+      "type": "object",
+      "description": "Zero or more. One batch of cell writes for a single sheet; `ref` is A1 within `sheet`. `meta` is the per-cell metadata projection (cell-resolution.schema.json / runtime-shapes.md §2).",
+      "required": ["type", "sheet", "cells"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "cell_update" },
+        "sheet": { "type": "string", "minLength": 1 },
+        "cells": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["ref"],
+            "additionalProperties": false,
+            "properties": {
+              "ref": { "type": "string", "minLength": 1 },
+              "value": {},
+              "meta": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    "review_summary": {
+      "type": "object",
+      "description": "Exactly once, before done. The reviewer-focused terminal summary — rendered as the final entry of the agent-activity feed (doc 11). `totals.needs_verification` is the DERIVED needs-verification count (doc 5 §Cell state model).",
+      "required": ["type", "totals", "blocking", "verification"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "review_summary" },
+        "totals": {
+          "type": "object",
+          "required": ["cells", "filled", "blocked", "needs_verification", "low_confidence"],
+          "properties": {
+            "cells": { "type": "integer", "minimum": 0 },
+            "filled": { "type": "integer", "minimum": 0 },
+            "blocked": { "type": "integer", "minimum": 0 },
+            "needs_verification": { "type": "integer", "minimum": 0 },
+            "low_confidence": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "blocking": {
+          "type": "object",
+          "required": ["count", "reason_codes", "focus"],
+          "properties": {
+            "count": { "type": "integer", "minimum": 0 },
+            "reason_codes": {
+              "type": "object",
+              "additionalProperties": { "type": "integer", "minimum": 0 }
+            },
+            "focus": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["reason_code", "count", "sample_refs", "detail"],
+                "properties": {
+                  "reason_code": { "type": "string", "minLength": 1 },
+                  "count": { "type": "integer", "minimum": 1 },
+                  "sample_refs": { "type": "array", "items": { "type": "string" } },
+                  "detail": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "verification": {
+          "type": "object",
+          "required": ["pending", "reviewed", "corrected", "focus"],
+          "properties": {
+            "pending": { "type": "integer", "minimum": 0 },
+            "reviewed": { "type": "integer", "minimum": 0 },
+            "corrected": { "type": "integer", "minimum": 0 },
+            "focus": {
+              "type": "object",
+              "required": ["needs_review", "low_confidence", "assumptions"],
+              "properties": {
+                "needs_review": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["ref"],
+                    "properties": {
+                      "ref": { "type": "string" },
+                      "field": { "type": ["string", "null"] },
+                      "member": { "type": ["string", "null"] },
+                      "state": { "type": ["string", "null"] }
+                    }
+                  }
+                },
+                "low_confidence": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["ref"],
+                    "properties": {
+                      "ref": { "type": "string" },
+                      "confidence": { "type": ["string", "null"] },
+                      "rationale": { "type": ["string", "null"] }
+                    }
+                  }
+                },
+                "assumptions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["ref"],
+                    "properties": {
+                      "ref": { "type": "string" },
+                      "hypothesis": { "type": ["string", "null"] }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "refresh_summary": {
+      "type": "object",
+      "description": "Refresh executions only (doc 11-refresh): exactly once, after review_summary and before done. An initial run never emits it.",
+      "required": ["type", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "refresh_summary" },
+        "summary": { "$ref": "#/$defs/refresh_delta" }
+      }
+    },
+    "done": {
+      "type": "object",
+      "description": "Exactly once on successful completion. On a refresh execution it additionally carries the same `summary` object as refresh_summary.",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "done" },
+        "summary": { "$ref": "#/$defs/refresh_delta" }
+      }
+    },
+    "error": {
+      "type": "object",
+      "description": "Terminal failure; no review_summary or done follows. `executionId` is present on refresh executions so the client can attribute the failure.",
+      "required": ["type", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "error" },
+        "message": { "type": "string", "minLength": 1 },
+        "scope": { "type": "string" },
+        "executionId": { "type": "string" }
+      }
+    },
+    "refresh_delta": {
+      "type": "object",
+      "description": "What a refresh execution changed (built by server/routes/runs.py::_build_refresh_summary).",
+      "required": [
+        "new_members_count",
+        "departed_members_count",
+        "retried_blocked_count",
+        "resolved_blocked_count",
+        "remaining_blocked_count",
+        "updated_cells_count"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "new_members_count": { "type": "integer", "minimum": 0 },
+        "departed_members_count": { "type": "integer", "minimum": 0 },
+        "retried_blocked_count": { "type": "integer", "minimum": 0 },
+        "resolved_blocked_count": { "type": "integer", "minimum": 0 },
+        "remaining_blocked_count": { "type": "integer", "minimum": 0 },
+        "updated_cells_count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

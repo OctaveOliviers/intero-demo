@@ -1,0 +1,28 @@
+{
+  "name": "intero-app",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:mock": "VITE_MOCK=true vite",
+    "seed": "cd .. && python3 -m scripts.seed",
+    "dev:seeded": "npm run seed && vite",
+    "test": "node --test 'src/**/*.test.js' 'src/**/*.test.mjs'",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:home-contract": "node --test src/lib/__tests__/home-flow-contract.test.mjs"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.7",
+    "jspreadsheet-ce": "^5.0.0",
+    "snarkdown": "^2.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^3.0.0",
+    "ajv": "^8.20.0",
+    "svelte": "^4.0.0",
+    "vite": "^5.0.0"
+  }
+}
