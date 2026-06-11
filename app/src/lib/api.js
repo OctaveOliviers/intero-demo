@@ -79,7 +79,16 @@ async function parseAuthResponse(res, fallbackMessage) {
 
 // --- auth ------------------------------------------------------------------
 
+// Dev-mock auth (VITE_MOCK=true): the whole auth domain short-circuits so the
+// app runs with no backend. `authMe` reports an authenticated mock user (so a
+// reload stays signed in), `authLogin` accepts any credentials, and the
+// per-user history endpoints return empty (mock history lives in the run/audit
+// fixtures, not behind auth). Without this, every auth call 401s against the
+// absent server even after the login screen's bypass.
+const MOCK_USER = { id: "mock-user", username: "mock" };
+
 export async function authMe() {
+  if (isMockMode("auth")) return { ...MOCK_USER };
   const res = await fetch(`${API_BASE}/api/auth/me`, {
     credentials: "include",
   });
@@ -87,6 +96,7 @@ export async function authMe() {
 }
 
 export async function authLogin(username, password) {
+  if (isMockMode("auth")) return { ...MOCK_USER, username: username || MOCK_USER.username };
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -97,6 +107,7 @@ export async function authLogin(username, password) {
 }
 
 export async function authLogout() {
+  if (isMockMode("auth")) return { ok: true };
   const res = await fetch(`${API_BASE}/api/auth/logout`, {
     method: "POST",
     credentials: "include",
@@ -110,6 +121,7 @@ export async function authLogout() {
 }
 
 export async function listMyRuns() {
+  if (isMockMode("auth")) return [];
   const res = await fetch(`${API_BASE}/api/auth/runs`, {
     credentials: "include",
   });
@@ -117,6 +129,7 @@ export async function listMyRuns() {
 }
 
 export async function listMyQueries() {
+  if (isMockMode("auth")) return [];
   const res = await fetch(`${API_BASE}/api/auth/queries`, {
     credentials: "include",
   });

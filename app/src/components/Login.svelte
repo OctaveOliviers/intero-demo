@@ -5,12 +5,14 @@
   logout, return here.
 
   Auth is cookie-based (HttpOnly session set by the server), so `credentials:
-  "include"` is all the client needs — there is no token to store. This talks to
-  the real auth API directly rather than through the per-domain mock seam, since
-  auth has no mock and is the precondition for everything behind it.
+  "include"` is all the client needs — there is no token to store. The login
+  goes through `authLogin` in the api seam, which short-circuits in dev mock
+  mode (VITE_MOCK=true): any non-empty username + password is accepted without
+  hitting the server, so the QA flows can be driven without seeding a user.
 -->
 <script>
   import { createEventDispatcher } from "svelte";
+  import { authLogin } from "../lib/api.js";
 
   const dispatch = createEventDispatcher();
 
@@ -28,17 +30,7 @@
     submitting = true;
     error = "";
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ username: username.trim(), password }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.detail || "Login failed");
-      }
-      const user = await res.json();
+      const user = await authLogin(username.trim(), password);
       password = "";
       dispatch("authenticated", user);
     } catch (e) {
