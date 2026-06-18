@@ -22,8 +22,13 @@ from typing import Any
 from core.clients import llm
 from core.indexing.profile import (
     classify_column,
+    discover_foreign_keys,
     discover_identity_links,
+    grain_cardinality_warnings,
+    grain_signal,
     readonly_connection,
+    schema_fingerprint,
+    table_fingerprint,
     validate_against_schema,
 )
 
@@ -70,6 +75,7 @@ Output shape:
   "description": "<one paragraph: which tables hold what, the primary entity, where free-text lives>",
   "tables": [
     { "name": "<table name, verbatim>", "description": "<clinical role of the table>",
+      "grain": "<what ONE row represents, e.g. 'one row per patient registration'>",
       "columns": [
         { "name": "<column name, verbatim>", "description": "<clinical meaning>",
           "codes": { "<code>": "<meaning>" } }
@@ -80,6 +86,9 @@ Output shape:
 Rules:
 - Include every table and every column given in the input, names verbatim.
 - Descriptions must be clinical, not technical restatements of the column name.
+- `grain` states what one row IS. Each table is tagged with a measured signal
+  (one-row-per-entity vs many-rows-per-entity) — keep that distinction; you are
+  only refining the phrasing (name the entity/event).
 - Only include `codes` when the column genuinely stores a coded set.
 - Output only the JSON object, starting with `{`.
 """
@@ -122,7 +131,13 @@ def extract_schema(db_path: Path) -> dict[str, Any]:
                 row_count = None
 
             for fk in conn.execute(f'PRAGMA foreign_key_list("{name}")').fetchall():
-                relationships.append({"from_table": name, "from_column": fk["from"]})
+                # Capture the target too (fk["table"]/fk["to"]) so a declared FK
+                # is a full edge for discover_foreign_keys; the filterable surface
+                # only reads from_table/from_column, so the extra keys are inert.
+                relationships.append({
+                    "from_table": name, "from_column": fk["from"],
+                    "to_table": fk["table"], "to_column": fk["to"],
+                })
 
             tables.append({
                 "name": name,
@@ -156,12 +171,19 @@ def _hint(annotation: dict[str, Any]) -> str:
 
 
 def _render_for_llm(
-    schema: dict[str, Any], classifications: dict[str, dict[str, dict]]
+    schema: dict[str, Any],
+    classifications: dict[str, dict[str, dict]],
+    grain: dict[str, str] | None = None,
 ) -> str:
     """A clean view of the schema + value hints for the prompt (no raw braces)."""
+    grain = grain or {}
     lines: list[str] = []
     for table in schema["tables"]:
-        lines.append(f"Table {table['name']} ({table['row_count']} rows):")
+        tname = table["name"]
+        signal = grain.get(tname)
+        head = f"Table {tname} ({table['row_count']} rows)"
+        head += f" [grain signal: {signal}]:" if signal else ":"
+        lines.append(head)
         for col in table["columns"]:
             annotation = classifications[table["name"]][col["name"]]
             lines.append(
@@ -218,9 +240,13 @@ def _assemble(
     classifications: dict[str, dict[str, dict]],
     prose: dict[str, Any],
     identity_links: list[dict[str, Any]] | None = None,
+    foreign_keys: list[dict[str, Any]] | None = None,
+    grain: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Merge the deterministic skeleton + filterable surface with the LLM prose
     into a `model.json` document."""
+    foreign_keys = foreign_keys or []
+    grain = grain or {}
     prose_tables = {t.get("name"): t for t in prose.get("tables", []) if isinstance(t, dict)}
     out_tables: list[dict[str, Any]] = []
     for table in schema["tables"]:
@@ -257,6 +283,14 @@ def _assemble(
         }
         if table["row_count"] is not None:
             out_table["row_count"] = table["row_count"]
+        # `grain` = the LLM's refined phrasing when given, else the deterministic
+        # signal floor (so grain is always populated; the LLM only sharpens it).
+        out_grain = (str(p_table.get("grain") or "").strip()) or grain.get(tname)
+        if out_grain:
+            out_table["grain"] = out_grain
+        # Measured/deterministic structural fingerprint — set last so the LLM
+        # cannot influence it (same invariant as identity_links/foreign_keys).
+        out_table["fingerprint"] = table_fingerprint(table, foreign_keys)
         out_tables.append(out_table)
 
     model = {
@@ -266,10 +300,81 @@ def _assemble(
         "description": (prose.get("description") or f"Database model for {database_id}.").strip(),
         "tables": out_tables,
     }
+    # `conventions` is asserted (LLM/human), optional — keep the LLM's if valid.
+    conventions = prose.get("conventions")
+    if isinstance(conventions, dict) and conventions:
+        model["conventions"] = conventions
     # Measured, deterministic — set after the prose merge so the LLM can never
-    # write or override an identity link (same invariant as the filterable surface).
+    # write or override the graph/fingerprint (same invariant as the filterable surface).
     if identity_links:
         model["identity_links"] = identity_links
+    if foreign_keys:
+        model["foreign_keys"] = foreign_keys
+    model["schema_fingerprint"] = schema_fingerprint(schema, foreign_keys, identity_links)
+    return model
+
+
+# Asserted prose preserved across re-index for a structurally-unchanged table, so
+# re-indexing never churns hand-authored semantics (mapping-artifact-redesign §6).
+# (Column-level durable fields — description, codes — are handled inline in
+# `_merge_durable`, since `codes` needs a vocabulary-coverage check.)
+_DURABLE_TABLE_FIELDS = ("description", "grain")
+
+
+def _merge_durable(model: dict[str, Any], previous: dict[str, Any] | None) -> dict[str, Any]:
+    """Overlay the prior model's ASSERTED fields onto the freshly-built `model`,
+    per the durable-semantics rule: an asserted field (db/table/column description,
+    grain, column codes, conventions) is preserved from `previous` when that
+    scope is structurally UNCHANGED — its fingerprint matches — OR when no prior
+    fingerprint exists yet (the first re-index after this feature ships: the
+    committed seeds carry hand-authored prose but no fingerprint, so preserve it
+    rather than let a fresh build wipe it). A changed fingerprint re-derives.
+    Measured blocks (foreign_keys, identity_links, fingerprints, the filterable
+    surface) are never touched here."""
+    if not previous:
+        return model
+
+    db_unchanged = (
+        previous.get("schema_fingerprint") is None
+        or previous.get("schema_fingerprint") == model.get("schema_fingerprint")
+    )
+    if db_unchanged:
+        for field in ("description", "summary"):
+            if previous.get(field) is not None:
+                model[field] = previous[field]
+        # conventions is asserted prose BUT its row_filters compile to SQL, so a
+        # stale predicate referencing a renamed/dropped column would break every
+        # emitted JOIN. Gate it on the structural fingerprint like the rest: carry
+        # it forward only when the schema is unchanged, never across a schema drift.
+        if previous.get("conventions") is not None:
+            model["conventions"] = previous["conventions"]
+
+    prev_tables = {t.get("name"): t for t in previous.get("tables", []) if isinstance(t, dict)}
+    for table in model.get("tables", []):
+        prev = prev_tables.get(table.get("name"))
+        if not prev:
+            continue
+        prev_fp = prev.get("fingerprint")
+        if prev_fp is not None and prev_fp != table.get("fingerprint"):
+            continue  # structurally changed — re-derive from the fresh build
+        for field in _DURABLE_TABLE_FIELDS:
+            if prev.get(field) is not None:
+                table[field] = prev[field]
+        prev_cols = {c.get("name"): c for c in prev.get("columns", []) if isinstance(c, dict)}
+        for col in table.get("columns", []):
+            pcol = prev_cols.get(col.get("name"))
+            if not pcol:
+                continue
+            if pcol.get("description") is not None:
+                col["description"] = pcol["description"]
+            # `codes` is durable too, BUT the fingerprint hashes only name+type —
+            # not the value vocabulary — so a column that GAINED a value would
+            # otherwise keep a stale codes map missing that value. Restore the
+            # prior codes only when they still cover the freshly-observed values;
+            # a grown vocabulary lets the fresh build's codes stand.
+            prev_codes = pcol.get("codes")
+            if prev_codes is not None and set(col.get("values") or []) <= set(prev_codes):
+                col["codes"] = prev_codes
     return model
 
 
@@ -279,20 +384,27 @@ async def build_database_model(
     *,
     display_name: str | None = None,
     sibling_databases: dict[str, Path] | None = None,
+    previous: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build a validated `model.json` document (a dict). The filterable surface
-    AND the cross-database identity links are computed deterministically from the
-    live data; one LLM call supplies the prose. `sibling_databases` maps the other
-    databases' ids to their sqlite paths — when given, measured `identity_links`
-    are profiled against them (see `profile.discover_identity_links`). Retries on
-    malformed LLM output; raises `BuilderValidationError` after
-    `_MAX_BUILD_ATTEMPTS` so the service marks the entity `status: error`."""
+    """Build a validated `model.json` document (a dict). The filterable surface,
+    the cross-database `identity_links` AND the within-database `foreign_keys`
+    graph are computed deterministically from the live data; one LLM call supplies
+    the prose. `sibling_databases` maps the other databases' ids to their sqlite
+    paths — when given, measured `identity_links` are profiled against them.
+    `previous` is the prior model (a ready model on re-index, the stub on first
+    index); its asserted prose is preserved for structurally-unchanged tables
+    (`_merge_durable`). Retries on malformed LLM output; raises
+    `BuilderValidationError` after `_MAX_BUILD_ATTEMPTS`."""
     schema = extract_schema(db_path)
     classifications = _build_filterable_surface(db_path, schema)
     identity_links = discover_identity_links(
         db_path, schema, classifications, sibling_databases or {}
     )
-    user_input = _render_for_llm(schema, classifications)
+    foreign_keys = discover_foreign_keys(db_path, schema, classifications)
+    grain = grain_signal(db_path, schema)
+    for warning in grain_cardinality_warnings(grain, foreign_keys):
+        logger.warning("grain/cardinality check (%s): %s", database_id, warning)
+    user_input = _render_for_llm(schema, classifications, grain)
     if display_name:
         user_input = f"database_name_hint: {display_name}\n\n{user_input}"
 
@@ -311,7 +423,11 @@ async def build_database_model(
         except (json.JSONDecodeError, ValueError) as exc:
             problems = [f"LLM output was not parseable JSON: {exc}"]
         else:
-            model = _assemble(database_id, schema, classifications, prose, identity_links)
+            model = _merge_durable(
+                _assemble(database_id, schema, classifications, prose,
+                          identity_links, foreign_keys, grain),
+                previous,
+            )
             problems = validate_against_schema(model, _SCHEMA_FILE)
             if not problems:
                 return model

@@ -3,8 +3,8 @@
 Scans ``var/audits/*`` and ``var/databases/*`` and exposes the registry both
 the HTTP list endpoints and the run orchestrator need. Reads each entity through
 ``indexing.read_meta``, the single accessor that knows the on-disk format
-(``spec.json``/``model.json``, with a legacy ``.md`` fallback) — so the catalog
-never branches on file layout. No HTTP, no LLM.
+(``spec.json``/``model.json``) — so the catalog never branches on file layout.
+No HTTP, no LLM.
 """
 
 from __future__ import annotations
@@ -25,24 +25,17 @@ def _read_json(path) -> dict | None:
 
 def _audit_card_meta(audit_id: str) -> dict:
     spec = _read_json(AUDITS_DIR / audit_id / "spec.json") or {}
-    provenance = spec.get("provenance")
-    if not isinstance(provenance, dict):
-        provenance = {}
-    return {
-        "version": str(spec.get("version")) if spec.get("version") is not None else None,
-        "scheme": provenance.get("scheme"),
-        "last_pulled": provenance.get("last_pulled") or provenance.get("lastPulled"),
-        "provenance_ref": provenance.get("ref") or provenance.get("source_ref"),
-        "provenance_url": provenance.get("url") or provenance.get("source_url"),
-        "level": spec.get("level") or "Local",
-        "read_only": bool(spec.get("read_only") or spec.get("readOnly") or False),
-        "stale": bool(spec.get("stale") or False),
-        "deadline": spec.get("deadline") or None,
-    }
+    meta = _card_meta(spec)
+    meta["deadline"] = spec.get("deadline") or None
+    return meta
 
 
 def _database_card_meta(db_id: str) -> dict:
     model = _read_json(DATABASES_DIR / db_id / "model.json") or {}
+    return _card_meta(model)
+
+
+def _card_meta(model: dict) -> dict:
     provenance = model.get("provenance")
     if not isinstance(provenance, dict):
         provenance = {}
@@ -114,20 +107,3 @@ def get_audit_by_id(audit_id: str) -> dict | None:
         if audit["id"] == audit_id:
             return audit
     return None
-
-
-def get_database_catalog_xml() -> str:
-    """Generate XML catalog of available databases for prompt injection."""
-    databases = load_database_catalog()
-    if not databases:
-        return "<available_databases>\n  <!-- No databases registered -->\n</available_databases>"
-
-    lines = ["<available_databases>"]
-    for db in databases:
-        lines.append("  <database>")
-        lines.append(f"    <name>{db['name']}</name>")
-        lines.append(f"    <description>{db['description']}</description>")
-        lines.append(f"    <type>{db['type']}</type>")
-        lines.append("  </database>")
-    lines.append("</available_databases>")
-    return "\n".join(lines)

@@ -40,7 +40,11 @@ from core.indexing.build_database_model import (  # noqa: E402
     build_database_model,
     extract_schema,
 )
-from core.indexing.profile import validate_against_schema  # noqa: E402
+from core.indexing.profile import (  # noqa: E402
+    discover_foreign_keys,
+    grain_signal,
+    validate_against_schema,
+)
 
 VAR_DIR = REPO_ROOT / "var"
 _DB_SCHEMA_FILE = "database-model.schema.json"
@@ -132,8 +136,16 @@ def run(args: argparse.Namespace) -> None:
     classifications = _build_filterable_surface(sqlite_path, schema)
     print_classifications(classifications)
 
+    # ── Step 3b: Within-database FK graph + grain signal (deterministic) ──
+    print("\n=== Step 3b: Discover within-database foreign keys ===")
+    foreign_keys = discover_foreign_keys(sqlite_path, schema, classifications)
+    for e in foreign_keys:
+        tag = "declared" if e["declared"] else e["evidence"]
+        print(f"  {e['column']} -> {e['target']} [{e['cardinality']}] ({tag})")
+    grain = grain_signal(sqlite_path, schema)
+
     if args.no_llm:
-        # ── Step 3b: Assemble with stub prose (no LLM) ──
+        # ── Step 3c: Assemble with stub prose (no LLM) ──
         print("\n=== Step 4: Assemble model (no LLM — stub descriptions) ===")
         stub_prose = {
             "title": args.database_id,
@@ -150,7 +162,10 @@ def run(args: argparse.Namespace) -> None:
                 for t in schema["tables"]
             ],
         }
-        model = _assemble(args.database_id, schema, classifications, stub_prose)
+        model = _assemble(
+            args.database_id, schema, classifications, stub_prose,
+            None, foreign_keys, grain,
+        )
     else:
         # ── Step 4: Full LLM pipeline ──
         print("\n=== Step 4: Build model (with LLM) ===")

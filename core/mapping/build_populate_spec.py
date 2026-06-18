@@ -196,6 +196,128 @@ def _short_alias(table: str, used: set[str]) -> str:
     return alias
 
 
+# Within-database multi-hop reach (Phase C): a `direct` field whose column lives in
+# a foreign-database table that is NOT the identity bridge's key table can still be
+# Tier-1-filled when a TO-ONE foreign-key chain reaches it from that key table —
+# the join is emitted into the region query, keyed by the bridge key, so the
+# executor stitches and blocks exactly as for a single-table read.
+_FK_HOP_CAP = 4
+
+
+def _fk_adjacency(edges: list[dict] | None) -> dict[str, list[tuple[str, str, str]]]:
+    """Undirected adjacency over TO-ONE FK edges only: ``table -> [(col_here,
+    other_table, col_there), …]``. A to-one edge is 1:1 (the FK column is
+    all-distinct), so it is safe to traverse in either direction; to-many edges
+    are omitted — joining from the key side would fan out."""
+    adj: dict[str, list[tuple[str, str, str]]] = {}
+    for e in edges or []:
+        if e.get("cardinality") != "to-one":
+            continue
+        ct, _, cc = (e.get("column") or "").partition(".")
+        tt, _, tc = (e.get("target") or "").partition(".")
+        if not (ct and cc and tt and tc) or ct == tt:
+            continue
+        adj.setdefault(ct, []).append((cc, tt, tc))
+        adj.setdefault(tt, []).append((tc, ct, cc))
+    return adj
+
+
+def _reachable_via_fk(table: str, key_table: str, edges: list[dict] | None) -> list[dict] | None:
+    """The join hops from ``key_table`` to ``table`` over to-one FK edges, or None.
+
+    Returns ``[]`` when they are the same table, a list of
+    ``{from_table, from_col, to_table, to_col}`` hops for a unique shortest path,
+    or ``None`` when unreachable or AMBIGUOUS (≥2 distinct shortest joins) — a
+    guessed join could mix rows, so the field stays ``interpret``."""
+    if table == key_table:
+        return []
+    adj = _fk_adjacency(edges)
+    paths: list[list[dict]] = []
+
+    def dfs(node: str, visited: set[str], hops: list[dict]) -> None:
+        if len(hops) >= _FK_HOP_CAP:
+            return
+        for col_here, nxt, col_there in adj.get(node, []):
+            if nxt in visited:
+                continue
+            hop = {"from_table": node, "from_col": col_here,
+                   "to_table": nxt, "to_col": col_there}
+            if nxt == table:
+                paths.append(hops + [hop])
+            else:
+                dfs(nxt, visited | {nxt}, hops + [hop])
+
+    dfs(key_table, {key_table}, [])
+    if not paths:
+        return None
+    shortest = min(len(p) for p in paths)
+    distinct: dict[tuple, list[dict]] = {}
+    for p in paths:
+        if len(p) == shortest:
+            canon = tuple(
+                (h["from_table"], h["to_table"], frozenset((h["from_col"], h["to_col"])))
+                for h in p
+            )
+            distinct[canon] = p
+    if len(distinct) != 1:  # 0 = none at this length (impossible), >1 = ambiguous
+        return None
+    return next(iter(distinct.values()))
+
+
+# SQL keywords/operators that may appear bare in a row-filter predicate and must
+# NOT be alias-qualified (they are not columns).
+_SQL_PRED_KEYWORDS = frozenset({
+    "and", "or", "not", "null", "is", "in", "like", "between", "exists", "true",
+    "false", "collate", "escape", "glob", "regexp", "match", "case", "when",
+    "then", "else", "end", "cast", "as",
+    # SQLite type names (so `CAST(x AS INTEGER)` keeps INTEGER bare, not aliased)
+    "integer", "int", "text", "real", "numeric", "blob", "none", "varchar",
+    "char", "boolean", "date", "datetime", "decimal", "float", "double",
+    "bigint", "smallint",
+})
+
+
+def _qualify_predicate(predicate: str, alias: str) -> str:
+    """Alias-qualify EVERY bare column in a row-filter predicate so it is
+    unambiguous inside a multi-table JOIN — not just the first token. E.g.
+    ``status != 'void' AND deleted_at IS NULL`` ->
+    ``r.status != 'void' AND r.deleted_at IS NULL`` (per the contract, a predicate
+    references only columns of its own ``row_filters[].table``). Skips: identifiers
+    already qualified (``x.col``), function names (``LOWER(`` ), SQL keywords, and
+    anything inside single-quoted string literals. A fully-qualified predicate is
+    therefore returned unchanged."""
+    # Split on single-quoted string literals (odd indices) so we never touch them.
+    parts = re.split(r"('(?:[^']|'')*')", predicate.strip())
+
+    def qualify_segment(seg: str) -> str:
+        def repl(m: re.Match) -> str:
+            ident = m.group(0)
+            after = seg[m.end():].lstrip()
+            if after.startswith(".") or after.startswith("("):
+                return ident  # table qualifier or function name
+            if ident.lower() in _SQL_PRED_KEYWORDS:
+                return ident
+            return f"{alias}.{ident}"
+        # identifiers NOT preceded by a word char or '.' (so `x.col` keeps its `col`)
+        return re.sub(r"(?<![\w.])[A-Za-z_]\w*", repl, seg)
+
+    return "".join(
+        seg if i % 2 else qualify_segment(seg) for i, seg in enumerate(parts)
+    )
+
+
+def _row_filters(conventions: dict | None, db: str) -> dict[str, str]:
+    """`{table: predicate}` from a database's conventions.row_filters (empty when none).
+
+    NO PRODUCER YET: indexing does not emit `conventions` on the current synthetic
+    databases, so this is a no-op there. The consuming path (this helper +
+    `_qualify_predicate` + the JOIN-emit in `_build_region`) is armed and unit-
+    tested so it is correct the day a real-EHR onboarding adds soft-delete /
+    effective-dating conventions."""
+    rfs = ((conventions or {}).get(db) or {}).get("row_filters") or []
+    return {rf["table"]: rf["predicate"] for rf in rfs if rf.get("table") and rf.get("predicate")}
+
+
 def _field_kind(field: dict) -> str:
     """The field's effective populate kind.
 
@@ -258,6 +380,8 @@ def _build_region(
     key_columns: dict[str, str] | None = None,
     key_tables: dict[str, str] | None = None,
     anchor_db: str | None = None,
+    join_paths: dict[tuple[str, str], list[dict]] | None = None,
+    conventions: dict | None = None,
 ) -> dict:
     """Compile one populate region: one read-only, cohort-scoped query per source
     `(database, table)` covering the largest set of cells, plus the cell map.
@@ -292,6 +416,11 @@ def _build_region(
             if field.get("code"):
                 code_sets[col] = {v: k for k, v in field["code"].items()}
                 entry["translate"] = col
+            # Multi-hop: carry the FK join chain so try_direct can render a VALID
+            # per-cell provenance SQL (the leaf table does not carry the bridge
+            # key, so a bare `… FROM <leaf> WHERE <key>=…` would be malformed).
+            if join_paths and (db, table) in join_paths:
+                entry["via"] = join_paths[(db, table)]
             cell_map.append(entry)
         else:  # interpret — fetch every source column as evidence; the LLM/agent decides
             for src in field["sources"]:
@@ -317,14 +446,48 @@ def _build_region(
                 f"carries no identity key for it"
             )
         key_col = (key_columns or {}).get(db, anchor_col)
+        row_filters = _row_filters(conventions, db)
+        hops = (join_paths or {}).get((db, table))
+        if hops:
+            # Multi-hop: the column lives in a non-key table reached via a to-one FK
+            # chain. JOIN from the bridge key table to it, still keyed by the bridge
+            # key so the executor stitches and blocks unchanged; AND any row filters.
+            used: set[str] = set()
+            key_table = hops[0]["from_table"]
+            alias_of = {key_table: _short_alias(key_table, used)}
+            from_parts = [f"{key_table} {alias_of[key_table]}"]
+            where = [f"{alias_of[key_table]}.{key_col} IN (:{COHORT_BIND})"]
+            if key_table in row_filters:
+                where.append(_qualify_predicate(row_filters[key_table], alias_of[key_table]))
+            for hop in hops:
+                a_to = _short_alias(hop["to_table"], used)
+                alias_of[hop["to_table"]] = a_to
+                on = f"{alias_of[hop['from_table']]}.{hop['from_col']} = {a_to}.{hop['to_col']}"
+                if hop["to_table"] in row_filters:
+                    on += f" AND {_qualify_predicate(row_filters[hop['to_table']], a_to)}"
+                from_parts.append(f"JOIN {hop['to_table']} {a_to} ON {on}")
+            leaf = alias_of[table]
+            # Select ALL requested leaf columns: `key_col` lives on the KEY table
+            # (a different alias), so a leaf column must never be dropped for
+            # sharing the key's name (it would silently blank that cell).
+            select_cols = [f"{alias_of[key_table]}.{key_col}"] + [
+                f"{leaf}.{c}" for c in cols
+            ]
+            sql = (
+                f"SELECT {', '.join(select_cols)} FROM {' '.join(from_parts)} "
+                f"WHERE {' AND '.join(where)}"
+            )
+            queries.append({"database": db, "sql": sql, "key_column": key_col})
+            continue
+
         alias = table[0].lower()
         select_cols = [f"{alias}.{key_col}"] + [
             f"{alias}.{c}" for c in cols if c != key_col
         ]
-        sql = (
-            f"SELECT {', '.join(select_cols)} FROM {table} {alias} "
-            f"WHERE {alias}.{key_col} IN (:{COHORT_BIND})"
-        )
+        where = [f"{alias}.{key_col} IN (:{COHORT_BIND})"]
+        if table in row_filters:
+            where.append(_qualify_predicate(row_filters[table], alias))
+        sql = f"SELECT {', '.join(select_cols)} FROM {table} {alias} WHERE {' AND '.join(where)}"
         query = {"database": db, "sql": sql}
         if key_col != anchor_col:
             query["key_column"] = key_col
@@ -340,13 +503,24 @@ def _build_region(
     }
 
 
-def build_populate_spec(mapping: dict) -> dict:
+def build_populate_spec(
+    mapping: dict,
+    *,
+    join_graph: dict[str, list[dict]] | None = None,
+    conventions: dict[str, dict] | None = None,
+) -> dict:
     """Compile a parsed `mapping.json` into the v2 `populate.json` spec (a dict).
 
     Pure and deterministic — no LLM, no database connection. Per region it emits one
     read-only, cohort-scoped query per source table (covering the largest set of cells),
     the cell map (result column → workbook cell), code-set translations, and the
     identity join keys; plus the top-level cohort block (A7).
+
+    `join_graph` maps each database id to its measured within-database `foreign_keys`
+    (Phase C): a `direct` field on a foreign non-key table is kept direct — its query
+    JOINs to it over a to-one FK chain — instead of being demoted to `interpret`.
+    `conventions` maps each database id to its `conventions` block; any `row_filters`
+    are ANDed into the emitted queries. Both default to None (today's behavior).
     """
     if not isinstance(mapping, dict):
         raise BuildError("mapping is not a JSON object")
@@ -396,12 +570,22 @@ def build_populate_spec(mapping: dict) -> dict:
         # `interpret` (see _field_kind), so one mapping region can yield a direct AND an
         # interpret populate region (both scoped to the same cohort identities).
         by_kind: dict[str, list[dict]] = {"direct": [], "interpret": []}
+        join_paths: dict[tuple[str, str], list[dict]] = {}
         for field in region_fields:
             kind = _field_kind(field)
             if kind == "direct":
                 db, table, _col = _parse_source(field["sources"][0])
                 if not _tier1_reachable(db, table, cohort["database"], key_tables):
-                    kind = "interpret"  # Tier 1 cannot key this table's rows (A3)
+                    # A foreign non-key table: keep `direct` only if a to-one FK
+                    # chain reaches it from the bridge key table (Phase C);
+                    # otherwise Tier 1 cannot key its rows -> interpret (A3).
+                    hops = None
+                    if join_graph is not None and key_tables and db in key_tables:
+                        hops = _reachable_via_fk(table, key_tables[db], join_graph.get(db))
+                    if hops:
+                        join_paths[(db, table)] = hops
+                    else:
+                        kind = "interpret"
             by_kind[kind].append(field)
         present = [k for k in ("direct", "interpret") if by_kind[k]]
         for kind in present:
@@ -411,6 +595,8 @@ def build_populate_spec(mapping: dict) -> dict:
                     out_id, sheet, kind, by_kind[kind], anchor_col, code_sets,
                     multi_sheet=multi_sheet, key_columns=key_columns,
                     key_tables=key_tables, anchor_db=cohort["database"],
+                    join_paths=join_paths if kind == "direct" else None,
+                    conventions=conventions,
                 )
             )
 
@@ -428,7 +614,12 @@ def build_populate_spec(mapping: dict) -> dict:
     return spec
 
 
-def fold_executable(mapping: dict) -> dict:
+def fold_executable(
+    mapping: dict,
+    *,
+    join_graph: dict[str, list[dict]] | None = None,
+    conventions: dict[str, dict] | None = None,
+) -> dict:
     """Compile the executable from `mapping`'s match and fold it in under `executable`.
 
     A4 keeps the match and the derived executable in **one file**: this returns a
@@ -436,8 +627,11 @@ def fold_executable(mapping: dict) -> dict:
     (and validated) v2 spec. Pure and deterministic — call it whenever the match
     changes; never hand-edit the result. Raises :class:`BuildError` if the compiled
     executable does not satisfy the v2 contract (a broken executable is never folded).
+
+    `join_graph`/`conventions` (per database id) are threaded to `build_populate_spec`
+    for Phase-C multi-hop direct JOINs + row-filter enforcement; both default to None.
     """
-    spec = build_populate_spec(mapping)
+    spec = build_populate_spec(mapping, join_graph=join_graph, conventions=conventions)
     errors = validate_populate_spec(spec)
     if errors:
         raise BuildError("compiled executable is invalid: " + "; ".join(errors))

@@ -49,7 +49,10 @@ from core.running.sql import SqlError, run_readonly_sql
 # via the identity bridge — such a cell is blocked, identities are never mixed.
 _AMBIGUOUS = object()
 
-_FROM_TABLE = re.compile(r"\bFROM\s+(\w+)", re.IGNORECASE)
+# Every table a query reads — FROM plus each JOIN — so a failed multi-hop query
+# is attributed to ALL its tables (incl. the leaf the cell_map names), not just
+# the first table after FROM (the bridge key table).
+_QUERY_TABLES = re.compile(r"\b(?:FROM|JOIN)\s+(\w+)", re.IGNORECASE)
 
 
 class TryDirectError(Exception):
@@ -169,9 +172,8 @@ async def _resolve_direct_region(
     failed_tables: dict[str, dict[str, Any]] = {}
     for src in per_db:
         if src["error"] is not None:
-            m = _FROM_TABLE.search(src["sql"])
-            if m:
-                failed_tables[m.group(1).lower()] = src
+            for tbl in _QUERY_TABLES.findall(src["sql"]):
+                failed_tables.setdefault(tbl.lower(), src)
 
     successful = [s for s in per_db if s["error"] is None]
     anchor_srcs = [s for s in successful if s["translate"] is None]
@@ -252,7 +254,8 @@ async def _resolve_direct_region(
             raw = source_row.get(column)
             code_map = (code_sets.get(entry["translate"])
                         if entry.get("translate") else None)
-            narrowed = _narrowed_sql(table, column, src["key_columns"], src_ident)
+            via = entry.get("via")
+            narrowed = _narrowed_sql(table, column, src["key_columns"], src_ident, via)
             table_column = f"{table}.{column}"
 
             if raw is None:
@@ -270,7 +273,7 @@ async def _resolve_direct_region(
                 value = code_map[str(raw)] if code_map is not None else str(raw)
                 source = Source(
                     database=src["database"],
-                    query=_source_sql(table, column, src["key_columns"], src_ident),
+                    query=_source_sql(table, column, src["key_columns"], src_ident, via),
                     table_column=table_column,
                 ).as_dict()
                 await run_store.update(
@@ -403,19 +406,49 @@ def _where_identity(identity_keys: list[str], ident: tuple[Any, ...]) -> str:
     return " AND ".join(f"{k} = {_lit(v)}" for k, v in zip(identity_keys, ident))
 
 
+def _via_from(via: list[dict[str, Any]]) -> tuple[str, dict[str, str]]:
+    """Build the multi-hop ``FROM <key_table> a0 JOIN … `` clause and the per-table
+    aliases. ``via`` is the FK hop chain the compiler attached to the cell_map
+    entry: ``[{from_table, from_col, to_table, to_col}, …]`` from the bridge key
+    table to the leaf table that actually holds the value."""
+    aliases = {via[0]["from_table"]: "a0"}
+    parts = [f'{via[0]["from_table"]} a0']
+    for i, hop in enumerate(via, start=1):
+        a = f"a{i}"
+        aliases[hop["to_table"]] = a
+        parts.append(
+            f'JOIN {hop["to_table"]} {a} ON '
+            f'{aliases[hop["from_table"]]}.{hop["from_col"]} = {a}.{hop["to_col"]}'
+        )
+    return " ".join(parts), aliases
+
+
 def _narrowed_sql(
-    table: str, column: str, identity_keys: list[str], ident: tuple[Any, ...]
+    table: str, column: str, identity_keys: list[str], ident: tuple[Any, ...],
+    via: list[dict[str, Any]] | None = None,
 ) -> str:
     """The narrowed per-cell projection recorded on ``attempts[0]`` — focused
-    context for an escalated cell (not the wide bulk query that actually ran)."""
+    context for an escalated cell (not the wide bulk query that actually ran).
+    For a multi-hop direct field the leaf ``table`` does not carry the bridge key,
+    so the narrowed query JOINs along ``via`` and keys on the bridge table (a0)."""
+    if via:
+        frm, aliases = _via_from(via)
+        where = _where_identity([f"a0.{k}" for k in identity_keys], ident)
+        return f"SELECT {aliases[table]}.{column} FROM {frm} WHERE {where}"
     return f"SELECT {column} FROM {table} WHERE {_where_identity(identity_keys, ident)}"
 
 
 def _source_sql(
-    table: str, column: str, identity_keys: list[str], ident: tuple[Any, ...]
+    table: str, column: str, identity_keys: list[str], ident: tuple[Any, ...],
+    via: list[dict[str, Any]] | None = None,
 ) -> str:
     """The provenance query on ``sources[]``: the value shown ALONGSIDE its identity
     so the evidence is self-verifying (never a bare ``SELECT <value>``)."""
+    if via:
+        frm, aliases = _via_from(via)
+        keys = [f"a0.{k}" for k in identity_keys]
+        cols = ", ".join(keys + [f"{aliases[table]}.{column}"])
+        return f"SELECT {cols} FROM {frm} WHERE {_where_identity(keys, ident)}"
     cols = ", ".join(identity_keys + [column])
     return f"SELECT {cols} FROM {table} WHERE {_where_identity(identity_keys, ident)}"
 

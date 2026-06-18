@@ -19,14 +19,14 @@ export function countWorkbookStatus(cellMetadata) {
       blocked += 1;
       continue;
     }
-    if (state === "not_applicable") continue;
-    const kind = norm(meta.kind);
+    // "Needs review" mirrors the backend's needs_verification EXACTLY — a FILLED
+    // cell awaiting sign-off (review_state "not_reviewed") — so the top-band chip
+    // can never diverge from the review summary. The store now sets review_state
+    // on every filled interpret cell (DB trigger) and cell_wire forwards it, so
+    // there is no longer a kind/interpret fallback (which over-counted pending
+    // and review_state-less cells the backend never counted).
     const reviewState = norm(meta.review_state ?? meta.reviewState);
-    const isInterpret = kind === "interpret" || kind === "interpretive";
-    if (
-      reviewState === "not_reviewed" ||
-      (isInterpret && !reviewState)
-    ) {
+    if (state === "filled" && reviewState === "not_reviewed") {
       needsReview += 1;
     }
   }

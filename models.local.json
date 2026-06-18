@@ -1,0 +1,45 @@
+{
+  "schema_version": "1",
+  "stages": {
+    "index_audit": {
+      "provider": "openai-compatible",
+      "model": "Kimi-K2.6",
+      "endpoint": "https://ai-interoai6300ai551863803818.services.ai.azure.com/openai/v1",
+      "temperature": 0.0,
+      "api_key_env": "AZURE_LLM_API_KEY",
+      "max_tokens": 32000
+    },
+    "index_db": {
+      "provider": "openai-compatible",
+      "model": "Kimi-K2.6",
+      "endpoint": "https://ai-interoai6300ai551863803818.services.ai.azure.com/openai/v1",
+      "temperature": 0.0,
+      "api_key_env": "AZURE_LLM_API_KEY",
+      "max_tokens": 32000
+    },
+    "mapping": {
+      "provider": "openai-compatible",
+      "model": "Kimi-K2.6",
+      "endpoint": "https://ai-interoai6300ai551863803818.services.ai.azure.com/openai/v1",
+      "temperature": 0.0,
+      "api_key_env": "AZURE_LLM_API_KEY",
+      "max_tokens": 32000
+    },
+    "tier2": {
+      "provider": "openai-compatible",
+      "model": "Kimi-K2.6",
+      "endpoint": "https://ai-interoai6300ai551863803818.services.ai.azure.com/openai/v1",
+      "temperature": 0.3,
+      "api_key_env": "AZURE_LLM_API_KEY",
+      "max_tokens": 32000
+    },
+    "tier3_agent": {
+      "provider": "openai-compatible",
+      "model": "Kimi-K2.6",
+      "endpoint": "https://ai-interoai6300ai551863803818.services.ai.azure.com/openai/v1",
+      "temperature": 0.2,
+      "api_key_env": "AZURE_LLM_API_KEY",
+      "max_tokens": 32000
+    }
+  }
+}

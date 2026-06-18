@@ -69,9 +69,13 @@
    invent their own colors. All values derive from the neutral/accent/status
    tokens above — no new saturated hues, calm and colorblind-safe. */
 :root {
-  /* Workbook cell status backgrounds precedence: gray > blue > white. */
+  /* Workbook cell status backgrounds, matched to the status chips/summary so a
+     cell's colour reads the same as its count: blocked (red) > needs-review
+     (amber) > not-applicable (gray) > settled (white). */
   --cell-bg-legacy-not-applicable: var(--color-surface-muted); /* light gray */
-  --cell-bg-needs-review: var(--color-accent-weak);            /* light blue */
+  --cell-bg-blocked: var(--color-danger-weak);                 /* light red — could not resolve, not yet seen */
+  --cell-bg-blocked-seen: var(--color-hover);                  /* gray — blocked, acknowledged (seen >2s) */
+  --cell-bg-needs-review: var(--color-warning-weak);           /* amber — awaiting sign-off */
   --cell-bg-reviewed-settled: var(--color-surface);            /* white */
 
   /* Cell kind — direct reads as settled (no tint); interpret stands out gently. */

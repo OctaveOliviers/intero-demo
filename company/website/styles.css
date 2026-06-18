@@ -1,0 +1,139 @@
+:root {
+  --bg: #04111a;
+  --text: #f8fbff;
+  --muted: #c3d8ea;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  position: relative;
+  overflow: hidden;
+  min-height: 100dvh;
+  background: radial-gradient(circle at 20% 20%, #103248 0%, var(--bg) 52%);
+  color: var(--text);
+  font-family: "Satoshi", "Outfit", "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.hero {
+  position: relative;
+  z-index: 2;
+  min-height: 100dvh;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.9rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #8bc7f7;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2.7rem, 10vw, 6.3rem);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+}
+
+.tagline {
+  margin: 0;
+  max-width: 39rem;
+  color: var(--muted);
+  font-size: clamp(1rem, 2.5vw, 1.45rem);
+  line-height: 1.4;
+}
+
+.bg-layer {
+  position: absolute;
+  inset: auto;
+  width: 44rem;
+  height: 44rem;
+  border-radius: 50%;
+  filter: blur(50px);
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.bg-a {
+  background: #16a3ff;
+  top: -12rem;
+  left: -10rem;
+  animation: driftA 16s ease-in-out infinite alternate;
+}
+
+.bg-b {
+  background: #4c7dff;
+  right: -9rem;
+  bottom: -14rem;
+  animation: driftB 18s ease-in-out infinite alternate;
+}
+
+.bg-c {
+  background: #18b7b0;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  animation: pulseC 12s ease-in-out infinite;
+}
+
+@keyframes driftA {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(5rem, 3rem) scale(1.12);
+  }
+}
+
+@keyframes driftB {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(-5.4rem, -2rem) scale(1.1);
+  }
+}
+
+@keyframes pulseC {
+  0%,
+  100% {
+    opacity: 0.26;
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+  50% {
+    opacity: 0.48;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding: 1.35rem;
+    gap: 0.8rem;
+  }
+
+  .tagline {
+    max-width: 24rem;
+  }
+
+  .bg-layer {
+    width: 28rem;
+    height: 28rem;
+    filter: blur(40px);
+  }
+}

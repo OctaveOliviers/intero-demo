@@ -17,7 +17,7 @@ Verify cases (BUILD-PLAN.md §A2 + the provenance redesign):
 3. An unresolvable cell is left open for Tier 3.
 4. An off-code solution is rejected (validated against ``spec.json``) and rides
    on ``attempts[]``.
-5. A blank-output 'solution' is rejected at parse time → cell stays pending.
+5. A blank-output 'solution' is coerced to a clean escalate (never an empty fill).
 6. A malformed / failing LLM reply leaves the cell pending with the error.
 7. A retry with no clinical DB bound is recorded and escalated — never faked.
 8. A citation that is not an exact substring of the retry rows fails the solve
@@ -46,6 +46,7 @@ from core.running.try_llm import (  # noqa: E402
     TriageDecision,
     _load_canonical_model,
     _rows_for_prompt,
+    _schema_hint_for_cell,
     make_tier_llm,
     try_llm,
 )
@@ -119,24 +120,40 @@ def _scan(prompt: str, prefix: str) -> str:
 class TriageDecisionModelTest(unittest.TestCase):
     """The structured-output contract: shape constraints + citation/explanation rules."""
 
-    def test_blank_solution_output_is_invalid(self):
-        with self.assertRaises(ValueError):
-            TriageDecision.model_validate({"decision": "solution", "output": "  ",
-                                          "reason": "x"})
+    def test_blank_solution_output_degrades_to_escalate(self):
+        # No value to fill → escalate (never fabricate), not a parse failure.
+        d = TriageDecision.model_validate({"decision": "solution", "output": "  ",
+                                           "reason": "x"})
+        self.assertEqual(d.decision, "escalate")
+        self.assertIsNone(d.output)
 
-    def test_solution_requires_output(self):
-        with self.assertRaises(ValueError):
-            TriageDecision.model_validate({"decision": "solution", "reason": "x"})
+    def test_solution_without_output_degrades_to_escalate(self):
+        d = TriageDecision.model_validate({"decision": "solution", "reason": "x"})
+        self.assertEqual(d.decision, "escalate")
 
-    def test_escalate_must_not_carry_output(self):
-        with self.assertRaises(ValueError):
-            TriageDecision.model_validate({"decision": "escalate", "output": "v",
-                                          "reason": "x"})
+    def test_escalate_with_stray_output_is_coerced_null(self):
+        # A valid escalate must not be thrown away over a leftover output.
+        d = TriageDecision.model_validate({"decision": "escalate", "output": "v",
+                                           "reason": "x"})
+        self.assertEqual(d.decision, "escalate")
+        self.assertIsNone(d.output)
 
-    def test_citations_only_valid_for_solution(self):
-        with self.assertRaises(ValueError):
-            TriageDecision.model_validate({"decision": "retry", "output": "SELECT 1",
-                                          "reason": "x", "citations": ["q"]})
+    def test_solution_only_fields_on_non_solution_are_dropped(self):
+        # The exact failure that stranded every npda Tier-2 cell: a retry/escalate
+        # carrying citations/explanation/source_column. Coerce, don't reject.
+        d = TriageDecision.model_validate({"decision": "retry", "output": "SELECT 1",
+                                           "reason": "x", "citations": ["q"],
+                                           "explanation": "e", "source_column": "t.c"})
+        self.assertEqual(d.decision, "retry")
+        self.assertEqual(d.output, "SELECT 1")
+        self.assertIsNone(d.citations)
+        self.assertIsNone(d.explanation)
+        self.assertIsNone(d.source_column)
+
+    def test_surplus_unknown_field_is_ignored_not_rejected(self):
+        d = TriageDecision.model_validate({"decision": "escalate", "output": None,
+                                           "reason": "x", "confidence": "high"})
+        self.assertEqual(d.decision, "escalate")
 
     def test_reason_must_be_non_empty(self):
         with self.assertRaises(ValueError):
@@ -184,6 +201,32 @@ class RowsForPromptTest(unittest.TestCase):
 
 
 class Tier2SchemaHintTest(unittest.TestCase):
+    def test_schema_hint_lists_joins_among_chosen_tables(self):
+        cell = Cell(run_id="r1", ref="ALL!H2", field="diabetes_type", member="P1",
+                    kind="interpret", state="pending",
+                    attempts=[{"tier": "direct", "table_column": "registrations.x"}])
+        model = {
+            "tables": [
+                {"name": "patients", "columns": [{"name": "patient_id", "type": "text"}]},
+                {"name": "registrations",
+                 "columns": [{"name": "patient_id", "type": "text"},
+                             {"name": "diabetes_type", "type": "text"}]},
+            ],
+            "foreign_keys": [
+                {"column": "registrations.patient_id", "target": "patients.patient_id",
+                 "cardinality": "to-one", "declared": False, "evidence": "x"},
+            ],
+        }
+        hint = _schema_hint_for_cell(cell, model)
+        self.assertIn("joins:", hint)
+        self.assertIn("registrations.patient_id -> patients.patient_id [to-one]", hint)
+
+    def test_schema_hint_omits_joins_when_no_fk_among_chosen(self):
+        cell = Cell(run_id="r1", ref="ALL!A2", field="visit_date", member="P1",
+                    kind="direct", state="pending", attempts=[])
+        model = {"tables": [{"name": "visits", "columns": [{"name": "visit_date", "type": "text"}]}]}
+        self.assertNotIn("joins:", _schema_hint_for_cell(cell, model) or "")
+
     def test_load_canonical_model_reads_var_databases(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -411,12 +454,17 @@ class TryLlmVerifyTest(unittest.TestCase):
         self.assertIn("off-code", cell.attempts[1]["error"].lower())
         self.assertEqual(cell.attempts[1]["value"], "5")
 
-    # --- 5. blank-output solution never fills an empty string --------------
-    def test_blank_solution_left_pending(self):
+    # --- 5. blank-output solution degrades to a clean escalate -------------
+    def test_blank_solution_escalates_cleanly(self):
+        # A 'solution' with no value is coerced to escalate (never fills an empty
+        # string), and — unlike the old parse-rejection — leaves NO "triage
+        # failed" noise: the cell is simply handed to Tier 3 with only its
+        # Tier-1 attempt on record.
         cell = self.cells["ALL!T5"]
         self.assertEqual(cell.state, "pending")
         self.assertIsNone(cell.value)
-        self.assertIn("Tier-2 triage failed", cell.attempts[1]["error"])
+        self.assertEqual(len(cell.attempts), 1)
+        self.assertIn("is NULL", cell.attempts[0]["error"])
 
     # --- 8. ungroundable citation fails the solve --------------------------
     def test_unverifiable_citation_left_pending(self):

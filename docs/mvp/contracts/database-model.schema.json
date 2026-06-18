@@ -42,7 +42,7 @@
       "minLength": 1
     },
     "identity_links": {
-      "description": "MEASURED cross-database identity links: which of this database's identifier columns hold the same values as a column in a SIBLING database. Computed deterministically at indexing time by value-overlap sampling (profile.discover_identity_links) — never written by the LLM. The mapping reads these as facts when deciding identity.keys, and the compiled A3 identity bridge rests on them. Optional — absent when the database was indexed without siblings or no link was measured. Within-database links are not recorded here (PRAGMA foreign_key_list declares those).",
+      "description": "MEASURED cross-database identity links: which of this database's identifier columns hold the same values as a column in a SIBLING database. Computed deterministically at indexing time by value-overlap sampling (profile.discover_identity_links) — never written by the LLM. The mapping reads these as facts when deciding identity.keys, and the compiled A3 identity bridge rests on them. Optional — absent when the database was indexed without siblings or no link was measured. Within-database FKs are recorded separately in `foreign_keys`, measured the same way.",
       "type": "array",
       "minItems": 1,
       "items": {
@@ -68,6 +68,81 @@
         }
       }
     },
+    "foreign_keys": {
+      "description": "MEASURED within-database foreign keys: which of this database's columns hold values drawn from another table's key column in the SAME database. Computed deterministically at indexing by value-overlap containment (profile.discover_foreign_keys), unioned with any declared SQL constraints (PRAGMA foreign_key_list) — never written by the LLM. The mapping reads these as facts when authoring criteria_bindings[].join_path, and the populate compiler follows them to emit multi-hop within-database JOINs (Tier-1 try_direct). Distinct from identity_links, which are CROSS-database. Optional — absent when no within-database FK was measured.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["column", "target", "cardinality", "declared"],
+        "properties": {
+          "column": {
+            "description": "The FK-bearing column, as \"<table>.<column>\" (e.g. \"registrations.patient_id\"). No \"<db> ->\" prefix — unambiguous within one model.",
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "description": "The referenced key column in the SAME database, as \"<table>.<column>\" (e.g. \"patients.patient_id\"). Same field name as identity_links.target for consistent wording across cross-db bridges and within-db join hops.",
+            "type": "string",
+            "minLength": 1
+          },
+          "cardinality": {
+            "description": "Fan-out of the join FROM the referenced key TO the FK-bearing table: \"to-one\" when the FK column is all-distinct (one row per key — a safe direct multi-hop JOIN), \"to-many\" when it repeats (a join would fan out; Tier-1 cannot pick a single value and must delegate the field to the agent). The constraint is per-hop in the direction traversed, not that the whole relationship is 1:1.",
+            "type": "string",
+            "enum": ["to-one", "to-many"]
+          },
+          "declared": {
+            "description": "true when the edge comes from a real SQL constraint (PRAGMA foreign_key_list): certain, carries no evidence. false when MEASURED by value-overlap. On conflict, declared wins.",
+            "type": "boolean"
+          },
+          "evidence": {
+            "description": "The measurement that proved a MEASURED link (e.g. \"10/10 sampled values found in target\"). Required when declared is false; absent when declared is true.",
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allOf": [
+          {
+            "description": "A measured FK must carry its measurement; a declared FK must not.",
+            "if": { "properties": { "declared": { "const": false } } },
+            "then": { "required": ["evidence"] },
+            "else": { "not": { "required": ["evidence"] } }
+          }
+        ]
+      }
+    },
+    "conventions": {
+      "description": "Database-wide rules across tables. Optional — absent/empty on clean databases (e.g. current synthetic fixtures). Two deliberately separated kinds: `row_filters` are EXECUTABLE (the Tier-1 compiler ANDs them into emitted JOINs); `notes` are ORIENTATION prose only. ASSERTED (LLM/human), never measured — DURABLE across re-index, never recomputed wholesale.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "row_filters": {
+          "description": "Per-table predicates the compiler MUST AND into any SQL reading the table (soft-delete \"deleted_at IS NULL\", SCD2 \"valid_to IS NULL\"), so multi-hop direct JOINs never pull deleted/superseded rows.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["table", "predicate"],
+            "properties": {
+              "table": { "type": "string", "minLength": 1 },
+              "predicate": { "type": "string", "minLength": 1, "description": "A boolean SQL expression referencing ONLY columns of this row_filter's `table` (e.g. \"deleted_at IS NULL\", \"status != 'void' AND valid_to IS NULL\"). Columns may be written bare or already table-qualified; the compiler alias-qualifies every bare column when ANDing the predicate into an emitted JOIN." },
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "notes": {
+          "description": "Free-form orientation bullets true database-wide but NOT executable (\"All timestamps are UTC\", \"Amounts are integer cents\", \"legacy_* tables are frozen\"). Surfaced in the lookup digest and mapping prompt; never compiled to SQL.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "schema_fingerprint": {
+      "description": "Hash of the database STRUCTURE — table names, each table's column names+types, and the foreign_keys + identity_links edges. Lets re-index trigger on drift (not on a schedule) and lets runtime assert the model matches the live DB before trusting it. Deterministic. Optional (back-compat), recommended.",
+      "type": "string",
+      "minLength": 1
+    },
     "tables": {
       "description": "One record per table in the database. Required. Each carries the table's role and its columns (with the filterable surface annotations). Identifier/free-text/reference columns are still listed (with filterable:false + a reason) so the model is complete.",
       "type": "array",
@@ -85,6 +160,16 @@
             "description": "Number of rows at profiling time. Optional — a hint for the LLM and the library; not authoritative (re-profile on demand).",
             "type": "integer",
             "minimum": 0
+          },
+          "grain": {
+            "description": "Prose statement of what one row represents (e.g. \"one row per patient registration\"). Always populated: the deterministic all-distinct-key SIGNAL is the floor (one-row-per-entity when the table has an all-distinct identifier column, else an event/measurement table — many per entity), refined into clearer prose by the LLM when it indexes. Optional in the contract for back-compat; when absent the catalog/digest falls back to the first sentence of `description`. DURABLE: preserved across re-index (merged by table name), re-derived only when the table fingerprint changes.",
+            "type": "string",
+            "minLength": 1
+          },
+          "fingerprint": {
+            "description": "Hash of THIS table's structure — its column names+types and the FK edges touching it. Enables the durable-semantics merge to preserve asserted fields (description, grain) when the table is structurally unchanged, re-deriving them only when this changes. Optional.",
+            "type": "string",
+            "minLength": 1
           },
           "description": {
             "description": "Prose role of the table (e.g. \"One row per baby / birth record — the audit's primary entity.\"). Required — orients mapping and identity decisions.",

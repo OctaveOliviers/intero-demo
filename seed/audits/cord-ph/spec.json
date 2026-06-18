@@ -144,10 +144,16 @@
     {
       "number": 17,
       "name": "Delivery",
-      "type": "text",
+      "type": "category",
       "section": "ALL",
       "cell": "T",
-      "id": "all/delivery"
+      "id": "all/delivery",
+      "permitted_values": {
+        "1": "Spontaneous vaginal",
+        "2": "Emergency caesarean",
+        "3": "Forceps",
+        "4": "Vacuum"
+      }
     },
     {
       "number": 18,

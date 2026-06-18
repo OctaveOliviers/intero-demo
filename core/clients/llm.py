@@ -58,17 +58,29 @@ def _chat_urls(api_base: str) -> list[str]:
     return urls
 
 
-def _resolve_call(stage: str | None) -> tuple[str, str, str, float | None, int | None]:
-    """The (api_base, model, api_key, cfg_temperature, cfg_max_tokens) for a
-    call. ``stage=None`` is the legacy env-trio path, byte-identical to the
-    pre-config behaviour; a named stage resolves through models.json with the
+def _resolve_call(
+    stage: str | None,
+) -> tuple[str, str, str, float | None, int | None, dict]:
+    """The (api_base, model, api_key, cfg_temperature, cfg_max_tokens, extra_body)
+    for a call. ``stage=None`` is the legacy env-trio path, byte-identical to the
+    pre-config behaviour; a named stage resolves through models.yaml with the
     env trio as fallback (contracts/model-config.md). Config temperature /
     max_tokens, when set, OVERRIDE the call-site values — they are the
-    per-deployment tuning knob."""
+    per-deployment tuning knob. ``extra_body`` is merged into the request body
+    last (e.g. to switch off a model's reasoning); empty for the env path."""
     if stage is None:
-        return LLM_API_BASE, LLM_MODEL, LLM_API_KEY, None, None
+        return LLM_API_BASE, LLM_MODEL, LLM_API_KEY, None, None, {}
     cfg = model_config.resolve_stage(stage)
-    return cfg.endpoint, cfg.model, cfg.api_key, cfg.temperature, cfg.max_tokens
+    return cfg.endpoint, cfg.model, cfg.api_key, cfg.temperature, cfg.max_tokens, cfg.extra_body
+
+
+def _strip_null_body_keys(body: dict) -> dict:
+    """Drop request-body keys whose value is ``None``. This lets a stage's
+    ``extra_body`` REMOVE a computed default by setting it to ``null`` — the way
+    to swap a param for an endpoint-specific name, e.g. OpenAI reasoning models
+    that reject ``max_tokens`` and want ``max_completion_tokens`` instead:
+    ``"extra_body": {"max_tokens": null, "max_completion_tokens": 10000}``."""
+    return {k: v for k, v in body.items() if v is not None}
 
 
 class LLMConfigError(RuntimeError):
@@ -144,7 +156,7 @@ async def respond(
     temperature: float = 0.2,
     stage: str | None = None,
 ) -> str:
-    api_base, model, api_key, cfg_temp, cfg_max = _resolve_call(stage)
+    api_base, model, api_key, cfg_temp, cfg_max, extra_body = _resolve_call(stage)
     if not api_base or not model:
         raise LLMConfigError("LLM_API_BASE and LLM_MODEL must be set to build template models.")
 
@@ -159,7 +171,9 @@ async def respond(
         ],
         "temperature": cfg_temp if cfg_temp is not None else temperature,
         "max_tokens": cfg_max if cfg_max is not None else max_output_tokens,
+        **extra_body,
     }
+    body = _strip_null_body_keys(body)
 
     errors: list[tuple[str, int, str]] = []
     resp = None
@@ -222,7 +236,7 @@ async def respond_typed(
     so the model is the contract however loosely the server honours the schema.
     Raises :class:`LLMRequestError` on any transport/HTTP/empty/validation failure.
     """
-    api_base, model, api_key, cfg_temp, cfg_max = _resolve_call(stage)
+    api_base, model, api_key, cfg_temp, cfg_max, extra_body = _resolve_call(stage)
     if not api_base or not model:
         raise LLMConfigError("LLM_API_BASE and LLM_MODEL must be set to call the LLM.")
 
@@ -244,7 +258,9 @@ async def respond_typed(
         "temperature": cfg_temp if cfg_temp is not None else temperature,
         "max_tokens": cfg_max if cfg_max is not None else max_tokens,
         "response_format": {"type": "json_object"},
+        **extra_body,
     }
+    body = _strip_null_body_keys(body)
 
     errors: list[tuple[str, int, str]] = []
     resp = None

@@ -121,7 +121,6 @@ class AuthSmokeTests(unittest.TestCase):
         with (
             patch("server.routes.runs.run_engine.new_run_id", return_value="run-smoke-1"),
             patch("server.routes.runs._start_spine_run", return_value=None) as start_spine_mock,
-            patch("server.routes.runs._resolve_audit_excel", return_value=self.workbook),
             patch("server.routes.runs.RUNS_DIR", self.run_root),
         ):
             run_res = self.client.post(

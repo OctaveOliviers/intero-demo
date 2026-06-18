@@ -60,4 +60,4 @@ database/*/sql/
 # Cross-session thread coordination (per-worktree roster + personas, local only)
 .threads/
 .claude/
-models.local.json
+models.local.yaml

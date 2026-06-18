@@ -4,6 +4,9 @@
   "databases": [
     "cord-ph"
   ],
+  "database_summaries": {
+    "cord-ph": "Per-birth intrapartum and neonatal intensive care data joined on baby patient for cord pH quality audit."
+  },
   "description": "Cord pH audit bound to the cord-ph EMR. The primary entity is one baby / birth record in cord_ph_birth_records (the ALL region); the NICU region draws each baby's neonatal-unit course from nicu_admissions, joined back to the birth record by patient_code. Every audit value is a direct column read; mode of delivery carries a code map translating the database's text into the audit's coded set.",
   "identity": {
     "anchor": "cord-ph -> cord_ph_birth_records.patient_code",
@@ -564,15 +567,25 @@
       "criterion_id": "gestation_weeks",
       "label": "Gestation (completed weeks)",
       "type": "number",
-      "predicate": { "op": "gte", "value": 37, "unit": "weeks" },
-      "display": "Gestation ≥ 37 weeks"
+      "predicate": {
+        "op": "gte",
+        "value": 37,
+        "unit": "weeks"
+      },
+      "display": "Gestation \u2265 37 weeks"
     },
     {
       "criterion_id": "encounter_start",
       "label": "Delivery / encounter date",
       "type": "date",
-      "predicate": { "op": "between", "value": ["2025-04-01", "2026-03-31"] },
-      "display": "Delivery date 1 Apr 2025 – 31 Mar 2026"
+      "predicate": {
+        "op": "between",
+        "value": [
+          "2025-04-01",
+          "2026-03-31"
+        ]
+      },
+      "display": "Delivery date 1 Apr 2025 \u2013 31 Mar 2026"
     }
   ],
   "not_expressible": [

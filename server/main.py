@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
     seed_default_user()
 
     # Per-stage model config (contracts/model-config.md): a malformed
-    # models.json fails startup loudly; an unreachable endpoint only warns
+    # models.yaml fails startup loudly; an unreachable endpoint only warns
     # (the per-stage error surfaces at first use) — local Ollama endpoints
     # are started here when down. Never downloads a model.
     model_config.ensure_endpoints_ready()

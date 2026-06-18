@@ -29,6 +29,7 @@ import {
   syncAuditWorkbook,
   setAuditRefreshState,
   setAuditStatus,
+  setAuditRunTiming,
   startAudit,
   setAuditRunId,
 } from "./audits.js";
@@ -47,6 +48,10 @@ export { activeCommand };
 // Transient, audit-independent state.
 export const isSubmitting = writable(false);
 export const error = writable(null);
+// True from the moment the user hits the activity-box stop button until the run
+// finalizes — drives the "Finalizing…" now-line while the backend writes its
+// closing summary.
+export const runStopping = writable(false);
 
 // --- The live views: derived from the selected audit's record -------------
 
@@ -58,6 +63,9 @@ export const messages = derived(currentEntry, (e) => e?.messages || []);
 export const activity = derived(currentEntry, (e) => e?.activity || []);
 export const reviewSummary = derived(currentEntry, (e) => e?.reviewSummary || null);
 export const activeWorkbook = derived(currentEntry, (e) => e?.workbook || null);
+// Run timing for the activity-box elapsed timer (epoch ms; null when unknown).
+export const runStartedAt = derived(currentEntry, (e) => e?.runStartedAt || null);
+export const runEndedAt = derived(currentEntry, (e) => e?.runEndedAt || null);
 
 // "running" only while this audit IS the active stream. A record whose stored
 // status is "running" but which is no longer streaming (e.g. after a page
@@ -100,12 +108,29 @@ export function addMessage(msg) {
 // to be on screen. The sink writes ONLY into the owner audit's record; the
 // derived views above reflect it automatically when that audit is the one
 // being viewed — a background run can never pollute the audit you switched to.
-function makeStreamSink(auditId, runId) {
-  const acts = [];
-  let wb = null;
-  let chipEmitted = false;
+// On a fresh run the sink starts blank. On RESUME (reconnecting to an in-flight
+// run after a reload) it is seeded with the snapshot workbook + hydrated
+// activity already on screen, so incoming cell_update / activity events apply
+// ON TOP of what we fetched rather than replacing it. The stream has no replay,
+// so a fresh connection only delivers FUTURE events — snapshot + future = whole.
+function makeStreamSink(auditId, runId, seed = {}) {
+  const acts = Array.isArray(seed.activity) ? seed.activity.slice() : [];
+  let wb = seed.workbook || null;
+  let chipEmitted = Boolean(seed.workbook);  // resumed runs already showed the chip
 
   function append(event) {
+    // Agent tool/thinking elements carry a stable `id` and UPSERT in place, so a
+    // part that streams in chunks stays ONE growing line (with the full text)
+    // rather than appending a new partial copy per chunk. Everything else
+    // (orchestrator steps, refresh_summary) appends.
+    if (event && event.id != null) {
+      const i = acts.findIndex((a) => a && a.id === event.id);
+      if (i !== -1) {
+        acts[i] = event;
+        syncAuditActivity(auditId, acts.slice());
+        return;
+      }
+    }
     acts.push(event);
     syncAuditActivity(auditId, acts.slice());
   }
@@ -201,10 +226,34 @@ function makeStreamSink(auditId, runId) {
   };
 }
 
-export function startRunStream(runId, auditId) {
+export function startRunStream(runId, auditId, { resume = false, startedAt = null } = {}) {
+  // One live stream at a time: `activeSource`/`activeMockHandle` are module
+  // globals, so starting a new stream (e.g. opening a second still-running run,
+  // now that reconnect fires for any in-flight run) must first tear down the
+  // prior one — otherwise its EventSource is orphaned but keeps mutating the
+  // shared globals (its later `done` would null out OUR source). Closing an
+  // EventSource is silent (no onerror), so the prior run isn't flipped to
+  // error; it stays running on the backend and recovers via the snapshot +
+  // reconnect when reopened.
+  if (activeSource) {
+    activeSource.close();
+    activeSource = null;
+  }
+  if (activeMockHandle) {
+    activeMockHandle.close();
+    activeMockHandle = null;
+  }
   activeStream.set({ auditId, runId });
-  const sink = makeStreamSink(auditId, runId);
-  const isRefreshRun = Boolean(get(audits).find((a) => a.id === auditId)?.refreshInFlight);
+  const owner0 = get(audits).find((a) => a.id === auditId);
+  // Resume seeds the sink from what's already on screen (the snapshot we just
+  // fetched + hydrated activity); a fresh run starts blank.
+  const sink = resume
+    ? makeStreamSink(auditId, runId, {
+        workbook: owner0?.workbook || null,
+        activity: owner0?.activity || [],
+      })
+    : makeStreamSink(auditId, runId);
+  const isRefreshRun = Boolean(owner0?.refreshInFlight);
 
   function finalizeRefreshStateOnDone() {
     if (isRefreshRun) {
@@ -221,19 +270,33 @@ export function startRunStream(runId, auditId) {
 
   function endStream() {
     isSubmitting.set(false);
+    runStopping.set(false);
+    // Freeze the elapsed timer at the moment the run reached a terminal state.
+    setAuditRunTiming(auditId, { endedAt: Date.now() });
     activeStream.set(null);
     activeSource = null;
     activeMockHandle = null;
   }
 
-  // Initial/new runs reset prior activity; refresh runs keep history so the
-  // right panel can group multiple execution episodes deterministically.
-  if (!isRefreshRun) {
-    syncAuditActivity(auditId, []);
+  // A fresh run resets prior state; a RESUME must preserve the snapshot +
+  // activity already on screen (that's the whole point — apply live deltas on
+  // top of it). Refresh runs keep activity history either way.
+  if (!resume) {
+    if (!isRefreshRun) {
+      syncAuditActivity(auditId, []);
+    }
+    syncAuditReviewSummary(auditId, null);
+    syncAuditWorkbook(auditId, null);
+    setAuditRefreshState(auditId, { refreshAvailable: false, refreshInFlight: isRefreshRun });
   }
-  syncAuditReviewSummary(auditId, null);
-  syncAuditWorkbook(auditId, null);
-  setAuditRefreshState(auditId, { refreshAvailable: false, refreshInFlight: isRefreshRun });
+  // Seed the elapsed-timer clock: a fresh/refresh run starts now; a resume
+  // prefers the backend's authoritative started_at so a reconnect shows the
+  // TRUE elapsed time, falling back to any local stamp, then now.
+  runStopping.set(false);
+  setAuditRunTiming(auditId, {
+    startedAt: resume ? (startedAt || owner0?.runStartedAt || Date.now()) : Date.now(),
+    endedAt: null,
+  });
   setAuditStatus(auditId, "running");
 
   if (isMockMode("runs")) {
@@ -307,7 +370,13 @@ export function startRunStream(runId, auditId) {
     }
     if (status === "error") {
       clearRefreshStateOnFailure();
-      sink.setStatus(status);
+      // On a RESUME, an error usually means "this run is no longer live"
+      // (finished while we were away, or the server restarted) — not that the
+      // analysis failed. We already hold a valid DB snapshot, so settle the
+      // spinner without showing a failure or discarding the data. Likewise a
+      // user STOP finalizes gracefully (the backend normally sends a summary +
+      // done, but if an error slips through after a stop we still settle clean).
+      sink.setStatus(resume || get(runStopping) ? "completed" : status);
       endStream();
       source.close();
     }
@@ -315,9 +384,15 @@ export function startRunStream(runId, auditId) {
 
   source.onerror = () => {
     // Only flip to error if the run was still in flight (ignore the close that
-    // fires after a normal "done").
+    // fires after a normal "done"). On a RESUME we hold a valid snapshot, so a
+    // transport error just means the live link dropped — settle quietly to
+    // completed rather than surfacing a failure over good data. A user STOP holds
+    // the stream open for the backend's finalize frames; if the transport drops
+    // in that window we still settle to completed, never a failure.
     const owner = get(audits).find((a) => a.id === auditId);
-    if (owner?.status === "running") sink.setStatus("error");
+    if (owner?.status === "running") {
+      sink.setStatus(resume || get(runStopping) ? "completed" : "error");
+    }
     clearRefreshStateOnFailure();
     endStream();
     source.close();
@@ -326,33 +401,37 @@ export function startRunStream(runId, auditId) {
   return source;
 }
 
+// Stop & FINALIZE the active run (the activity-box pause button): ask the
+// backend to wind down and write a summary of the work done so far, as if the
+// run had finished. We DELIBERATELY keep the live stream open — the backend now
+// emits review_summary + done on stop, which the normal stream handler turns
+// into a completed run with its terminal summary. Closing the stream here (the
+// old behavior) would drop those finalize events and lose the summary.
 export async function stopActiveRun() {
   const stream = get(activeStream);
   if (!stream?.runId) return;
-  const { runId, auditId } = stream;
+  const { runId } = stream;
 
-  if (activeSource) {
-    activeSource.close();
-    activeSource = null;
-  }
-  // Cancel the mock timeline so cells stop filling after a stop.
+  runStopping.set(true);
+
+  // Mock has no backend: finalize the in-memory timeline in place (emit the
+  // review_summary + done it would have reached) instead of just cancelling.
   if (activeMockHandle) {
-    activeMockHandle.close();
-    activeMockHandle = null;
+    if (typeof activeMockHandle.finalize === "function") {
+      activeMockHandle.finalize();
+    } else {
+      activeMockHandle.close();
+      activeMockHandle = null;
+    }
+    return;
   }
 
   try {
     await apiStopRun(runId);
   } catch (_) {
-    // Best-effort — the process may already be gone.
+    // Best-effort — if the stop call fails the run keeps streaming to its own
+    // natural end, which still finalizes correctly.
   }
-
-  activeStream.set(null);
-  isSubmitting.set(false);
-
-  const sink = makeStreamSink(auditId, runId);
-  sink.emitMessage({ role: "assistant", type: "text", content: "Run stopped." });
-  sink.setStatus("stopped");
 }
 
 // Hard reset transient chat/run runtime on auth transitions (e.g. logout) so
@@ -373,14 +452,20 @@ export function resetChatRuntime() {
   activeCommand.set(null);
 }
 
-// Open (or focus) a run's workbook. The owner audit's record either already
-// holds the workbook (live-fill keeps writing into it) or we fetch a snapshot
-// into it; pointing currentAuditId at the owner makes the derived view show
-// it. A run with no local record (e.g. server history on a fresh browser)
-// gets a minimal record so the snapshot has somewhere durable to live.
+// Open (or focus) a run's workbook. The backend (`/workbook`, built from
+// state.db — the source of truth) is re-fetched every time, so the view always
+// reflects the database, not a stale localStorage cache. The ONE exception is
+// the run that is actively streaming into this tab right now: its in-memory
+// workbook is being live-filled by the stream and must not be clobbered by a
+// snapshot. A run with no local record (server history on a fresh browser) gets
+// a minimal record so the snapshot has somewhere durable to live.
 export async function openWorkbook(runId) {
-  const live = get(activeWorkbook);
-  if (live && live.runId === runId) return;
+  // The actively-streaming run is authoritative live — focus it, don't refetch.
+  if (getActiveRunId() === runId) {
+    const owner = get(audits).find((a) => a.runId === runId);
+    if (owner) currentAuditId.set(owner.id);
+    return;
+  }
 
   let owner = get(audits).find((a) => a.runId === runId);
   if (!owner) {
@@ -394,25 +479,63 @@ export async function openWorkbook(runId) {
       activity: [],
       reviewSummary: null,
       workbook: null,
+      runStartedAt: null,
+      runEndedAt: null,
     };
     audits.update((list) => [owner, ...list]);
   }
 
-  if (!owner.workbook) {
-    try {
-      const data = await apiGetWorkbook(runId);
-      syncAuditWorkbook(owner.id, {
-        runId,
-        sheets: data.sheets,
-        cellMetadata: data.cellMetadata || {},
-        currentSheetIndex: 0,
-      });
-    } catch (e) {
+  // Always re-read the authoritative state from the backend. This is what makes
+  // a run recover correctly after a page reload / navigate-away / fresh browser:
+  // every cell the agent wrote (out-of-process, straight to state.db) is in the
+  // response even if it never reached this browser over the live stream.
+  let snapshot = null;
+  try {
+    snapshot = await apiGetWorkbook(runId);
+    syncAuditWorkbook(owner.id, {
+      runId,
+      sheets: snapshot.sheets,
+      cellMetadata: snapshot.cellMetadata || {},
+      currentSheetIndex: 0,
+    });
+  } catch (e) {
+    // Keep any cached workbook on a transient fetch failure rather than blanking.
+    if (!owner.workbook) {
       error.set(e.message);
       return;
     }
   }
   currentAuditId.set(owner.id);
+
+  // Seed the activity-box timer from the snapshot. For a FINISHED run reopened
+  // from history (reload / fresh browser) this is the only place it's set — no
+  // stream reconnect happens — so the timer freezes at the real duration
+  // (endedAt − startedAt) instead of showing 0s. A live run is re-seeded just
+  // below by startRunStream (which clears endedAt).
+  const snapStarted = snapshot?.startedAt ? Date.parse(snapshot.startedAt) : NaN;
+  const snapEnded = snapshot?.endedAt ? Date.parse(snapshot.endedAt) : NaN;
+  setAuditRunTiming(owner.id, {
+    startedAt: Number.isFinite(snapStarted) ? snapStarted : null,
+    endedAt: Number.isFinite(snapEnded) ? snapEnded : null,
+  });
+
+  // Reconnect the live stream iff the backend says the run is still live, so
+  // cells AND agent activity keep updating on top of the snapshot we just
+  // loaded. `runStatus` from /workbook is the AUTHORITATIVE signal: a fresh
+  // browser (or any reload) has no trustworthy local "running" flag, because
+  // server history is hydrated as "completed". The snapshot is the catch-up;
+  // the stream is the live tail — re-fetching /workbook alone can't tail, HTTP
+  // is one-shot pull. Reconnecting a run that actually finished is safe: the
+  // broker settles it immediately (synthesized done), so this never hangs.
+  const live = snapshot?.runStatus === "in_progress" || snapshot?.runStatus === "queued";
+  if (live && getActiveRunId() !== runId && !isMockMode("runs")) {
+    // Seed the elapsed timer from the backend's authoritative started_at so a
+    // reconnect shows the true elapsed time, not a restart from 0.
+    startRunStream(runId, owner.id, {
+      resume: true,
+      startedAt: Number.isFinite(snapStarted) ? snapStarted : null,
+    });
+  }
 }
 
 // In real mode, download through the backend export route so server-side export

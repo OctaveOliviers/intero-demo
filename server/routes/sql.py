@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 
-from core.config import ROOT
+from core.config import DATABASES_DIR, ROOT
 from server.auth import store as auth_store
 from server.auth.deps import require_user
 from server.models import SqlQuery, SqlResponse
@@ -38,6 +38,13 @@ def _resolve_database_path(database: str | None) -> Path:
             status_code=422,
             detail="No database specified. Provide a database path in the request body.",
         )
+    # A bare database id — what the spine's cell `sources[].database` carries
+    # (e.g. "npda-demographics") — resolves to the deployment's SQLite for
+    # that database. Path forms keep working for legacy callers.
+    if "/" not in database and "\\" not in database:
+        slug_path = DATABASES_DIR / database / "database.sqlite"
+        if slug_path.is_file():
+            return slug_path.resolve()
     path = Path(database)
     if not path.is_absolute():
         path = ROOT / path

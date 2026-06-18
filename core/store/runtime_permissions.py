@@ -151,7 +151,7 @@ RUNTIME_CORE_TABLE_RULES = {
 
 _POLICY: dict[RuntimeRole, dict[RuntimeTable, TableRule]] = {
     "api_app": {
-        "runs": _rule({"select": None, "insert": RUNS_INSERT_COLUMNS, "update": RUNS_INSERT_COLUMNS}),
+        "runs": _rule({"select": None, "insert": RUNS_INSERT_COLUMNS, "update": RUNS_INSERT_COLUMNS, "delete": None}),
         "cells": _rule({"select": None, "insert": CELLS_INSERT_COLUMNS, "update": CELLS_UPSERT_UPDATE_COLUMNS}),
         **RUNTIME_CORE_TABLE_RULES,
     },

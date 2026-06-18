@@ -2,23 +2,18 @@
   "schema_version": "1",
   "database": "npda-demographics",
   "title": "Northway PDU Demographics & Registration System",
-  "description": "Patient-administration / registration database for the Northway Paediatric Diabetes Unit (PDU). Captures demographic identity (NHS number, name, date of birth, sex, ethnicity, postcode, GP practice), diabetes-service registration (registration date, diabetes type, diagnosis date, care unit, comorbidities such as ADHD/ASD or learning disability) and service-exit (leaving date and reason, deceased date). Joined to the clinical EPR (npda-clinical) by NHS number. Free-text referral letters, registration notes and MDT summaries are held in registration_notes; some clinically relevant information (e.g. diabetes type and diagnosis date for one newly diagnosed patient, comorbidity flags) is only mentioned in those notes and not in structured columns.",
+  "description": "Patient-administration / registration database for the Northway Paediatric Diabetes Unit (PDU). Captures demographic identity (NHS number, name, date of birth, sex, ethnicity, postcode, GP practice), diabetes-service registration (registration date, diabetes type, diagnosis date, care unit, service-exit details) and service-exit (leaving date and reason, deceased date). Joined to the clinical EPR (npda-clinical) by NHS number. Free-text referral letters, registration notes and MDT summaries are held in registration_notes; some clinically relevant information (e.g. diabetes type and diagnosis date for one newly diagnosed patient, comorbidity flags) is only mentioned in those notes and not in structured columns.",
   "identity_links": [
     {
       "column": "patients.nhs_number",
-      "target": "npda-clinical -> psychology.patient_ref",
-      "evidence": "10/10 sampled values found in target"
-    },
-    {
-      "column": "patients.nhs_number",
-      "target": "npda-clinical -> technology.patient_ref",
+      "target": "npda-clinical -> clinic_visits.patient_ref",
       "evidence": "10/10 sampled values found in target"
     }
   ],
   "tables": [
     {
       "name": "patients",
-      "description": "Patient demographics record. One row per registered patient \u2014 holds NHS number (the join key to the clinical EPR), name, date of birth, sex assigned at birth, ethnicity (as recorded at registration), postcode, registered GP practice code and the PDU number.",
+      "description": "Patient demographics record. One row per registered patient — holds NHS number (the join key to the clinical EPR), name, date of birth, sex assigned at birth, ethnicity (as recorded at registration), postcode, registered GP practice code and the PDU number.",
       "columns": [
         {
           "name": "patient_id",
@@ -30,7 +25,7 @@
         {
           "name": "nhs_number",
           "type": "text",
-          "description": "Ten-digit NHS number \u2014 the canonical UK patient identifier and the join key to the npda-clinical EPR (patient_ref).",
+          "description": "Ten-digit NHS number — the canonical UK patient identifier and the join key to the npda-clinical EPR (patient_ref).",
           "filterable": false,
           "reason": "identifier"
         },
@@ -60,53 +55,37 @@
           }
         },
         {
-          "name": "sex_code",
+          "name": "sex",
           "type": "text",
-          "description": "Sex assigned at birth as a coded value: 1 = Male, 2 = Female, 3 = Not specified, 99 = Unknown. Matches the NPDA permitted values directly.",
+          "description": "Sex assigned at birth, stored as the plain-language label as shown in the registration UI (Male, Female, Not specified, Unknown).",
           "filterable": true,
           "filter_type": "category",
           "values": [
-            "1",
-            "2"
-          ],
-          "codes": {
-            "1": "Male",
-            "2": "Female",
-            "3": "Not specified",
-            "99": "Unknown"
-          }
+            "Female",
+            "Male"
+          ]
         },
         {
-          "name": "ethnicity_code",
+          "name": "ethnicity",
           "type": "text",
-          "description": "Self-reported ethnic category as recorded at registration, using the NHS Data Dictionary single-letter codes (A, B, C, D, E, F, G, H, J, K, L, M, N, P, R, S, Z, 99). One patient (Sumaiya Begum) has a different ethnicity code recorded on the clinical system (npda-clinical.clinic_visits.ethnicity_recorded), creating a known cross-source conflict.",
+          "description": "Self-reported ethnic category as recorded at registration, stored as the full NHS Data Dictionary label (e.g. 'Asian - Indian'). One patient has a different ethnicity recorded on the clinical system (npda-clinical.clinic_visits.ethnicity_recorded), a known cross-source conflict.",
           "filterable": true,
           "filter_type": "category",
           "values": [
-            "A",
-            "F",
-            "H",
-            "J",
-            "K",
-            "M",
-            "N",
-            "R"
-          ],
-          "codes": {
-            "A": "White - British",
-            "F": "Mixed - White and Asian",
-            "H": "Asian - Indian",
-            "J": "Asian - Pakistani",
-            "K": "Asian - Bangladeshi",
-            "M": "Black - Caribbean",
-            "N": "Black - African",
-            "R": "Chinese"
-          }
+            "Asian - Bangladeshi",
+            "Asian - Indian",
+            "Asian - Pakistani",
+            "Black - African",
+            "Black - Caribbean",
+            "Chinese",
+            "Mixed - White and Asian",
+            "White - British"
+          ]
         },
         {
           "name": "postcode",
           "type": "text",
-          "description": "Patient's usual-address full UK postcode (upper case, with single space) \u2014 used to derive deprivation and Local Authority statistics.",
+          "description": "Patient's usual-address full UK postcode (upper case, with single space) — used to derive deprivation and Local Authority statistics.",
           "filterable": true,
           "filter_type": "category",
           "values": [
@@ -144,7 +123,7 @@
         {
           "name": "pdu_number",
           "type": "text",
-          "description": "3-digit Paediatric Diabetes Unit (PDU) number \u2014 the audit-submission organisational identifier (Northway PDU = 157).",
+          "description": "3-digit Paediatric Diabetes Unit (PDU) number — the audit-submission organisational identifier (Northway PDU = 157).",
           "filterable": true,
           "filter_type": "category",
           "values": [
@@ -152,11 +131,13 @@
           ]
         }
       ],
-      "row_count": 10
+      "row_count": 10,
+      "fingerprint": "c5d06810f33b265a",
+      "grain": "one row per entity"
     },
     {
       "name": "registrations",
-      "description": "Per-patient diabetes-service registration record. One row per patient capturing diabetes type, diagnosis date, registering care unit, structured comorbidity flags (ADHD/ASD status, learning disability) and any service-exit (leaving date and reason, deceased date). For one newly diagnosed patient (Ethan Brookes) the diagnosis_date is blank in this table \u2014 it is only recorded in npda-clinical.clinical_notes (admission summary) and the demographics-side registration_notes referral letter.",
+      "description": "Per-patient diabetes-service registration record. One row per patient capturing diabetes type, diagnosis date, registering care unit and any service-exit (leaving date and reason, deceased date). Comorbidities such as ADHD/ASD and learning disability are NOT held as structured flags here - they are documented only in the free-text registration_notes (referral letters and MDT summaries). For one newly diagnosed patient (Ethan Brookes) the diagnosis_date is blank and is recorded only in registration_notes and the clinical EPR admission summary.",
       "columns": [
         {
           "name": "registration_id",
@@ -184,24 +165,16 @@
           }
         },
         {
-          "name": "diabetes_type_code",
+          "name": "diabetes_type",
           "type": "text",
-          "description": "Diabetes type as recorded at registration, matching the NPDA Diabetes Type permitted values: 1 = Type 1, 2 = Type 2, 3 = CF-related, 4 = MODY, 5 = Other specified, 99 = Unknown/unspecified.",
+          "description": "Diabetes type as recorded at registration, stored as the plain-language label (e.g. 'Type 1 Diabetes Mellitus').",
           "filterable": true,
           "filter_type": "category",
           "values": [
-            "1",
-            "2",
-            "4"
-          ],
-          "codes": {
-            "1": "Type 1 Diabetes Mellitus",
-            "2": "Type 2 Diabetes Mellitus",
-            "3": "Cystic Fibrosis Related Diabetes",
-            "4": "MODY (monogenic forms of diabetes)",
-            "5": "Other specified Diabetes Mellitus",
-            "99": "Unknown/unspecified"
-          }
+            "MODY (monogenic forms of diabetes)",
+            "Type 1 Diabetes Mellitus",
+            "Type 2 Diabetes Mellitus"
+          ]
         },
         {
           "name": "diagnosis_date",
@@ -225,26 +198,6 @@
           ]
         },
         {
-          "name": "adhd_asd_status",
-          "type": "text",
-          "description": "Structured comorbidity flag for Attention Deficit Hyperactivity Disorder / Autism Spectrum Disorder, free-text drawn from the registration form's tick-boxes (one of 'ADHD', 'ASD', 'both', or blank if neither / not asked).",
-          "filterable": true,
-          "filter_type": "category",
-          "values": [
-            "ADHD"
-          ]
-        },
-        {
-          "name": "learning_disability_flag",
-          "type": "text",
-          "description": "Y/N flag for confirmed diagnosis of a learning disability.",
-          "filterable": true,
-          "filter_type": "category",
-          "values": [
-            "N"
-          ]
-        },
-        {
           "name": "leaving_date",
           "type": "text",
           "description": "Date the patient left the PDU during the audit year (DD/MM/YYYY), or blank if still under PDU care.",
@@ -256,19 +209,14 @@
           }
         },
         {
-          "name": "leaving_reason_code",
+          "name": "leaving_reason",
           "type": "text",
-          "description": "Coded reason for leaving the service: 1 = Transitioned to adult diabetes service, 2 = Moved out of area, 3 = Other.",
+          "description": "Reason for leaving the service, stored as the plain-language label (e.g. 'Transitioned to adult diabetes service'), or blank if still under PDU care.",
           "filterable": true,
           "filter_type": "category",
           "values": [
-            "1"
-          ],
-          "codes": {
-            "1": "Transitioned to adult diabetes service",
-            "2": "Moved out of area",
-            "3": "Other"
-          }
+            "Transitioned to adult diabetes service"
+          ]
         },
         {
           "name": "deceased_date",
@@ -278,11 +226,13 @@
           "reason": "reference"
         }
       ],
-      "row_count": 10
+      "row_count": 10,
+      "fingerprint": "d901a7cdfdaf0832",
+      "grain": "one row per entity"
     },
     {
       "name": "registration_notes",
-      "description": "Free-text registration-side notes: GP referral letters, registration summaries from the diabetes nurse, MDT summaries, genetics letters and transition-planning notes. Carries clinically important content not held in structured columns: e.g. RNOTE-001 is the GP referral letter that records Ethan Brookes' diagnosis date and Type 1 status (absent from the registrations row), RNOTE-005 records the transition-final-visit date for Aisha Khan.",
+      "description": "Free-text registration-side notes: GP referral letters, registration summaries from the diabetes nurse, MDT summaries, genetics letters and transition-planning notes. These are the ONLY source for comorbidity status (ADHD/ASD, learning disability) and carry other content absent from structured columns - e.g. RNOTE-001 records Ethan Brookes' diagnosis date and Type 1 status, RNOTE-005 records the transition-final-visit date for Aisha Khan.",
       "columns": [
         {
           "name": "note_id",
@@ -346,7 +296,33 @@
           "reason": "free-text"
         }
       ],
-      "row_count": 6
+      "row_count": 6,
+      "fingerprint": "edca42d51b75a88f",
+      "grain": "one row per entity"
     }
-  ]
+  ],
+  "foreign_keys": [
+    {
+      "column": "patients.patient_id",
+      "target": "registrations.patient_id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "registration_notes.patient_id",
+      "target": "patients.patient_id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "6/6 sampled values found in target"
+    },
+    {
+      "column": "registration_notes.patient_id",
+      "target": "registrations.patient_id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "6/6 sampled values found in target"
+    }
+  ],
+  "schema_fingerprint": "79e108426855a9b1"
 }

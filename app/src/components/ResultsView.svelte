@@ -1,12 +1,10 @@
 <script>
-  import { activeWorkbook, downloadWorkbook } from "../stores/chat.js";
+  import { activeWorkbook, downloadWorkbook, runStatus } from "../stores/chat.js";
   import { audits, currentAuditId } from "../stores/audits.js";
   import { getDeadlineSubtitle } from "../lib/deadlineSubtitle.js";
   import { countWorkbookStatus } from "../lib/statusCounters.js";
   import {
-    ACTIVITY_VISUAL_STATES,
     RIGHT_PANEL_MODES,
-    resultViewUiState,
     togglePanel,
     requestSummaryScroll,
   } from "../stores/resultViewUi.js";
@@ -19,7 +17,10 @@
   $: activeRunId = $activeWorkbook?.runId || currentAudit?.runId || null;
   $: templateDeadline = currentAudit?.submissionDeadline || null;
   $: deadlineSubtitle = getDeadlineSubtitle(templateDeadline)?.text || null;
-  $: activityVisualState = $resultViewUiState.activityVisualState;
+  // The eye tracks the LIVE run state, not resultViewUiState (whose
+  // activityVisualState initializer is never wired to the stream): scanning +
+  // accent while this audit's run is streaming, settled green once finished.
+  $: activityRunning = $runStatus === "running";
   // Live status counters (doc 11 §Status counters): derived from cell
   // metadata, so they tick up during the run and down as cells are reviewed.
   $: counters = countWorkbookStatus($activeWorkbook?.cellMetadata);
@@ -66,12 +67,13 @@
           <button
             type="button"
             class="control activity-control"
-            class:is-running={activityVisualState === ACTIVITY_VISUAL_STATES.RUNNING}
+            class:is-running={activityRunning}
+            class:is-complete={!activityRunning}
             on:click={onActivityControlClick}
             aria-label="Toggle activity panel"
             title="Activity"
           >
-            {#if activityVisualState === ACTIVITY_VISUAL_STATES.RUNNING}
+            {#if activityRunning}
               <ScanningEye size={14} />
               <span class="sr-only">Activity running</span>
             {:else}
@@ -202,6 +204,9 @@
   }
   .activity-control.is-running {
     color: var(--color-accent);
+  }
+  .activity-control.is-complete {
+    color: var(--color-success);
   }
   .activity-control :global(.eye-search) {
     color: inherit;

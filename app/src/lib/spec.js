@@ -69,15 +69,16 @@ const CORD_QUARTER = {
   dateTo: new Date("2026-06-30T00:00:00"),
 };
 
-// The NPDA audit year: appointment dates must fall in 1 Apr 2025 – 31 Mar 2026.
+// The NPDA audit year (2026/27 dataset): appointment dates must fall in
+// 1 Apr 2026 – 31 Mar 2027.
 const NPDA_YEAR = {
-  dateFrom: new Date("2025-04-01T00:00:00"),
-  dateTo: new Date("2026-03-31T00:00:00"),
+  dateFrom: new Date("2026-04-01T00:00:00"),
+  dateTo: new Date("2027-03-31T00:00:00"),
 };
 
 // "Under 25 on the first day of the audit year" as a date-of-birth cut-off:
-// born after (1 Apr 2025 − 25 years) = 1 Apr 2000.
-const NPDA_DOB_CUTOFF = new Date("2000-04-01T00:00:00");
+// born after (1 Apr 2026 − 25 years) = 1 Apr 2001.
+const NPDA_DOB_CUTOFF = new Date("2001-04-01T00:00:00");
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 

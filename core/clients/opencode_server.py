@@ -28,6 +28,7 @@ class OpenCodeServer:
         self._port = port  # 0 → server picks a free port; we read it from stdout
         self._proc: Optional[asyncio.subprocess.Process] = None
         self._url: Optional[str] = None
+        self._stdout_task: Optional[asyncio.Task] = None
         self._stderr_task: Optional[asyncio.Task] = None
 
     @property
@@ -73,9 +74,25 @@ class OpenCodeServer:
             await self.stop()
             raise RuntimeError(f"opencode serve failed to start: {exc}") from exc
 
-        # Drain stderr into the logger so the buffer doesn't fill.
+        # Drain BOTH pipes into the logger so neither buffer fills. opencode
+        # serve echoes every tool result to stdout — a single large result
+        # (e.g. the agent's pending-cells SELECT) exceeds the 64KB pipe buffer,
+        # and an undrained pipe blocks that write forever: the tool call never
+        # completes and the run freezes waiting for session.idle.
+        self._stdout_task = asyncio.create_task(self._drain_stdout())
         self._stderr_task = asyncio.create_task(self._drain_stderr())
         return self._url
+
+    async def _drain_stdout(self) -> None:
+        # Chunked read, not readline: a single echoed line longer than the
+        # StreamReader's 64KB limit would raise LimitOverrunError, kill this
+        # task, and re-create the very stall this drain exists to prevent.
+        assert self._proc is not None and self._proc.stdout is not None
+        while True:
+            chunk = await self._proc.stdout.read(65536)
+            if not chunk:
+                return
+            logger.debug("opencode[stdout]: %d bytes", len(chunk))
 
     async def _drain_stderr(self) -> None:
         assert self._proc is not None and self._proc.stderr is not None
@@ -105,6 +122,8 @@ class OpenCodeServer:
             except asyncio.TimeoutError:
                 _signal_group(signal.SIGKILL)
                 await self._proc.wait()
+        if self._stdout_task is not None:
+            self._stdout_task.cancel()
         if self._stderr_task is not None:
             self._stderr_task.cancel()
         self._proc = None

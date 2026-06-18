@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from fastapi import HTTPException
 
-from core.running.run_audit import OpenCodeRunner
+from core.running.stream_runner import SpineRunBroker
 from server.routes import runs as runs_route
 
 
@@ -90,9 +90,6 @@ class RunRefreshRouteTest(unittest.TestCase):
         (run_dir / "status.json").write_text(
             json.dumps({"status": "completed"}), encoding="utf-8"
         )
-        (run_dir / "metadata.json").write_text("{}", encoding="utf-8")
-        source_wb = Path(self._tmp.name) / "source.xlsx"
-        source_wb.write_bytes(b"fake-workbook")
         fake_run = SimpleNamespace(
             audit_id="npda",
             database_ids=["npda-clinical"],
@@ -101,7 +98,7 @@ class RunRefreshRouteTest(unittest.TestCase):
         fake_store = _FakeStore(fake_run)
         calls: list[dict] = []
 
-        def _fake_start_spine(run_id, run_dir, audit_id, database_id, filters, workbook_path, execution_id=None):
+        def _fake_start_spine(run_id, run_dir, audit_id, database_id, filters, execution_id=None):
             calls.append(
                 {
                     "run_id": run_id,
@@ -109,7 +106,6 @@ class RunRefreshRouteTest(unittest.TestCase):
                     "audit_id": audit_id,
                     "database_id": database_id,
                     "filters": filters,
-                    "workbook_path": workbook_path,
                     "execution_id": execution_id,
                 }
             )
@@ -117,7 +113,6 @@ class RunRefreshRouteTest(unittest.TestCase):
         with (
             patch.object(runs_route, "RUNS_DIR", self.runs_dir),
             patch.object(runs_route, "Store", lambda: fake_store),
-            patch.object(runs_route, "_resolve_audit_excel", lambda _audit_id: source_wb),
             patch.object(runs_route, "_start_spine_run", _fake_start_spine),
             patch.object(runs_route, "_new_execution_id", lambda: "exec-test-123"),
         ):
@@ -129,9 +124,9 @@ class RunRefreshRouteTest(unittest.TestCase):
         self.assertTrue(fake_store.closed)
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0]["execution_id"], "exec-test-123")
-        self.assertTrue((run_dir / "metadata.json").exists())
-        self.assertTrue((run_dir / "status.json").exists())
-        self.assertEqual((run_dir / "result.xlsx").read_bytes(), b"fake-workbook")
+        self.assertEqual(calls[0]["audit_id"], "npda")
+        # No workbook is copied to disk — the run rebuilds its grid from state.db.
+        self.assertFalse((run_dir / "result.xlsx").exists())
 
     def test_refresh_duplicate_clicks_are_rejected_while_active(self):
         run_id = "run-4"
@@ -140,8 +135,6 @@ class RunRefreshRouteTest(unittest.TestCase):
         (run_dir / "status.json").write_text(
             json.dumps({"status": "completed"}), encoding="utf-8"
         )
-        source_wb = Path(self._tmp.name) / "source4.xlsx"
-        source_wb.write_bytes(b"wb")
         fake_run = SimpleNamespace(
             audit_id="npda",
             database_ids=["npda-clinical"],
@@ -169,7 +162,6 @@ class RunRefreshRouteTest(unittest.TestCase):
         with (
             patch.object(runs_route, "RUNS_DIR", self.runs_dir),
             patch.object(runs_route, "Store", _fake_store_factory),
-            patch.object(runs_route, "_resolve_audit_excel", lambda _audit_id: source_wb),
             patch.object(runs_route, "_start_spine_run", _fake_start_spine),
             patch.object(runs_route, "_new_execution_id", lambda: "exec-lock-test"),
         ):
@@ -191,8 +183,6 @@ class RunRefreshRouteTest(unittest.TestCase):
         (run_dir / "status.json").write_text(
             json.dumps({"status": "completed"}), encoding="utf-8"
         )
-        source_wb = Path(self._tmp.name) / "source5.xlsx"
-        source_wb.write_bytes(b"wb")
         fake_run = SimpleNamespace(
             audit_id="npda",
             database_ids=["npda-clinical"],
@@ -200,7 +190,7 @@ class RunRefreshRouteTest(unittest.TestCase):
         )
 
         execution_ids = iter(["exec-reuse-1", "exec-reuse-2"])
-        runner = OpenCodeRunner(client=None)
+        runner = SpineRunBroker()
 
         async def _fake_run_spine(
             run_id: str,
@@ -208,7 +198,6 @@ class RunRefreshRouteTest(unittest.TestCase):
             _audit_id: str,
             _database_id: str | None,
             _filters: dict[str, str],
-            _workbook_path: Path,
             execution_id: str | None = None,
             # Accept whatever the real _run_spine signature grows (the double
             # broke once when user_id landed without this).
@@ -252,6 +241,11 @@ class RunRefreshRouteTest(unittest.TestCase):
             return out
 
         async def _refresh_then_collect() -> tuple[object, list[dict]]:
+            # Each execution is a fresh reservation: SpineRunBroker.reserve is a
+            # no-op while the run's prior terminal state lingers, so clear it
+            # before re-running the same run id (a refresh starts a new execution).
+            runner._runs.pop(run_id, None)
+            runner._reserved.pop(run_id, None)
             response = await runs_route.refresh_run(run_id)
             events = await asyncio.wait_for(_collect_stream_events(), timeout=1.0)
             return response, events
@@ -263,7 +257,6 @@ class RunRefreshRouteTest(unittest.TestCase):
             patch.object(runs_route, "RUNS_DIR", self.runs_dir),
             patch.object(runs_route.runner_mod, "runner", runner),
             patch.object(runs_route, "Store", _fake_store_factory),
-            patch.object(runs_route, "_resolve_audit_excel", lambda _audit_id: source_wb),
             patch.object(runs_route, "_run_spine", _fake_run_spine),
             patch.object(runs_route, "_new_execution_id", lambda: next(execution_ids)),
         ):

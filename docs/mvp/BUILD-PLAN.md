@@ -238,14 +238,24 @@ upstream**, its **current code + verify-or-build**, and its **verify** check. Bu
   pass on the seed; `kind` is derived (multi-source → `interpret`); the cohort block matches the
   criteria base.
 
-### A5 · index → `spec.json` + `model.json` — ⏸ ON HOLD (DB done, audit paused)
-> **A5 outcome (2026-06-07).** The MVP pivots away from LLM-driven audit indexing.
-> Audit `spec.json` is now **hand-authored** against the contract
-> (`docs/mvp/contracts/audit-spec.schema.json`); `core/indexing/build_audit_spec.py`
-> is dead code in the MVP path (do not delete; carries a top-of-file notice + the
-> unfixed-bug list for the eventual unpause: #2 `_HEADER_ROW` endswith, #3 coverage
-> after merge, #4 slug(header)≠slug(name), #7 truncated retry feedback, #8 LLM-
-> enumeration altitude). **Database indexing landed:** `build_database_model.py`
+### A5 · index → `spec.json` + `model.json` — ✅ DONE (audit indexer rewritten, T11)
+> **T11 unpause (2026-06-11).** `build_audit_spec.py` rewritten at the right
+> altitude: the `fields[]` skeleton (number/section/cell/verbatim name/FK id) is
+> extracted MECHANICALLY from row-1 headers; one LLM call supplies only the
+> per-field judgment (type/unit/format/permitted_values/notes, joined by
+> `number`) + audit-level prose, `deadline`, and suggested criteria — the LLM
+> cannot add, drop, rename, or move a field. This killed the whole A5 bug list:
+> #2 (rows matched structurally), #4 (`name` IS the header), #3/#7/#8 (no
+> coverage guard left to fool). Measured via `make eval --stage index-audit`:
+> field recall/precision **1.0/1.0** by construction, type_match 0.88, notes
+> 1.0, criteria_recall 0.8; the old builder could not complete a single build
+> (its own coverage gate rejected every attempt — bug #4 live). The canonical
+> code NUMBERING is unrecoverable from a workbook that states no codes, so
+> `code_set_match` is report-only on the audit leg (input gap, not model
+> failure). Tests: `core/indexing/tests/audit_spec.py`.
+>
+> **A5 outcome (2026-06-07, superseded).** The MVP had pivoted to hand-authored
+> `spec.json` while the builder was paused. **Database indexing landed:** `build_database_model.py`
 > + `profile.py` produce a schema-valid `model.json` from a live sqlite,
 > re-raise on profiler errors (no more silent `reason: reference` mislabel), and
 > the deterministic-surface invariant is now test-enforced (LLM prose cannot
@@ -344,9 +354,9 @@ above are kept as the design record of how each contract was pinned.
 | `core/running/try_agent.py` / `try_llm.py` / `try_direct.py` | **live**, with tests under `core/running/tests/` (A1/A2/A3) |
 | `core/running/stream_runner.py` + `events.py` | **live** — strict-v2 broker + canonical event builders (#200) |
 | `core/running/build_workbook.py` | **live** — per-run `result.xlsx` from spec + cohort (#205) |
-| `core/mapping/*` | **live** — match + criteria + folded executable (A4); `database_summaries` emission pending (Phase 4 · T7) |
+| `core/mapping/*` | **live** — match + criteria + folded executable (A4) + `database_summaries` emission (T7) |
 | `core/indexing/build_database_model.py` + `profile.py` | **live** (A5 database half) |
-| `core/indexing/build_audit_spec.py` | **reachable from upload but paused** — known bugs #2/#3/#4/#7/#8; rewrite is Phase 4 · T11 |
+| `core/indexing/build_audit_spec.py` | **live** — T11 rewrite: mechanical `fields[]` skeleton + prose-only LLM; measured by `make eval --stage index-audit` |
 | `core/store/` | **live** — cells/events/runs + `field_codes` + refresh tables; legacy `needs_verification` CHECK value to drop (Phase 4 · T13) |
 | `core/config.py` | under `var/` per `contracts/storage-layout.md`; per-stage model config pending (Phase 4 · T9) |
 | `core/agent/opencode.json` | tightened allow-list (A1); obsolete tool/skill **files** still present — deletion is Phase 4 · T14 |

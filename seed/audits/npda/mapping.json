@@ -5,7 +5,11 @@
     "npda-demographics",
     "npda-clinical"
   ],
-  "description": "npda-clinical.clinic_visits is the primary entity (one row per visit), joined to npda-demographics by NHS number. Demographics (A\u2013E, M\u2013N) and registration data (F\u2013H, I\u2013L) come from npda-demographics.patients and registrations. Visit date (O) comes from clinic_visits. Clinical measurements (P\u2013T, AB\u2013AL) are drawn from npda-clinical.measurements, selecting by measurement_type. Annual care-process dates and results (AE\u2013AG, AM\u2013AO, AS) come from npda-clinical.screening_results, selecting by screening_type. Treatment and technology snapshots (U\u2013Z, AA, AN, AP) come from npda-clinical.technology. Psychology and dietetics (AU\u2013AZ) come from npda-clinical.psychology. Hospital-admission details (BA\u2013BG), smoking status (AQ\u2013AR), sick-day rules (AT), and any values missing from structured fields are extracted from free-text clinical_notes and registration_notes.",
+  "database_summaries": {
+    "npda-demographics": "Patient demographics, registration details and service-exit dates joined to each clinic visit via NHS number. Comorbidity status (ADHD/ASD, learning disability) is documented only in free-text registration_notes, not in structured flags.",
+    "npda-clinical": "Visit-level clinical measurements, annual screening results and free-text notes. Clinic letters, psychology notes and dietetics notes carry the encounter-level care processes - treatment/technology, psychology, dietetics, smoking, sick-day rules and admission details - none of which are held in structured columns."
+  },
+  "description": "npda-clinical.clinic_visits is the primary entity (one row per visit), joined to npda-demographics by NHS number. Demographics (A-E, M-N) and registration data (H-L) come from npda-demographics.patients and registrations. Comorbidity items - ADHD/ASD (F) and learning disability (G) - are not structured flags; they are read from npda-demographics.registration_notes free text. Visit date (O) comes from clinic_visits. Routine lab/observation measurements (P-T, AB-AD, AH-AL) come from npda-clinical.measurements and annual care-process dates/results (AE-AG, AM, AO, AS) from npda-clinical.screening_results. Treatment and technology items (U-AA, AN), the psychology annual review (AU-AW), the dietetics annual review (AX-AZ), smoking status (AQ-AR), sick-day rules (AT) and all hospital-admission details (BB-BG) are NOT held in structured tables - they are extracted from the free-text npda-clinical.clinical_notes (clinic letters, psychology notes, dietetics notes, admission letters/summaries).",
   "identity": {
     "anchor": "npda-clinical -> clinic_visits.visit_id",
     "grain": "one row per patient visit or appointment, including outpatient clinic visits, inpatient admissions and transition final visits",
@@ -62,7 +66,7 @@
       "header": "Sex assigned at birth",
       "kind": "direct",
       "sources": [
-        "npda-demographics -> patients.sex_code"
+        "npda-demographics -> patients.sex"
       ],
       "code": {
         "1": "Male",
@@ -77,7 +81,7 @@
       "header": "Ethnic Category",
       "kind": "direct",
       "sources": [
-        "npda-demographics -> patients.ethnicity_code"
+        "npda-demographics -> patients.ethnicity"
       ],
       "code": {
         "A": "White - British",
@@ -104,9 +108,9 @@
       "region": "ALL",
       "cell": "F",
       "header": "Has the patient had a diagnosis of Attention Deficit Hyperactivity Disorder (ADHD) or Autism Spectrum Disorder (ASD)?",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-demographics -> registrations.adhd_asd_status"
+        "npda-demographics -> registration_notes.body"
       ],
       "code": {
         "ADHD": "Yes, ADHD",
@@ -118,9 +122,9 @@
       "region": "ALL",
       "cell": "G",
       "header": "Does the patient have a diagnosis of a learning disability?",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-demographics -> registrations.learning_disability_flag"
+        "npda-demographics -> registration_notes.body"
       ],
       "code": {
         "Y": "Yes",
@@ -133,7 +137,7 @@
       "header": "Diabetes Type",
       "kind": "direct",
       "sources": [
-        "npda-demographics -> registrations.diabetes_type_code"
+        "npda-demographics -> registrations.diabetes_type"
       ],
       "code": {
         "1": "Type 1 Diabetes Mellitus",
@@ -168,7 +172,7 @@
       "header": "Reason for leaving service",
       "kind": "direct",
       "sources": [
-        "npda-demographics -> registrations.leaving_reason_code"
+        "npda-demographics -> registrations.leaving_reason"
       ],
       "code": {
         "1": "Transitioned to adult diabetes service",
@@ -276,9 +280,9 @@
       "region": "ALL",
       "cell": "U",
       "header": "Insulin regime at time of visit",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> technology.insulin_regimen"
+        "npda-clinical -> clinical_notes.text"
       ],
       "code": {
         "none": "No insulin",
@@ -292,9 +296,9 @@
       "region": "ALL",
       "cell": "V",
       "header": "Other (non-insulin) blood glucose lowering medication at time of visit",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> technology.non_insulin_med"
+        "npda-clinical -> clinical_notes.text"
       ],
       "code": {
         "none": "No medication",
@@ -309,9 +313,9 @@
       "region": "ALL",
       "cell": "W",
       "header": "Has lifestyle and dietary modification been recommended to reduce blood glucose levels?",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> technology.lifestyle_advice_given"
+        "npda-clinical -> clinical_notes.text"
       ],
       "code": {
         "yes": "Yes"
@@ -321,9 +325,9 @@
       "region": "ALL",
       "cell": "X",
       "header": "Was the patient using a continuous glucose monitor (CGM) at time of visit?",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> technology.cgm_in_use"
+        "npda-clinical -> clinical_notes.text"
       ],
       "code": {
         "yes": "Yes",
@@ -334,9 +338,9 @@
       "region": "ALL",
       "cell": "Y",
       "header": "Was the patient using (or trained to use) blood ketone testing equipment at time of visit?",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> technology.blood_ketone_testing"
+        "npda-clinical -> clinical_notes.text"
       ],
       "code": {
         "yes": "Yes",
@@ -347,9 +351,10 @@
       "region": "ALL",
       "cell": "Z",
       "header": "Did the patient receive immunotherapy prior to or after the diagnosis of stage 3 Type 1 diabetes?",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> technology.immunotherapy_received"
+        "npda-clinical -> clinical_notes.text",
+        "npda-demographics -> registration_notes.body"
       ],
       "code": {
         "yes": "Yes",
@@ -360,9 +365,10 @@
       "region": "ALL",
       "cell": "AA",
       "header": "Date immunotherapy started",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> technology.immunotherapy_start_date"
+        "npda-clinical -> clinical_notes.text",
+        "npda-demographics -> registration_notes.body"
       ]
     },
     {
@@ -518,9 +524,9 @@
       "region": "ALL",
       "cell": "AN",
       "header": "At time of, or following measurement of thyroid function, was the patient prescribed any thyroid treatment?",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> technology.thyroid_treatment"
+        "npda-clinical -> clinical_notes.text"
       ],
       "code": {
         "none": "No thyroid therapy",
@@ -611,18 +617,19 @@
       "region": "ALL",
       "cell": "AU",
       "header": "Date of Annual Psychological Screening Assessment",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> psychology.screening_date"
+        "npda-clinical -> clinical_notes.text",
+        "npda-clinical -> clinical_notes.note_date"
       ]
     },
     {
       "region": "ALL",
       "cell": "AV",
       "header": "Following annual psychological screening, was the patient assessed as requiring additional psychological support outside of routine care?",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> psychology.additional_support_needed"
+        "npda-clinical -> clinical_notes.text"
       ],
       "code": {
         "yes": "Yes",
@@ -633,9 +640,9 @@
       "region": "ALL",
       "cell": "AW",
       "header": "Was the patient offered an additional appointment with a mental health professional as part of the diabetes MDT?",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> psychology.mental_health_appointment_status"
+        "npda-clinical -> clinical_notes.text"
       ],
       "code": {
         "offered_attended": "Offered and attended",
@@ -649,18 +656,18 @@
       "region": "ALL",
       "cell": "AX",
       "header": "Date Level 3 carbohydrate counting education received",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> psychology.carb_counting_education_date"
+        "npda-clinical -> clinical_notes.text"
       ]
     },
     {
       "region": "ALL",
       "cell": "AY",
       "header": "Was the patient offered an additional appointment with a paediatric dietitian during the audit year?",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> psychology.dietitian_appointment_offered"
+        "npda-clinical -> clinical_notes.text"
       ],
       "code": {
         "yes": "Yes",
@@ -671,9 +678,9 @@
       "region": "ALL",
       "cell": "AZ",
       "header": "Date of additional appointment with dietitian",
-      "kind": "direct",
+      "kind": "interpret",
       "sources": [
-        "npda-clinical -> psychology.dietitian_appointment_date"
+        "npda-clinical -> clinical_notes.text"
       ]
     },
     {
@@ -765,7 +772,7 @@
     {
       "criterion_id": "diabetes_type",
       "label": "Diabetes type",
-      "source": "npda-demographics -> registrations.diabetes_type_code",
+      "source": "npda-demographics -> registrations.diabetes_type",
       "type": "category",
       "join_path": "clinic_visits.patient_ref -> patients.nhs_number; patients.patient_id -> registrations.patient_id",
       "grain_rule": "the patient has >=1 matching registration row with the specified diabetes type code",
@@ -799,18 +806,9 @@
       "from": "audit_field+db_column"
     },
     {
-      "criterion_id": "insulin_regime",
-      "label": "Insulin regime",
-      "source": "npda-clinical -> technology.insulin_regimen",
-      "type": "category",
-      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
-      "grain_rule": "the patient has >=1 technology snapshot row with the specified insulin regimen",
-      "from": "audit_field+db_column"
-    },
-    {
       "criterion_id": "sex_assigned_at_birth",
       "label": "Sex assigned at birth",
-      "source": "npda-demographics -> patients.sex_code",
+      "source": "npda-demographics -> patients.sex",
       "type": "category",
       "join_path": "clinic_visits.patient_ref -> patients.nhs_number",
       "grain_rule": "the patient has >=1 matching demographics row with the specified sex code",
@@ -819,7 +817,7 @@
     {
       "criterion_id": "ethnic_category",
       "label": "Ethnic Category",
-      "source": "npda-demographics -> patients.ethnicity_code",
+      "source": "npda-demographics -> patients.ethnicity",
       "type": "category",
       "join_path": "clinic_visits.patient_ref -> patients.nhs_number",
       "grain_rule": "the patient has >=1 matching demographics row with the specified ethnicity code",
@@ -844,24 +842,6 @@
       "from": "audit_field+db_column"
     },
     {
-      "criterion_id": "adhd_asd_diagnosis",
-      "label": "ADHD or ASD diagnosis",
-      "source": "npda-demographics -> registrations.adhd_asd_status",
-      "type": "category",
-      "join_path": "clinic_visits.patient_ref -> patients.nhs_number; patients.patient_id -> registrations.patient_id",
-      "grain_rule": "the patient has >=1 matching registration row with the specified ADHD/ASD status",
-      "from": "audit_field+db_column"
-    },
-    {
-      "criterion_id": "learning_disability",
-      "label": "Learning disability",
-      "source": "npda-demographics -> registrations.learning_disability_flag",
-      "type": "category",
-      "join_path": "clinic_visits.patient_ref -> patients.nhs_number; patients.patient_id -> registrations.patient_id",
-      "grain_rule": "the patient has >=1 matching registration row with the specified learning disability flag",
-      "from": "audit_field+db_column"
-    },
-    {
       "criterion_id": "diabetes_diagnosis_date",
       "label": "Date of Diabetes Diagnosis",
       "source": "npda-demographics -> registrations.diagnosis_date",
@@ -882,7 +862,7 @@
     {
       "criterion_id": "leaving_service_reason",
       "label": "Reason for leaving service",
-      "source": "npda-demographics -> registrations.leaving_reason_code",
+      "source": "npda-demographics -> registrations.leaving_reason",
       "type": "category",
       "join_path": "clinic_visits.patient_ref -> patients.nhs_number; patients.patient_id -> registrations.patient_id",
       "grain_rule": "the patient has >=1 matching registration row with the specified leaving reason code",
@@ -940,105 +920,6 @@
       "type": "number",
       "join_path": "clinic_visits.visit_id -> measurements.visit_ref",
       "grain_rule": "the visit has >=1 measurement row with measurement_type = 'cholesterol' and value in range",
-      "from": "audit_field+db_column"
-    },
-    {
-      "criterion_id": "cgm_in_use",
-      "label": "Continuous glucose monitor in use",
-      "source": "npda-clinical -> technology.cgm_in_use",
-      "type": "category",
-      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
-      "grain_rule": "the patient has >=1 technology snapshot row with the specified CGM use status",
-      "from": "audit_field+db_column"
-    },
-    {
-      "criterion_id": "blood_ketone_testing",
-      "label": "Blood ketone testing",
-      "source": "npda-clinical -> technology.blood_ketone_testing",
-      "type": "category",
-      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
-      "grain_rule": "the patient has >=1 technology snapshot row with the specified blood ketone testing status",
-      "from": "audit_field+db_column"
-    },
-    {
-      "criterion_id": "non_insulin_medication",
-      "label": "Non-insulin blood glucose lowering medication",
-      "source": "npda-clinical -> technology.non_insulin_med",
-      "type": "category",
-      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
-      "grain_rule": "the patient has >=1 technology snapshot row with the specified non-insulin medication",
-      "from": "audit_field+db_column"
-    },
-    {
-      "criterion_id": "immunotherapy_received",
-      "label": "Immunotherapy received",
-      "source": "npda-clinical -> technology.immunotherapy_received",
-      "type": "category",
-      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
-      "grain_rule": "the patient has >=1 technology snapshot row with the specified immunotherapy status",
-      "from": "audit_field+db_column"
-    },
-    {
-      "criterion_id": "thyroid_treatment",
-      "label": "Thyroid treatment",
-      "source": "npda-clinical -> technology.thyroid_treatment",
-      "type": "category",
-      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
-      "grain_rule": "the patient has >=1 technology snapshot row with the specified thyroid treatment",
-      "from": "audit_field+db_column"
-    },
-    {
-      "criterion_id": "lifestyle_modification_recommended",
-      "label": "Lifestyle and dietary modification recommended",
-      "source": "npda-clinical -> technology.lifestyle_advice_given",
-      "type": "category",
-      "join_path": "clinic_visits.patient_ref -> technology.patient_ref",
-      "grain_rule": "the patient has >=1 technology snapshot row indicating lifestyle advice was given",
-      "from": "audit_field+db_column"
-    },
-    {
-      "criterion_id": "psychological_screening_date",
-      "label": "Date of Annual Psychological Screening Assessment",
-      "source": "npda-clinical -> psychology.screening_date",
-      "type": "date",
-      "join_path": "clinic_visits.patient_ref -> psychology.patient_ref",
-      "grain_rule": "the patient has >=1 psychology row with screening date in range",
-      "from": "audit_field+db_column"
-    },
-    {
-      "criterion_id": "additional_psych_support_needed",
-      "label": "Additional psychological support needed",
-      "source": "npda-clinical -> psychology.additional_support_needed",
-      "type": "category",
-      "join_path": "clinic_visits.patient_ref -> psychology.patient_ref",
-      "grain_rule": "the patient has >=1 psychology row with the specified additional support status",
-      "from": "audit_field+db_column"
-    },
-    {
-      "criterion_id": "mental_health_appointment",
-      "label": "Mental health appointment status",
-      "source": "npda-clinical -> psychology.mental_health_appointment_status",
-      "type": "category",
-      "join_path": "clinic_visits.patient_ref -> psychology.patient_ref",
-      "grain_rule": "the patient has >=1 psychology row with the specified mental health appointment status",
-      "from": "audit_field+db_column"
-    },
-    {
-      "criterion_id": "carb_counting_date",
-      "label": "Date Level 3 carbohydrate counting education received",
-      "source": "npda-clinical -> psychology.carb_counting_education_date",
-      "type": "date",
-      "join_path": "clinic_visits.patient_ref -> psychology.patient_ref",
-      "grain_rule": "the patient has >=1 psychology row with carbohydrate counting education date in range",
-      "from": "audit_field+db_column"
-    },
-    {
-      "criterion_id": "dietitian_appointment_offered",
-      "label": "Dietitian appointment offered",
-      "source": "npda-clinical -> psychology.dietitian_appointment_offered",
-      "type": "category",
-      "join_path": "clinic_visits.patient_ref -> psychology.patient_ref",
-      "grain_rule": "the patient has >=1 psychology row indicating a dietitian appointment was offered",
       "from": "audit_field+db_column"
     },
     {
@@ -1145,6 +1026,90 @@
       "label": "Gluten-free diet recommended/prescribed",
       "source": "npda-clinical -> screening_results.result_code",
       "reason": "structured column captures 'no' only; 'yes' is not coded separately"
+    },
+    {
+      "criterion_id": "insulin_regime",
+      "label": "Insulin regime",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes (clinic/psychology/dietetics notes); no structured column"
+    },
+    {
+      "criterion_id": "adhd_asd_diagnosis",
+      "label": "ADHD or ASD diagnosis",
+      "source": "npda-demographics -> registration_notes.body",
+      "reason": "only recorded in free-text registration notes (referral letters, MDT summaries); no structured flag"
+    },
+    {
+      "criterion_id": "learning_disability",
+      "label": "Learning disability",
+      "source": "npda-demographics -> registration_notes.body",
+      "reason": "only recorded in free-text registration notes (referral letters, MDT summaries); no structured flag"
+    },
+    {
+      "criterion_id": "cgm_in_use",
+      "label": "Continuous glucose monitor in use",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes (clinic/psychology/dietetics notes); no structured column"
+    },
+    {
+      "criterion_id": "blood_ketone_testing",
+      "label": "Blood ketone testing",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes (clinic/psychology/dietetics notes); no structured column"
+    },
+    {
+      "criterion_id": "non_insulin_medication",
+      "label": "Non-insulin blood glucose lowering medication",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes (clinic/psychology/dietetics notes); no structured column"
+    },
+    {
+      "criterion_id": "immunotherapy_received",
+      "label": "Immunotherapy received",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes (clinic/psychology/dietetics notes); no structured column"
+    },
+    {
+      "criterion_id": "thyroid_treatment",
+      "label": "Thyroid treatment",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes (clinic/psychology/dietetics notes); no structured column"
+    },
+    {
+      "criterion_id": "lifestyle_modification_recommended",
+      "label": "Lifestyle and dietary modification recommended",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes (clinic/psychology/dietetics notes); no structured column"
+    },
+    {
+      "criterion_id": "psychological_screening_date",
+      "label": "Date of Annual Psychological Screening Assessment",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes (clinic/psychology/dietetics notes); no structured column"
+    },
+    {
+      "criterion_id": "additional_psych_support_needed",
+      "label": "Additional psychological support needed",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes (clinic/psychology/dietetics notes); no structured column"
+    },
+    {
+      "criterion_id": "mental_health_appointment",
+      "label": "Mental health appointment status",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes (clinic/psychology/dietetics notes); no structured column"
+    },
+    {
+      "criterion_id": "carb_counting_date",
+      "label": "Date Level 3 carbohydrate counting education received",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes (clinic/psychology/dietetics notes); no structured column"
+    },
+    {
+      "criterion_id": "dietitian_appointment_offered",
+      "label": "Dietitian appointment offered",
+      "source": "npda-clinical -> clinical_notes.text",
+      "reason": "only recorded in free-text clinical notes (clinic/psychology/dietetics notes); no structured column"
     }
   ],
   "executable": {
@@ -1156,7 +1121,7 @@
     ],
     "cohort": {
       "database": "npda-clinical",
-      "from": "clinic_visits b JOIN technology t ON b.patient_ref = t.patient_ref JOIN measurements m ON b.visit_id = m.visit_ref JOIN psychology p ON b.patient_ref = p.patient_ref JOIN screening_results s ON b.patient_ref = s.patient_ref",
+      "from": "clinic_visits b JOIN measurements m ON b.visit_id = m.visit_ref JOIN screening_results s ON b.patient_ref = s.patient_ref",
       "identity_select": "b.visit_id AS visit_id",
       "where": []
     },
@@ -1168,20 +1133,17 @@
         "queries": [
           {
             "database": "npda-demographics",
-            "sql": "SELECT p.nhs_number, p.date_of_birth, p.postcode, p.sex_code, p.ethnicity_code, p.gp_practice_code, p.pdu_number FROM patients p WHERE p.nhs_number IN (:cohort)",
+            "sql": "SELECT p.nhs_number, p.date_of_birth, p.postcode, p.sex, p.ethnicity, p.gp_practice_code, p.pdu_number FROM patients p WHERE p.nhs_number IN (:cohort)",
+            "key_column": "nhs_number"
+          },
+          {
+            "database": "npda-demographics",
+            "sql": "SELECT p.nhs_number, r.diabetes_type, r.diagnosis_date, r.leaving_date, r.leaving_reason, r.deceased_date FROM patients p JOIN registrations r ON p.patient_id = r.patient_id WHERE p.nhs_number IN (:cohort)",
             "key_column": "nhs_number"
           },
           {
             "database": "npda-clinical",
             "sql": "SELECT c.visit_id, c.visit_date FROM clinic_visits c WHERE c.visit_id IN (:cohort)"
-          },
-          {
-            "database": "npda-clinical",
-            "sql": "SELECT t.visit_id, t.insulin_regimen, t.non_insulin_med, t.lifestyle_advice_given, t.cgm_in_use, t.blood_ketone_testing, t.immunotherapy_received, t.immunotherapy_start_date, t.thyroid_treatment FROM technology t WHERE t.visit_id IN (:cohort)"
-          },
-          {
-            "database": "npda-clinical",
-            "sql": "SELECT p.visit_id, p.screening_date, p.additional_support_needed, p.mental_health_appointment_status, p.carb_counting_education_date, p.dietitian_appointment_offered, p.dietitian_appointment_date FROM psychology p WHERE p.visit_id IN (:cohort)"
           }
         ],
         "row_anchor": "visit_id",
@@ -1206,17 +1168,89 @@
           },
           {
             "field": "sex_assigned_at_birth",
-            "column": "sex_code",
+            "column": "sex",
             "table": "patients",
             "cell_template": "{col:D}{row}",
-            "translate": "sex_code"
+            "translate": "sex"
           },
           {
             "field": "ethnic_category",
-            "column": "ethnicity_code",
+            "column": "ethnicity",
             "table": "patients",
             "cell_template": "{col:E}{row}",
-            "translate": "ethnicity_code"
+            "translate": "ethnicity"
+          },
+          {
+            "field": "diabetes_type",
+            "column": "diabetes_type",
+            "table": "registrations",
+            "cell_template": "{col:H}{row}",
+            "translate": "diabetes_type",
+            "via": [
+              {
+                "from_table": "patients",
+                "from_col": "patient_id",
+                "to_table": "registrations",
+                "to_col": "patient_id"
+              }
+            ]
+          },
+          {
+            "field": "date_of_diabetes_diagnosis",
+            "column": "diagnosis_date",
+            "table": "registrations",
+            "cell_template": "{col:I}{row}",
+            "via": [
+              {
+                "from_table": "patients",
+                "from_col": "patient_id",
+                "to_table": "registrations",
+                "to_col": "patient_id"
+              }
+            ]
+          },
+          {
+            "field": "date_of_leaving_service",
+            "column": "leaving_date",
+            "table": "registrations",
+            "cell_template": "{col:J}{row}",
+            "via": [
+              {
+                "from_table": "patients",
+                "from_col": "patient_id",
+                "to_table": "registrations",
+                "to_col": "patient_id"
+              }
+            ]
+          },
+          {
+            "field": "reason_for_leaving_service",
+            "column": "leaving_reason",
+            "table": "registrations",
+            "cell_template": "{col:K}{row}",
+            "translate": "leaving_reason",
+            "via": [
+              {
+                "from_table": "patients",
+                "from_col": "patient_id",
+                "to_table": "registrations",
+                "to_col": "patient_id"
+              }
+            ]
+          },
+          {
+            "field": "death_date",
+            "column": "deceased_date",
+            "table": "registrations",
+            "cell_template": "{col:L}{row}",
+            "via": [
+              {
+                "from_table": "patients",
+                "from_col": "patient_id",
+                "to_table": "registrations",
+                "to_col": "patient_id"
+              }
+            ]
           },
           {
             "field": "gp_practice_code",
@@ -1235,100 +1269,6 @@
             "column": "visit_date",
             "table": "clinic_visits",
             "cell_template": "{col:O}{row}"
-          },
-          {
-            "field": "insulin_regime_at_time_of_visit",
-            "column": "insulin_regimen",
-            "table": "technology",
-            "cell_template": "{col:U}{row}",
-            "translate": "insulin_regimen"
-          },
-          {
-            "field": "other_non_insulin_blood_glucose_lowering_medication_at_time_of_visit",
-            "column": "non_insulin_med",
-            "table": "technology",
-            "cell_template": "{col:V}{row}",
-            "translate": "non_insulin_med"
-          },
-          {
-            "field": "has_lifestyle_and_dietary_modification_been_recommended_to_reduce_blood_glucose_levels",
-            "column": "lifestyle_advice_given",
-            "table": "technology",
-            "cell_template": "{col:W}{row}",
-            "translate": "lifestyle_advice_given"
-          },
-          {
-            "field": "was_the_patient_using_a_continuous_glucose_monitor_cgm_at_time_of_visit",
-            "column": "cgm_in_use",
-            "table": "technology",
-            "cell_template": "{col:X}{row}",
-            "translate": "cgm_in_use"
-          },
-          {
-            "field": "was_the_patient_using_or_trained_to_use_blood_ketone_testing_equipment_at_time_of_visit",
-            "column": "blood_ketone_testing",
-            "table": "technology",
-            "cell_template": "{col:Y}{row}",
-            "translate": "blood_ketone_testing"
-          },
-          {
-            "field": "did_the_patient_receive_immunotherapy_prior_to_or_after_the_diagnosis_of_stage_3_type_1_diabetes",
-            "column": "immunotherapy_received",
-            "table": "technology",
-            "cell_template": "{col:Z}{row}",
-            "translate": "immunotherapy_received"
-          },
-          {
-            "field": "date_immunotherapy_started",
-            "column": "immunotherapy_start_date",
-            "table": "technology",
-            "cell_template": "{col:AA}{row}"
-          },
-          {
-            "field": "at_time_of_or_following_measurement_of_thyroid_function_was_the_patient_prescribed_any_thyroid_treatment",
-            "column": "thyroid_treatment",
-            "table": "technology",
-            "cell_template": "{col:AN}{row}",
-            "translate": "thyroid_treatment"
-          },
-          {
-            "field": "date_of_annual_psychological_screening_assessment",
-            "column": "screening_date",
-            "table": "psychology",
-            "cell_template": "{col:AU}{row}"
-          },
-          {
-            "field": "following_annual_psychological_screening_was_the_patient_assessed_as_requiring_additional_psychological_support_outside_of_routine_care",
-            "column": "additional_support_needed",
-            "table": "psychology",
-            "cell_template": "{col:AV}{row}",
-            "translate": "additional_support_needed"
-          },
-          {
-            "field": "was_the_patient_offered_an_additional_appointment_with_a_mental_health_professional_as_part_of_the_diabetes_mdt",
-            "column": "mental_health_appointment_status",
-            "table": "psychology",
-            "cell_template": "{col:AW}{row}",
-            "translate": "mental_health_appointment_status"
-          },
-          {
-            "field": "date_level_3_carbohydrate_counting_education_received",
-            "column": "carb_counting_education_date",
-            "table": "psychology",
-            "cell_template": "{col:AX}{row}"
-          },
-          {
-            "field": "was_the_patient_offered_an_additional_appointment_with_a_paediatric_dietitian_during_the_audit_year",
-            "column": "dietitian_appointment_offered",
-            "table": "psychology",
-            "cell_template": "{col:AY}{row}",
-            "translate": "dietitian_appointment_offered"
-          },
-          {
-            "field": "date_of_additional_appointment_with_dietitian",
-            "column": "dietitian_appointment_date",
-            "table": "psychology",
-            "cell_template": "{col:AZ}{row}"
           },
           {
             "field": "start_date_hospital_provider_spell",
@@ -1367,26 +1307,6 @@
             "cell_template": "{col:G}{row}"
           },
           {
-            "field": "diabetes_type",
-            "cell_template": "{col:H}{row}"
-          },
-          {
-            "field": "date_of_diabetes_diagnosis",
-            "cell_template": "{col:I}{row}"
-          },
-          {
-            "field": "date_of_leaving_service",
-            "cell_template": "{col:J}{row}"
-          },
-          {
-            "field": "reason_for_leaving_service",
-            "cell_template": "{col:K}{row}"
-          },
-          {
-            "field": "death_date",
-            "cell_template": "{col:L}{row}"
-          },
-          {
             "field": "patient_height_cm",
             "cell_template": "{col:P}{row}"
           },
@@ -1405,6 +1325,34 @@
           {
             "field": "observation_date_hba1c_value",
             "cell_template": "{col:T}{row}"
+          },
+          {
+            "field": "insulin_regime_at_time_of_visit",
+            "cell_template": "{col:U}{row}"
+          },
+          {
+            "field": "other_non_insulin_blood_glucose_lowering_medication_at_time_of_visit",
+            "cell_template": "{col:V}{row}"
+          },
+          {
+            "field": "has_lifestyle_and_dietary_modification_been_recommended_to_reduce_blood_glucose_levels",
+            "cell_template": "{col:W}{row}"
+          },
+          {
+            "field": "was_the_patient_using_a_continuous_glucose_monitor_cgm_at_time_of_visit",
+            "cell_template": "{col:X}{row}"
+          },
+          {
+            "field": "was_the_patient_using_or_trained_to_use_blood_ketone_testing_equipment_at_time_of_visit",
+            "cell_template": "{col:Y}{row}"
+          },
+          {
+            "field": "did_the_patient_receive_immunotherapy_prior_to_or_after_the_diagnosis_of_stage_3_type_1_diabetes",
+            "cell_template": "{col:Z}{row}"
+          },
+          {
+            "field": "date_immunotherapy_started",
+            "cell_template": "{col:AA}{row}"
           },
           {
             "field": "systolic_blood_pressure",
@@ -1455,6 +1403,10 @@
             "cell_template": "{col:AM}{row}"
           },
           {
+            "field": "at_time_of_or_following_measurement_of_thyroid_function_was_the_patient_prescribed_any_thyroid_treatment",
+            "cell_template": "{col:AN}{row}"
+          },
+          {
             "field": "observation_date_coeliac_disease_screening",
             "cell_template": "{col:AO}{row}"
           },
@@ -1477,6 +1429,30 @@
           {
             "field": "date_of_provision_of_advice_sick_day_rules_about_managing_diabetes_during_intercurrent_illness_or_episodes_of_hyperglycaemia",
             "cell_template": "{col:AT}{row}"
+          },
+          {
+            "field": "date_of_annual_psychological_screening_assessment",
+            "cell_template": "{col:AU}{row}"
+          },
+          {
+            "field": "following_annual_psychological_screening_was_the_patient_assessed_as_requiring_additional_psychological_support_outside_of_routine_care",
+            "cell_template": "{col:AV}{row}"
+          },
+          {
+            "field": "was_the_patient_offered_an_additional_appointment_with_a_mental_health_professional_as_part_of_the_diabetes_mdt",
+            "cell_template": "{col:AW}{row}"
+          },
+          {
+            "field": "date_level_3_carbohydrate_counting_education_received",
+            "cell_template": "{col:AX}{row}"
+          },
+          {
+            "field": "was_the_patient_offered_an_additional_appointment_with_a_paediatric_dietitian_during_the_audit_year",
+            "cell_template": "{col:AY}{row}"
+          },
+          {
+            "field": "date_of_additional_appointment_with_dietitian",
+            "cell_template": "{col:AZ}{row}"
           },
           {
             "field": "discharge_date_hospital_provider_spell",
@@ -1506,13 +1482,13 @@
       }
     ],
     "code_sets": {
-      "sex_code": {
+      "sex": {
         "Male": "1",
         "Female": "2",
         "Not specified": "3",
         "Unknown": "99"
       },
-      "ethnicity_code": {
+      "ethnicity": {
         "White - British": "A",
         "White - Irish": "B",
         "White - Any other White background": "C",
@@ -1532,54 +1508,18 @@
         "Not stated": "Z",
         "Not Known": "99"
       },
-      "insulin_regimen": {
-        "No insulin": "none",
-        "One - three injections/day": "MDI_1_to_3",
-        "Four or more injections/day": "MDI_4_or_more",
-        "Insulin pump (standalone)": "insulin_pump",
-        "Hybrid closed loop": "hybrid_closed_loop"
+      "diabetes_type": {
+        "Type 1 Diabetes Mellitus": "1",
+        "Type 2 Diabetes Mellitus": "2",
+        "Cystic Fibrosis Related Diabetes": "3",
+        "MODY (monogenic forms of diabetes)": "4",
+        "Other specified Diabetes Mellitus": "5",
+        "Unknown/unspecified": "99"
       },
-      "non_insulin_med": {
-        "No medication": "none",
-        "Metformin only": "metformin_only",
-        "GLP-1 agonists": "glp1",
-        "SGLT2 inhibitors": "sglt2",
-        "Other": "other"
-      },
-      "lifestyle_advice_given": {
-        "Yes": "yes"
-      },
-      "cgm_in_use": {
-        "Yes": "yes",
-        "No": "no"
-      },
-      "blood_ketone_testing": {
-        "Yes": "yes",
-        "No": "no"
-      },
-      "immunotherapy_received": {
-        "Yes": "yes",
-        "No": "no"
-      },
-      "thyroid_treatment": {
-        "No thyroid therapy": "none",
-        "Thyroxine for hypothyroidism": "levothyroxine",
-        "Antithyroid medication for hyperthyroidism": "antithyroid"
-      },
-      "additional_support_needed": {
-        "Yes": "yes",
-        "No": "no"
-      },
-      "mental_health_appointment_status": {
-        "Offered and attended": "offered_attended",
-        "Offered and did not attend": "offered_did_not_attend",
-        "Offered and declined": "offered_declined",
-        "Not offered": "not_offered",
-        "Mental health support accessed elsewhere": "accessed_elsewhere"
-      },
-      "dietitian_appointment_offered": {
-        "Yes": "yes",
-        "No": "no"
+      "leaving_reason": {
+        "Transitioned to adult diabetes service": "1",
+        "Moved out of area": "2",
+        "Other": "3"
       }
     },
     "identity_bridges": [

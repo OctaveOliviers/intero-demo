@@ -15,12 +15,15 @@
   "$defs": {
     "activity": {
       "type": "object",
-      "description": "One feed entry. `headline` is required and non-empty (the collapsed status line); no legacy alias keys (`summary`, `message`) are ever emitted.",
+      "description": "One feed entry. `headline` is required and non-empty (the full status line); `label` is the crisp 3-5 word line shown when the activity box is folded; `kind` distinguishes an orchestrator step from an agent tool call or thinking snippet. No legacy alias keys (`summary`, `message`) are ever emitted.",
       "required": ["type", "headline"],
       "additionalProperties": false,
       "properties": {
         "type": { "const": "activity" },
         "headline": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "kind": { "type": "string", "enum": ["step", "tool", "thinking"] },
+        "id": { "type": "string", "description": "Stable identity for a streaming element (agent tool call / reasoning block); the FE upserts by it so a chunked part collapses to one growing line. Orchestrator steps omit it." },
         "detail": { "type": "string" },
         "name": { "type": "string" },
         "status": { "type": "string", "enum": ["running", "ok", "error"] }

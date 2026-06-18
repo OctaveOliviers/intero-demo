@@ -30,6 +30,11 @@ class _RunState:
         self.done: bool = False
         self.run_dir: Path = run_dir
         self.review_summary_emitted: bool = False
+        # Set by request_stop (user pause): a cooperative signal the spine reads
+        # in its CancelledError handler to FINALIZE gracefully (emit a
+        # review_summary + done) rather than error out. Distinct from stop(),
+        # which hard-kills with an error (the delete path).
+        self.stop_requested: bool = False
 
 
 class SpineRunBroker:
@@ -92,12 +97,43 @@ class SpineRunBroker:
         self._runs[run_id] = state
         return True
 
+    def request_stop(self, run_id: str) -> bool:
+        """Cooperative stop for a USER PAUSE: flag the run so the spine finalizes
+        with a summary instead of erroring. Unlike :meth:`stop`, this does NOT
+        mark the run done or push a terminal event — the spine's CancelledError
+        handler still owns emitting ``review_summary`` + ``done`` (so the broker's
+        "review_summary precedes done" invariant holds). Returns True if a live
+        run was flagged, False if it was unknown/already finished."""
+        state = self._runs.get(run_id) or self._reserved.get(run_id)
+        if state is None or state.done:
+            return False
+        state.stop_requested = True
+        return True
+
+    def is_stop_requested(self, run_id: str) -> bool:
+        state = self._runs.get(run_id) or self._reserved.get(run_id)
+        return state is not None and state.stop_requested
+
     async def stream_events(self, run_id: str) -> AsyncIterator[dict]:
         state = self._runs.get(run_id) or self._reserved.get(run_id)
         if state is None:
             yield {"type": "error", "message": f"unknown run: {run_id}"}
             return
         while True:
+            # A client reconnecting to a run whose events were already drained
+            # by the original consumer (e.g. a page reload after the run
+            # finished) must not block forever on an empty queue. If the run is
+            # already terminal and nothing is buffered, synthesize the terminal
+            # event so the client stops cleanly and keeps its fetched snapshot.
+            # A still-running run, or one with buffered events, falls through to
+            # the normal blocking drain — so a live reload streams future events
+            # and a fast first-connect still gets everything the queue holds.
+            if state.done and state.queue.empty():
+                if state.status == "error":
+                    yield {"type": "error", "message": "run already finished"}
+                else:
+                    yield {"type": "done"}
+                return
             event = await state.queue.get()
             yield event
             if event.get("type") in ("done", "error"):

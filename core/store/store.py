@@ -165,6 +165,17 @@ class Store:
             ).fetchall()
         return [self._row_to_run(r) for r in rows]
 
+    def delete_run(self, run_id: str) -> bool:
+        """Delete a run and ALL its child rows. The child tables (cells,
+        field_codes, run_executions, run_members, events) declare
+        ``REFERENCES runs(id) ON DELETE CASCADE`` and ``PRAGMA foreign_keys`` is
+        ON, so removing the parent row removes every trace of the run from the
+        state DB in one statement. Returns True if a run row existed."""
+        self._require_permission("runs", "delete")
+        cur = self._conn.execute("DELETE FROM runs WHERE id = ?", (run_id,))
+        self._conn.commit()
+        return cur.rowcount > 0
+
     def update_run(self, run_id: str, **fields) -> None:
         """Patch named run columns. JSON fields are encoded automatically.
 

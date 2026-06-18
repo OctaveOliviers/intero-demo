@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  filtersFromCohort,
   isTemplateIdAllowed,
   normalizeDatabaseValidationError,
   pickDatabaseForRun,
@@ -58,6 +59,23 @@ test("mock-mode keeps static/mock DB chip behavior", () => {
 
 test("real-mode default DB chips are empty", () => {
   assert.deepEqual(defaultDatabaseChipsForMode({ mockDatabases: false }), []);
+});
+
+test("NPDA cohort chips flatten to bindable run filters", () => {
+  // The diabetes spec emits a display-only DOB chip (cross-database criterion
+  // the cohort query can't compose) and an appointment range as two chips
+  // sharing one field, the second carrying a "to" connector.
+  const cohort = [
+    { kind: "date", field: "dateOfBirth", label: "Date of birth after",
+      value: "1 Apr 2001", raw: "2001-04-01" },
+    { kind: "date", field: "appointmentDate", label: "Appointment",
+      value: "1 Apr 2026", raw: "2026-04-01" },
+    { kind: "date", field: "appointmentDate", label: "Appointment",
+      value: "31 Mar 2027", raw: "2027-03-31", connector: "to" },
+  ];
+  assert.deepEqual(filtersFromCohort(cohort), {
+    audit_year: "2026-04-01 to 2027-03-31",
+  });
 });
 
 test("real-mode auth errors from DB validation are preserved (not swallowed)", () => {

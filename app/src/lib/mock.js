@@ -366,7 +366,23 @@ export function mockStartRunStream(
   }
 
   next();
-  return { close() { cancelled = true; } };
+  return {
+    close() {
+      cancelled = true;
+    },
+    // Stop & finalize (mirrors the backend's stop-and-finalize): cancel the rest
+    // of the timeline and emit the run's terminal summary + done immediately, so
+    // a user stop reads as "finished early" with a real summary rather than just
+    // freezing mid-fill.
+    finalize() {
+      if (cancelled) return;
+      cancelled = true;
+      runFlows.delete(runId);
+      const summaryStep = steps.find((s) => s.kind === "review_summary");
+      if (summaryStep && onReviewSummary) onReviewSummary(summaryStep.event);
+      if (onDone) onDone({});
+    },
+  };
 }
 
 // openWorkbook fallback (e.g. restoring a finished analysis after reload). The

@@ -14,6 +14,7 @@ import json
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -371,6 +372,69 @@ class OrchestratorSpineTest(unittest.TestCase):
             self.assertNotIn("done", kinds)
             self.assertNotIn("review_summary", kinds)
             store.close()
+
+
+class TierToggleTest(unittest.TestCase):
+    """TIER2_ENABLED / TIER3_ENABLED (core.config) gate the LLM + agent tiers for
+    perf isolation — Tier 1 always runs; a skipped tier hands its cells onward."""
+
+    def _run(self, env):
+        stub_direct.calls.clear(); stub_llm.seen.clear(); stub_llm.calls = 0
+        stub_agent.sessions.clear()
+        d = tempfile.TemporaryDirectory()
+        store = Store(Path(d.name) / "state.db")
+        store.create_run(Run(id="r1", audit_id="test", status="in_progress"))
+        events: list[dict] = []
+        with unittest.mock.patch.dict("os.environ", env):
+            asyncio.run(orchestrate_run(
+                store, "r1", EXECUTABLE, COHORT,
+                tier_direct=stub_direct, tier_llm=stub_llm, tier_agent=stub_agent,
+                emit=events.append, audit={"fields": []},
+            ))
+        cells = {(c.field, c.member): c for c in store.get_cells("r1")}
+        store.close(); d.cleanup()
+        return cells, events
+
+    def test_tier2_off_skips_llm_and_hands_cells_to_the_agent(self):
+        cells, events = self._run({"TIER2_ENABLED": "0"})
+        self.assertEqual(stub_llm.calls, 0, "Tier 2 must not run")
+        # gestation_weeks P002 (which Tier 2 would have filled) instead reaches the
+        # agent — resolved_by 'agent', never 'LLM'.
+        resolved = {c.resolved_by for c in cells.values() if c.resolved_by}
+        self.assertNotIn("LLM", resolved)
+        self.assertIn("agent", resolved)
+        headlines = [e["headline"] for e in events if e["type"] == "activity"]
+        self.assertTrue(any("Skipping the per-cell LLM tier" in h for h in headlines))
+
+    def test_tier3_off_leaves_the_rest_pending(self):
+        cells, _ = self._run({"TIER3_ENABLED": "0"})
+        self.assertEqual(len(stub_agent.sessions), 0, "the agent must not run")
+        # The interpret cells Tier 2 left open stay pending (no agent to settle them).
+        self.assertEqual(cells[("summary", "P001")].state, "pending")
+
+    def test_both_on_by_default_is_unchanged(self):
+        cells, _ = self._run({})
+        by_tier: dict[str, int] = {}
+        for c in cells.values():
+            if c.resolved_by:
+                by_tier[c.resolved_by] = by_tier.get(c.resolved_by, 0) + 1
+        self.assertEqual(by_tier, {"direct": 5, "LLM": 1, "agent": 2})
+
+    def test_server_flags_map_to_an_authoritative_env(self):
+        from core.config import tier_enabled, tier_env_overrides
+        # A flag-less start sets BOTH on explicitly — overrides a stale export.
+        with unittest.mock.patch.dict("os.environ", {"TIER2_ENABLED": "0"}):
+            with unittest.mock.patch.dict(
+                "os.environ", tier_env_overrides(no_tier2=False, no_tier3=False)
+            ):
+                self.assertTrue(tier_enabled("tier2"))
+                self.assertTrue(tier_enabled("tier3"))
+        # --no-tier2 disables only Tier 2.
+        with unittest.mock.patch.dict(
+            "os.environ", tier_env_overrides(no_tier2=True, no_tier3=False)
+        ):
+            self.assertFalse(tier_enabled("tier2"))
+            self.assertTrue(tier_enabled("tier3"))
 
 
 class SeedExecutableTest(unittest.TestCase):

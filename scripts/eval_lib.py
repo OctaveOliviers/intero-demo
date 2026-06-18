@@ -17,6 +17,7 @@ makes a regression diagnosable, not just detectable. No I/O, no LLM here;
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -29,6 +30,17 @@ def _norm(value: Any) -> str:
 
 
 # --- audit spec (spec.json) --------------------------------------------------
+
+_CRITERION_STOPWORDS = frozenset({"of", "in", "at", "the", "a", "an", "and", "status"})
+
+
+def _criterion_tokens(criterion: dict) -> set[str]:
+    """The significant tokens of a criterion's id + label, for concept matching."""
+    text = f"{criterion.get('id') or ''} {criterion.get('label') or ''}"
+    return {
+        t for t in re.split(r"[^a-z0-9]+", _norm(text)) if t and t not in _CRITERION_STOPWORDS
+    }
+
 
 def _field_key(field: dict) -> tuple[str, str]:
     """Position is the stable identity: (section, cell). Ids/names are what the
@@ -87,10 +99,23 @@ def score_audit_spec(golden: dict, candidate: dict) -> dict:
             else:
                 mismatches.append(f"missing notes {k[0]}!{k[1]} (golden has notes)")
 
-    gold_criteria = {_norm(c.get("id")) for c in golden.get("inclusion_criteria") or [] if c.get("id")}
-    cand_criteria = {_norm(c.get("id")) for c in candidate.get("inclusion_criteria") or [] if c.get("id")}
-    for missing in sorted(gold_criteria - cand_criteria):
-        mismatches.append(f"missing inclusion criterion {missing!r}")
+    # Criteria are a ~5-item JUDGMENT (suggestions), so they are scored at the
+    # CONCEPT level: a golden criterion is recalled when any candidate criterion
+    # shares a significant token with its id/label (`gestation_weeks` matches a
+    # suggested `gestation`; `delivery_mode` matches `mode of delivery`). Exact
+    # slug equality over-penalises naming luck; the named mismatches keep a
+    # genuine concept gap diagnosable.
+    gold_criteria = [c for c in golden.get("inclusion_criteria") or [] if c.get("id")]
+    cand_tokens = [
+        _criterion_tokens(c) for c in candidate.get("inclusion_criteria") or []
+    ]
+    criteria_hits = 0
+    for crit in gold_criteria:
+        tokens = _criterion_tokens(crit)
+        if any(tokens & ct for ct in cand_tokens):
+            criteria_hits += 1
+        else:
+            mismatches.append(f"missing inclusion criterion {_norm(crit.get('id'))!r}")
 
     return {
         "metrics": {
@@ -102,7 +127,7 @@ def score_audit_spec(golden: dict, candidate: dict) -> dict:
             "code_set_match": _rate(codes_hits, codes_total),
             "notes_coverage": _rate(notes_hits, notes_total),
             "candidate_notes": cand_notes,
-            "criteria_recall": _rate(len(gold_criteria & cand_criteria), len(gold_criteria)),
+            "criteria_recall": _rate(criteria_hits, len(gold_criteria)),
         },
         "mismatches": mismatches,
     }

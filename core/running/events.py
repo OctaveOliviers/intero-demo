@@ -23,11 +23,23 @@ def build_activity_event(
     detail: str | None = None,
     name: str | None = None,
     status: str | None = None,
+    label: str | None = None,
+    kind: str | None = None,
+    id: str | None = None,
 ) -> dict:
     """Strict-v2 `activity` event with required `headline`.
 
     Optional fields are included only when provided; no legacy alias keys
     (such as `summary`) are emitted.
+
+    ``label`` is the crisp 3–5 word "what's happening now" line the FE shows
+    when the activity box is folded; ``kind`` ("step" | "tool" | "thinking")
+    lets the FE distinguish an orchestrator step from an agent tool call or a
+    thinking snippet. Both are optional — a missing ``kind`` reads as "step".
+    ``id`` is a stable identity for a streaming element (an agent tool call or
+    reasoning block): the FE UPSERTS by it, so a part that streams in chunks
+    collapses into ONE growing line instead of many partial copies. Orchestrator
+    steps omit it (each step is its own line).
     """
     headline = headline.strip()
     if not headline:
@@ -39,6 +51,12 @@ def build_activity_event(
         event["name"] = name
     if status is not None:
         event["status"] = status
+    if label is not None:
+        event["label"] = label
+    if kind is not None:
+        event["kind"] = kind
+    if id is not None:
+        event["id"] = id
     return event
 
 

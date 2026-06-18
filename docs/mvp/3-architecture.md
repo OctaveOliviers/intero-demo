@@ -46,7 +46,7 @@ way:
 
 ---
 
-## Phase 1 — Indexing  *[partial — database built, audit indexer paused]*
+## Phase 1 — Indexing  *[built]*
 
 **Goal:** turn a newly-added template or database into a reusable, richly
 structured JSON *model* that a later agent can work from **without ever
@@ -77,11 +77,13 @@ How it works today (`core/indexing/service.py`):
   progress to the front end over SSE, and a **startup rescan** that re-launches
   any entity left mid-indexing if the server died.
 
-> **Status (A5).** The database path is **[built]**. The audit-template path is
-> **[paused]**: the MVP audits ship hand-authored `spec.json`, and the existing
-> LLM builder carries known bugs awaiting the planned rewrite (mechanical
-> `fields[]` skeleton from layout extraction; the LLM fills prose only) — see
-> [BUILD-PLAN.md](./BUILD-PLAN.md) §A5.
+> **Status (A5).** Both paths are **[built]**. The audit-template indexer was
+> rewritten at the database indexer's altitude (T11): the `fields[]` skeleton —
+> number, section, cell, verbatim header name, FK id — is extracted mechanically
+> from the workbook; the LLM fills prose only (types, units, permitted values,
+> notes, deadline, suggested criteria) and can never restructure. Quality is
+> measured, not asserted: `make eval --stage index-audit` scores every rebuild
+> against the golden seed spec — see [BUILD-PLAN.md](./BUILD-PLAN.md) §A5.
 
 **What makes a *good* model** — and the bar the MVP must hit — is specified in
 [4-indexing-and-mapping.md](./4-indexing-and-mapping.md): the model must be

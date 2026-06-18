@@ -86,7 +86,9 @@
           "reason": "free-text"
         }
       ],
-      "row_count": 10
+      "row_count": 10,
+      "fingerprint": "77277062b3c73512",
+      "grain": "one row per entity"
     },
     {
       "name": "conditions",
@@ -159,7 +161,9 @@
           ]
         }
       ],
-      "row_count": 16
+      "row_count": 16,
+      "fingerprint": "baf58d79d395b3ed",
+      "grain": "many rows per entity"
     },
     {
       "name": "cord_ph_birth_records",
@@ -772,7 +776,9 @@
           ]
         }
       ],
-      "row_count": 10
+      "row_count": 10,
+      "fingerprint": "1e057b598303fb0b",
+      "grain": "one row per entity"
     },
     {
       "name": "devices",
@@ -848,7 +854,9 @@
           "reason": "identifier"
         }
       ],
-      "row_count": 7
+      "row_count": 7,
+      "fingerprint": "3b22a9ecadea800c",
+      "grain": "one row per entity"
     },
     {
       "name": "encounters",
@@ -1006,7 +1014,9 @@
           ]
         }
       ],
-      "row_count": 14
+      "row_count": 14,
+      "fingerprint": "9ed7990d14ccb578",
+      "grain": "one row per entity"
     },
     {
       "name": "medications",
@@ -1148,7 +1158,9 @@
           ]
         }
       ],
-      "row_count": 4
+      "row_count": 4,
+      "fingerprint": "3c9a2109ebafbbe0",
+      "grain": "one row per entity"
     },
     {
       "name": "nicu_admissions",
@@ -1394,7 +1406,9 @@
           ]
         }
       ],
-      "row_count": 4
+      "row_count": 4,
+      "fingerprint": "d33a7d88a649d0a6",
+      "grain": "one row per entity"
     },
     {
       "name": "observations",
@@ -1513,7 +1527,9 @@
           }
         }
       ],
-      "row_count": 36
+      "row_count": 36,
+      "fingerprint": "499865fd2c653805",
+      "grain": "one row per entity"
     },
     {
       "name": "organizations",
@@ -1642,7 +1658,9 @@
           }
         }
       ],
-      "row_count": 2
+      "row_count": 2,
+      "fingerprint": "762fbaa71894df8d",
+      "grain": "many rows per entity"
     },
     {
       "name": "patients",
@@ -1947,7 +1965,9 @@
           }
         }
       ],
-      "row_count": 20
+      "row_count": 20,
+      "fingerprint": "60933e590663506e",
+      "grain": "one row per entity"
     },
     {
       "name": "payers",
@@ -2183,7 +2203,9 @@
           }
         }
       ],
-      "row_count": 1
+      "row_count": 1,
+      "fingerprint": "3b39acc568249169",
+      "grain": "many rows per entity"
     },
     {
       "name": "procedures",
@@ -2296,7 +2318,9 @@
           ]
         }
       ],
-      "row_count": 20
+      "row_count": 20,
+      "fingerprint": "fb60d535d84ebf14",
+      "grain": "one row per entity"
     },
     {
       "name": "providers",
@@ -2440,7 +2464,173 @@
           }
         }
       ],
-      "row_count": 5
+      "row_count": 5,
+      "fingerprint": "adf1f143f6bc190a",
+      "grain": "one row per entity"
     }
-  ]
+  ],
+  "foreign_keys": [
+    {
+      "column": "clinical_notes.encounter",
+      "target": "encounters.id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "clinical_notes.patient",
+      "target": "cord_ph_birth_records.baby_patient",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "clinical_notes.patient",
+      "target": "patients.id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "conditions.encounter",
+      "target": "encounters.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "14/14 sampled values found in target"
+    },
+    {
+      "column": "conditions.patient",
+      "target": "clinical_notes.patient",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "conditions.patient",
+      "target": "cord_ph_birth_records.baby_patient",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "conditions.patient",
+      "target": "patients.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "cord_ph_birth_records.baby_patient",
+      "target": "patients.id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "cord_ph_birth_records.encounter",
+      "target": "encounters.id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "cord_ph_birth_records.mother_patient",
+      "target": "patients.id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "devices.encounter",
+      "target": "encounters.id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "7/7 sampled values found in target"
+    },
+    {
+      "column": "encounters.patient",
+      "target": "clinical_notes.patient",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "encounters.patient",
+      "target": "cord_ph_birth_records.baby_patient",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "encounters.patient",
+      "target": "patients.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "encounters.provider",
+      "target": "providers.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "5/5 sampled values found in target"
+    },
+    {
+      "column": "observations.encounter",
+      "target": "encounters.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "12/12 sampled values found in target"
+    },
+    {
+      "column": "observations.patient",
+      "target": "clinical_notes.patient",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "observations.patient",
+      "target": "cord_ph_birth_records.baby_patient",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "observations.patient",
+      "target": "patients.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "procedures.encounter",
+      "target": "encounters.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "13/13 sampled values found in target"
+    },
+    {
+      "column": "procedures.patient",
+      "target": "clinical_notes.patient",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "procedures.patient",
+      "target": "cord_ph_birth_records.baby_patient",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "procedures.patient",
+      "target": "patients.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    }
+  ],
+  "schema_fingerprint": "7afc99d0451f22a3"
 }

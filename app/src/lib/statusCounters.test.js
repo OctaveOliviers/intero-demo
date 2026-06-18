@@ -7,13 +7,16 @@ test("blocked and needs-review are counted from cell metadata", () => {
   const meta = {
     "ALL!A2": { kind: "direct", state: "filled" },
     "ALL!B2": { kind: "interpret", state: "filled", review_state: "not_reviewed" },
-    "ALL!C2": { kind: "interpret", state: "filled" }, // interpret, no review_state yet
+    // No review_state → NOT counted: the backend's needs_verification ignores
+    // it too (the store sets "not_reviewed" on real filled interpret cells), so
+    // the chip stays in lock-step with the review summary.
+    "ALL!C2": { kind: "interpret", state: "filled" },
     "ALL!D2": { kind: "interpret", state: "filled", review_state: "reviewed" },
     "ALL!E2": { state: "blocked", reason_code: "NOT_LOCATED" },
     "ALL!F2": { kind: "interpret", state: "blocked", reason_code: "MISSING_SOURCE_RECORD" },
     "ALL!G2": { state: "not_applicable" },
   };
-  assert.deepEqual(countWorkbookStatus(meta), { blocked: 2, needsReview: 2 });
+  assert.deepEqual(countWorkbookStatus(meta), { blocked: 2, needsReview: 1 });
 });
 
 test("a blocked interpret cell never double-counts as needs-review", () => {

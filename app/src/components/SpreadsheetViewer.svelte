@@ -1,6 +1,6 @@
 <script>
   import { onDestroy } from "svelte";
-  import { activeWorkbook, runCommand } from "../stores/chat.js";
+  import { activeCommand, activeWorkbook, runCommand } from "../stores/chat.js";
   import { updateCurrentAuditWorkbook } from "../stores/audits.js";
   import {
     RIGHT_PANEL_MODES,
@@ -15,21 +15,24 @@
   import jspreadsheet from "jspreadsheet-ce";
   import "jspreadsheet-ce/dist/jspreadsheet.css";
 
-  // Accent underline marks a cell as traceable (clickable -> right panel).
-  const CLICKABLE_STYLE =
-    "color: var(--color-accent);" +
-    "text-decoration-line: underline;" +
-    "text-decoration-color: var(--color-accent);" +
-    "text-underline-offset: 2px;" +
-    "cursor: pointer;";
+  // A cell with metadata is clickable (-> evidence panel). No link styling: the
+  // value stays plain black text; the cell's STATE is conveyed by its background
+  // colour (below), not by a blue underline. Just the pointer affordance.
+  const CLICKABLE_STYLE = "cursor: pointer;";
   const STATUS_BACKGROUND = Object.freeze({
     [CELL_VISUAL_STATUS.LEGACY]: "var(--cell-bg-legacy-not-applicable)",
+    [CELL_VISUAL_STATUS.BLOCKED]: "var(--cell-bg-blocked)",
+    [CELL_VISUAL_STATUS.BLOCKED_SEEN]: "var(--cell-bg-blocked-seen)",
     [CELL_VISUAL_STATUS.NEEDS_REVIEW]: "var(--cell-bg-needs-review)",
     [CELL_VISUAL_STATUS.REVIEWED]: "var(--cell-bg-reviewed-settled)",
   });
   const STATUS_STYLE = Object.freeze({
     [CELL_VISUAL_STATUS.LEGACY]:
       `background-color: ${STATUS_BACKGROUND[CELL_VISUAL_STATUS.LEGACY]};`,
+    [CELL_VISUAL_STATUS.BLOCKED]:
+      `background-color: ${STATUS_BACKGROUND[CELL_VISUAL_STATUS.BLOCKED]};`,
+    [CELL_VISUAL_STATUS.BLOCKED_SEEN]:
+      `background-color: ${STATUS_BACKGROUND[CELL_VISUAL_STATUS.BLOCKED_SEEN]};`,
     [CELL_VISUAL_STATUS.NEEDS_REVIEW]:
       `background-color: ${STATUS_BACKGROUND[CELL_VISUAL_STATUS.NEEDS_REVIEW]};`,
     [CELL_VISUAL_STATUS.REVIEWED]:
@@ -37,6 +40,10 @@
   });
   const HEADER_ROWS = 1;
   const AUTO_REVIEW_DELAY_MS = 2000;
+  // Render at least this many data rows so the grid fills the viewport and
+  // scrolls like a real worksheet even for a small cohort. cell_update only
+  // ever targets real cohort rows, so the padding rows stay blank.
+  const MIN_DISPLAY_ROWS = 100;
 
   let container;
   let instance = null;
@@ -107,9 +114,32 @@
     return asObject(map) || {};
   }
 
-  function getMetaSql(meta) {
+  // The traceable source of a cell: legacy run metadata carries a flat `sql`
+  // (+ database/evidence); spine cell metadata carries `sources` — an array of
+  // {database, query, table_column, row_id?, citations?}. Normalize both into
+  // the {sql, database, evidence, explanation} shape runCommand consumes.
+  function getMetaSource(meta) {
     const normalized = normalizeCellMeta(meta);
-    return typeof normalized?.sql === "string" ? normalized.sql : "";
+    if (!normalized) return null;
+    const explanation = normalized.explanation ?? null;
+    if (typeof normalized.sql === "string" && normalized.sql) {
+      return {
+        sql: normalized.sql,
+        database: normalized.database ?? null,
+        evidence: normalized.evidence ?? null,
+        explanation,
+      };
+    }
+    const sources = Array.isArray(normalized.sources) ? normalized.sources : [];
+    const first = sources.find((s) => s && typeof s.query === "string" && s.query);
+    if (!first) return null;
+    const citations = sources.flatMap((s) => (Array.isArray(s?.citations) ? s.citations : []));
+    return {
+      sql: first.query,
+      database: first.database ?? null,
+      evidence: citations.length ? citations : null,
+      explanation,
+    };
   }
 
   function isInterpretiveNotReviewed(meta) {
@@ -118,6 +148,21 @@
     const reviewState = normalizeMetaValue(normalized?.review_state);
     const interpretive = kind === "interpret" || kind === "interpretive";
     return interpretive && reviewState === "not_reviewed";
+  }
+
+  // A blocked cell that hasn't been acknowledged yet (red, not yet gray).
+  function isBlockedNotSeen(meta) {
+    const normalized = normalizeCellMeta(meta);
+    const state = normalizeMetaValue(normalized?.state ?? normalized?.audit_state);
+    const reviewState = normalizeMetaValue(normalized?.review_state);
+    return state === "blocked" && reviewState !== "reviewed";
+  }
+
+  // Both interpret-not-reviewed and blocked-not-seen settle on dwell by the same
+  // marker (review_state=reviewed): interpret yellow -> white, blocked red ->
+  // gray. One mechanism, one timer, two visual outcomes keyed on `state`.
+  function isAcknowledgeableOnDwell(meta) {
+    return isInterpretiveNotReviewed(meta) || isBlockedNotSeen(meta);
   }
 
   // The v5 worksheet object lives on the rendered .jss_container element.
@@ -134,7 +179,10 @@
 
   function styleForMeta(meta) {
     let style = STATUS_STYLE[mapCellVisualStatus(meta)] || STATUS_STYLE[CELL_VISUAL_STATUS.REVIEWED];
-    if (getMetaSql(meta)) style += CLICKABLE_STYLE;
+    // Any cell carrying metadata is inspectable (a tier touched it: filled,
+    // blocked, etc.), so it opens the evidence panel on click — pointer cursor
+    // for all of them, not just the ones with a SQL source.
+    if (meta) style += CLICKABLE_STYLE;
     return style;
   }
 
@@ -164,7 +212,7 @@
       if (!cellMetadata[cellRef]) return wb;
       const currentMeta = normalizeCellMeta(cellMetadata[cellRef]);
       if (!currentMeta) return wb;
-      if (!isInterpretiveNotReviewed(currentMeta)) return wb;
+      if (!isAcknowledgeableOnDwell(currentMeta)) return wb;
       return {
         ...wb,
         cellMetadata: {
@@ -178,7 +226,7 @@
   }
 
   function scheduleAutoReview(cellRef, meta) {
-    if (!isInterpretiveNotReviewed(meta)) {
+    if (!isAcknowledgeableOnDwell(meta)) {
       cancelAutoReviewTimer();
       return;
     }
@@ -244,7 +292,7 @@
           columns: cols,
           minDimensions: [
             numCols || 1,
-            displayData.length || 1,
+            Math.max(displayData.length, MIN_DISPLAY_ROWS),
           ],
         },
       ],
@@ -255,20 +303,30 @@
         const sn = wb2.sheets[wb2.currentSheetIndex].name;
         const cellRef = sn + "!" + colToLetters(x1) + (y1 + 1 + HEADER_ROWS);
         const meta = getCellMetadataMap(wb2)[cellRef];
-        const sql = getMetaSql(meta);
-        if (!sql) {
+        const normalized = normalizeCellMeta(meta);
+        // No metadata at all (a blank/spacer cell) → nothing to inspect.
+        if (!normalized) {
           cancelAutoReviewTimer();
           return;
         }
-        const normalized = normalizeCellMeta(meta);
-        openCellEvidence(cellRef, meta);
-        runCommand(
-          sql,
-          normalized?.explanation ?? null,
-          normalized?.database ?? null,
-          normalized?.evidence ?? null,
-        );
-        scheduleAutoReview(cellRef, normalized || meta);
+        // Open the panel for ANY cell with metadata, passing its meta so the
+        // panel can show the status + (for blocked cells) the blocking reason.
+        openCellEvidence(cellRef, normalized);
+        const source = getMetaSource(meta);
+        if (source) {
+          runCommand(source.sql, source.explanation, source.database, source.evidence);
+          scheduleAutoReview(cellRef, normalized);
+        } else {
+          // Blocked / status-only cell: no query to run. Clear any stale query
+          // from a previously inspected cell so the panel shows just this cell's
+          // status + reason (read from the selected cell meta).
+          activeCommand.set(null);
+          // Still arm the dwell so a blocked cell settles red -> gray once seen,
+          // mirroring interpret yellow -> white. scheduleAutoReview cancels and
+          // returns for anything not acknowledgeable (legacy / already-seen), so
+          // this stays a no-op for genuine status-only cells.
+          scheduleAutoReview(cellRef, normalized);
+        }
       },
     });
 

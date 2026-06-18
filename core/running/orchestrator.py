@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable
 from uuid import uuid4
 
-from core.config import DATABASES_DIR
+from core.config import DATABASES_DIR, tier_enabled
 from core.running.events import (
     build_activity_event,
     build_review_summary_event,
@@ -141,11 +141,16 @@ def precompute_pending_cells(
     return cells
 
 
-def _cell_wire(cell: Cell) -> dict[str, Any]:
+def cell_wire(cell: Cell) -> dict[str, Any]:
     """One cell as the SSE ``cell_update.cells[]`` entry: ``{ref, value?, meta}``.
 
     `ref` is the A1 within its sheet; the sheet travels on the wrapper. `meta` is
     the per-cell metadata projection (runtime-shapes §2) — only the set fields.
+
+    Public: this is the single source of truth for the cell wire shape. The live
+    stream emits it (``RunStore.update`` / ``rebroadcast``) and the ``/workbook``
+    rebuild reuses it (``server/routes/workbook.py``), so a reopened run renders
+    identically to one watched live — keep both sides bound through this helper.
     """
     _, _, a1 = cell.ref.partition("!")
     meta = {k: v for k, v in {
@@ -153,6 +158,11 @@ def _cell_wire(cell: Cell) -> dict[str, Any]:
         "state": cell.state, "confidence": cell.confidence,
         "resolved_by": cell.resolved_by, "hypothesis": cell.hypothesis,
         "attempts": cell.attempts, "sources": cell.sources,
+        # review_state drives the FE's "needs review" count + cell colour: it must
+        # match the backend's needs_verification rule (filled interpret cell with
+        # review_state == "not_reviewed"), so the top-band chip can't diverge from
+        # the review summary. Omitted when None (direct cells never need review).
+        "review_state": cell.review_state,
         "explanation": cell.explanation, "reason_code": cell.reason_code,
         "reason_detail": cell.reason_detail,
     }.items() if v not in (None, [], {})}
@@ -249,7 +259,7 @@ class RunStore:
         the shared sqlite connection (see ``_write_lock``)."""
         async with self._write_lock:
             cell = self._store.update_cell(self.run_id, ref, **fields)
-            payload = {"sheet": cell.ref.partition("!")[0], "cells": [_cell_wire(cell)]}
+            payload = {"sheet": cell.ref.partition("!")[0], "cells": [cell_wire(cell)]}
             self._store.append_event(
                 Event(
                     run_id=self.run_id,
@@ -262,13 +272,26 @@ class RunStore:
                 self._emit({"type": "cell_update", **payload})
             return cell
 
-    async def activity(self, headline: str) -> None:
+    async def activity(
+        self,
+        headline: str,
+        *,
+        label: str | None = None,
+        kind: str | None = None,
+        id: str | None = None,
+    ) -> None:
         """Persist + stream an ``activity`` heartbeat — the public seam a tier uses
         to surface a within-tier note (e.g. "Tier 2 is single-database") into the
         run stream the FE already consumes, without reaching into the store/emit
         internals. Mirrors the orchestrator's between-tier ``_activity``. Holds the
-        same write lock as :meth:`update`."""
-        event = build_activity_event(headline)
+        same write lock as :meth:`update`.
+
+        ``label`` (folded now-line) and ``kind`` ("step"|"tool"|"thinking") ride
+        through to the FE — Tier 3 uses them to surface agent tool calls and
+        thinking, not just coarse steps. ``id`` lets a streaming element (a tool
+        call or reasoning block) UPSERT in place on the FE instead of appending a
+        new line per chunk."""
+        event = build_activity_event(headline, label=label, kind=kind, id=id)
         async with self._write_lock:
             self._store.append_event(
                 Event(
@@ -280,6 +303,30 @@ class RunStore:
             )
             if self._emit is not None:
                 self._emit(event)
+
+    async def rebroadcast(self, cells: list[Cell]) -> None:
+        """Persist + stream ``cell_update`` events for cells changed OUTSIDE
+        this process. Tier 3's agent writes the store's SQLite directly through
+        its SQL tool, so :meth:`update` (the in-process persist+stream seam)
+        never runs for those writes; the session driver polls the store and
+        rebroadcasts the changes so the FE fills live. One event per sheet per
+        batch — the agent's grouped writes arrive grouped."""
+        by_sheet: dict[str, list[Cell]] = {}
+        for cell in cells:
+            by_sheet.setdefault(cell.ref.partition("!")[0], []).append(cell)
+        async with self._write_lock:
+            for sheet, sheet_cells in by_sheet.items():
+                payload = {"sheet": sheet, "cells": [cell_wire(c) for c in sheet_cells]}
+                self._store.append_event(
+                    Event(
+                        run_id=self.run_id,
+                        type="cell_update",
+                        payload=payload,
+                        execution_id=self.execution_id,
+                    )
+                )
+                if self._emit is not None:
+                    self._emit({"type": "cell_update", **payload})
 
     def open_cells(self) -> list[Cell]:
         """The still-open (``pending``) cells, re-read from the store."""
@@ -306,9 +353,16 @@ def _activity(
     emit: Emit | None,
     headline: str,
     execution_id: str | None = None,
+    *,
+    label: str | None = None,
+    kind: str | None = "step",
 ) -> None:
-    """Persist an ``activity`` event and stream it (the between-tier heartbeat)."""
-    event = build_activity_event(headline)
+    """Persist an ``activity`` event and stream it (the between-tier heartbeat).
+
+    ``label`` is the crisp folded now-line; ``kind`` defaults to ``"step"`` since
+    every between-tier heartbeat is an orchestrator step (tool/thinking events
+    come from Tier 3 via :meth:`RunStore.activity`)."""
+    event = build_activity_event(headline, label=label, kind=kind)
     store.append_event(
         Event(
             run_id=run_id,
@@ -382,7 +436,8 @@ async def orchestrate_run(
     #    Materialise the run's field code sets from spec.json in the same breath,
     #    so the DB-level off-code guard is armed before any tier (or the agent's
     #    raw SQL) can write a value.
-    _activity(store, run_id, emit, "Preparing workbook and cohort.", execution_id=execution_id)
+    _activity(store, run_id, emit, "Preparing workbook and cohort.",
+              execution_id=execution_id, label="Preparing workbook")
     store.materialize_field_codes(run_id, audit)
     if prepare_pending_grid:
         pending = precompute_pending_cells(
@@ -400,10 +455,12 @@ async def orchestrate_run(
         emit,
         f"Prepared {len(pending)} cells across {len(cohort)} cohort members.",
         execution_id=execution_id,
+        label="Prepared the grid",
     )
 
     # 2. Deterministic auto-fill from database.
-    _activity(store, run_id, emit, "Auto-filling values from the database.", execution_id=execution_id)
+    _activity(store, run_id, emit, "Auto-filling values from the database.",
+              execution_id=execution_id, label="Auto-filling from database")
     await _run_tier(tier_direct, run_store)
     _activity(
         store,
@@ -411,23 +468,34 @@ async def orchestrate_run(
         emit,
         f"Auto-fill complete: {_counts_text(_cell_state_counts(store, run_id))}.",
         execution_id=execution_id,
+        label="Auto-fill complete",
     )
 
-    # 3. Still open? check unresolved values.
+    # 3. Still open? check unresolved values. (TIER2_ENABLED=0 skips this tier so
+    #    cells go straight to the agent — a perf-isolation toggle, core.config.)
     if run_store.open_cells():
-        _activity(store, run_id, emit, "Checking unresolved values.", execution_id=execution_id)
-        await _run_tier(tier_llm, run_store)
-        _activity(
-            store,
-            run_id,
-            emit,
-            f"Unresolved check complete: {_counts_text(_cell_state_counts(store, run_id))}.",
-            execution_id=execution_id,
-        )
+        if tier_enabled("tier2"):
+            _activity(store, run_id, emit, "Checking unresolved values.",
+                      execution_id=execution_id, label="Checking unresolved values")
+            await _run_tier(tier_llm, run_store)
+            _activity(
+                store,
+                run_id,
+                emit,
+                f"Unresolved check complete: {_counts_text(_cell_state_counts(store, run_id))}.",
+                execution_id=execution_id,
+                label="Unresolved check complete",
+            )
+        else:
+            _activity(store, run_id, emit,
+                      "Skipping the per-cell LLM tier (TIER2_ENABLED=0) — handing unresolved values straight to the agent.",
+                      execution_id=execution_id, label="Handing off to the agent")
 
-    # 4. Still open? investigate remaining missing values.
-    if run_store.open_cells():
-        _activity(store, run_id, emit, "Investigating remaining missing values.", execution_id=execution_id)
+    # 4. Still open? investigate remaining missing values. (TIER3_ENABLED=0 skips
+    #    the agent — leaves the rest pending; pairs with the TIER2 toggle.)
+    if run_store.open_cells() and tier_enabled("tier3"):
+        _activity(store, run_id, emit, "Investigating remaining missing values.",
+                  execution_id=execution_id, label="Investigating missing values")
         await _run_tier(tier_agent, run_store)
         _activity(
             store,
@@ -435,6 +503,7 @@ async def orchestrate_run(
             emit,
             f"Missing-value investigation complete: {_counts_text(_cell_state_counts(store, run_id))}.",
             execution_id=execution_id,
+            label="Investigation complete",
         )
 
     # 5. Status is derived from the persisted cells (never the stream); emit
@@ -445,6 +514,7 @@ async def orchestrate_run(
         emit,
         f"Finalizing results: {_counts_text(_cell_state_counts(store, run_id))}.",
         execution_id=execution_id,
+        label="Finalizing results",
     )
     store.recompute_status(run_id)
     review_summary = build_review_summary_event(store.get_cells(run_id))

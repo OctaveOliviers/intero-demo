@@ -307,6 +307,13 @@ def record_run(run_id: str, user_id: str, audit_id: str | None, request: str | N
         )
 
 
+def delete_run_attribution(run_id: str) -> None:
+    """Remove a run's attribution row so a deleted run no longer reappears in
+    the user's sidebar history (mergeServerRunHistory)."""
+    with _connect() as conn:
+        conn.execute("DELETE FROM run_attributions WHERE run_id = ?", (run_id,))
+
+
 def list_runs_for_user(user_id: str) -> list[dict[str, Any]]:
     with _connect() as conn:
         rows = conn.execute(

@@ -17,6 +17,7 @@ import json
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -24,11 +25,15 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from core.running.orchestrator import RunStore  # noqa: E402
 from core.running.try_agent import (  # noqa: E402
+    _part_transcript_record,
+    _transcript_stats,
+    agent_activity_from_part,
     build_prompt,
     finalize_unresolved,
     make_tier_agent,
     provision_worktree,
     try_agent,
+    write_agent_activity_log,
     write_run_context,
 )
 from core.store import Cell, Run, Store  # noqa: E402
@@ -201,20 +206,49 @@ class TryAgentTest(unittest.TestCase):
 
     # prompt ------------------------------------------------------------------
 
-    def test_prompt_is_minimal_names_databases_defers_to_skill(self):
+    def test_prompt_names_databases_defers_to_skill_with_column_triage(self):
         prompt = build_prompt(self.run_store)
-        # Names the databases the agent addresses + the skill, and nothing heavy.
+        # Names the databases the agent addresses + the skill.
         self.assertIn("cell-fill", prompt)
         self.assertIn("cord-ph", prompt)              # the bound clinical db
         self.assertIn("cells", prompt)                # the worksheet
         self.assertIn("lookup_execute", prompt)       # points at how to read specs
-        # MINIMAL: no inline worklist, field codes, schema dump, or single-DB lock-in.
-        self.assertNotIn("ALL!T2", prompt)            # worklist is discovered, not dumped
+        # The column triage: both fully-pending fields listed as EMPTY columns.
+        self.assertIn("EMPTY columns", prompt)
+        self.assertIn("`delivery`", prompt)
+        self.assertIn("`cord_arterial_ph`", prompt)
+        self.assertIn("1 of 1 cells pending", prompt)
+        # Per-FIELD only: no per-cell refs, field codes, or schema dump.
+        self.assertNotIn("ALL!T2", prompt)            # cell refs are discovered, not dumped
         self.assertNotIn("1=SVD", prompt)             # codes via lookup_execute, not prompt
         self.assertNotIn("permitted codes", prompt)
         # No leaked internals.
         for leaked in ("query_database", "query_cells", "runId", ":cohort", ":run", "P002"):
             self.assertNotIn(leaked, prompt, f"prompt leaks {leaked!r}")
+
+    def test_prompt_triage_classes_partial_and_interpret_columns(self):
+        # delivery becomes PARTIAL (P001 filled by an earlier tier, P002 still
+        # pending with a hypothesis); a free-text field lands under INTERPRET.
+        self.store.insert_pending_cells([
+            Cell(run_id="r1", ref="ALL!T3", field="delivery", member="P002",
+                 kind="direct", state="pending", hypothesis="value NULL in source"),
+            Cell(run_id="r1", ref="ALL!G2", field="reason_declined", member="P001",
+                 kind="interpret", state="pending"),
+        ])
+        self.store.update_cell(
+            "r1", "ALL!T2", value="1", state="filled",
+            resolved_by="direct", confidence="high",
+            sources=[{"database": "cord-ph",
+                      "query": "SELECT patient_code, delivery FROM cord_ph_birth_records",
+                      "table_column": "cord_ph_birth_records.delivery"}])
+        prompt = build_prompt(self.run_store)
+        self.assertIn("PARTIAL columns", prompt)
+        self.assertIn("1 of 2 cells pending", prompt)         # delivery: one straggler
+        self.assertIn("value NULL in source", prompt)         # the earlier tier's hypothesis
+        self.assertIn("INTERPRET cells", prompt)
+        self.assertIn("`reason_declined`", prompt)
+        # cord_arterial_ph is still fully pending — EMPTY section present too.
+        self.assertIn("EMPTY columns", prompt)
 
     # session driving ---------------------------------------------------------
 
@@ -265,6 +299,71 @@ class TryAgentTest(unittest.TestCase):
             self.assertEqual(c.state, "blocked")
             self.assertEqual(c.reason_code, "NOT_LOCATED")
 
+    def test_drive_session_rebroadcasts_out_of_process_agent_writes(self):
+        # The agent writes the cell SQLite directly (out-of-process); nothing
+        # else emits for those writes, so the session driver polls and
+        # rebroadcasts them as cell_update — here the fake's write during the
+        # session is streamed before the run ends.
+        events = []
+        run_store = RunStore(
+            self.store, "r1",
+            cohort=["P001", "P002"],
+            database_paths={"cord-ph": self.root / "cord-ph.sqlite"},
+            audit=_audit(),
+            anchor="patient_code",
+            cohort_tables={"cord-ph": ["cord_ph_birth_records"]},
+            emit=events.append,
+        )
+        client = _FakeClient(self.store)
+        asyncio.run(try_agent(run_store, run_dir=self.run_dir,
+                              session_directory="runs/r1",
+                              databases_dir=self.databases_dir, client=client))
+        agent_fills = [
+            c for e in events if e.get("type") == "cell_update"
+            for c in e["cells"]
+            if c["ref"] == "T2" and c["meta"].get("state") == "filled"
+        ]
+        self.assertTrue(agent_fills, f"agent write was never streamed: {events}")
+        self.assertEqual(agent_fills[0]["value"], "1")
+        self.assertEqual(agent_fills[0]["meta"]["resolved_by"], "agent")
+
+    def test_session_writes_full_transcript_to_run_dir(self):
+        # The agent's reasoning + tool I/O is captured untruncated to
+        # var/runs/<id>/agent-activity.jsonl for offline evaluation.
+        class _PartsClient(_FakeClient):
+            async def subscribe(self, sid):
+                q = asyncio.Queue()
+                q.put_nowait({"type": "message.part.updated", "properties": {"part": {
+                    "id": "r1", "type": "reasoning", "text": "checking the birth record"}}})
+                q.put_nowait({"type": "message.part.updated", "properties": {"part": {
+                    "id": "t1", "type": "tool", "tool": "sql_execute", "state": {
+                        "status": "completed", "title": "q",
+                        "input": {"query": "SELECT patient_code FROM cord_ph_birth_records"},
+                        "output": "9 rows"}}}})
+                q.put_nowait({"type": "session.idle"})
+                return q
+
+        asyncio.run(try_agent(self.run_store, run_dir=self.run_dir,
+                              session_directory="runs/r1",
+                              databases_dir=self.databases_dir,
+                              client=_PartsClient(self.store)))
+
+        log_path = self.run_dir / "agent-activity.jsonl"
+        self.assertTrue(log_path.exists(), "transcript log was not written")
+        lines = [json.loads(line) for line in
+                 log_path.read_text(encoding="utf-8").strip().split("\n")]
+        meta = lines[0]
+        self.assertEqual(meta["kind"], "meta")
+        self.assertIn("Fill this audit's pending cells", meta["prompt"])  # build_prompt output
+        self.assertEqual(meta["stats"]["tool_calls"], 1)
+        self.assertEqual(meta["stats"]["thinking_blocks"], 1)
+        kinds = [r.get("kind") for r in lines[1:]]
+        self.assertIn("thinking", kinds)
+        self.assertIn("tool", kinds)
+        tool_rec = next(r for r in lines[1:] if r["kind"] == "tool")
+        self.assertEqual(tool_rec["input"], {"query": "SELECT patient_code FROM cord_ph_birth_records"})
+        self.assertEqual(tool_rec["output"], "9 rows")
+
     def test_make_tier_agent_adapts_to_orchestrator_signature(self):
         # The adapter must be callable as tier(run_store) and drive try_agent.
         client = _FakeClient(self.store)
@@ -296,6 +395,162 @@ class TryAgentTest(unittest.TestCase):
         for legacy in ("populate_region", "table_read",
                        "table_write_values", "notes_write"):
             self.assertNotEqual(perms.get(legacy), "allow")
+
+
+class AgentActivityFromPartTest(unittest.TestCase):
+    """The Tier-3 part → activity mapper that lets the run stream follow the
+    agent's tool calls and thinking (doc 11 §agent_activity). Bounded emission
+    is the whole point: the token-by-token part stream must NOT flood the log."""
+
+    def test_tool_running_then_completed_forwards_once_each(self):
+        seen: dict[str, str] = {}
+        running = {"id": "p1", "type": "tool", "tool": "sql_execute",
+                   "state": {"status": "running"}}
+        ev = agent_activity_from_part(running, seen)
+        self.assertIsNotNone(ev)
+        self.assertEqual(ev["kind"], "tool")
+        # A second update at the SAME status is suppressed.
+        self.assertIsNone(agent_activity_from_part(dict(running), seen))
+        # The status transition to completed forwards again.
+        done = {"id": "p1", "type": "tool", "tool": "sql_execute",
+                "state": {"status": "completed"}}
+        ev2 = agent_activity_from_part(done, seen)
+        self.assertIsNotNone(ev2)
+        self.assertEqual(ev2["kind"], "tool")
+
+    def test_tool_pending_status_is_not_forwarded(self):
+        self.assertIsNone(agent_activity_from_part(
+            {"id": "p", "type": "tool", "tool": "x", "state": {"status": "pending"}}, {}))
+
+    def test_tool_state_title_is_used_as_headline(self):
+        ev = agent_activity_from_part(
+            {"id": "p", "type": "tool", "tool": "sql_execute",
+             "state": {"status": "running", "title": "SELECT * FROM patients"}}, {})
+        self.assertEqual(ev["headline"], "SELECT * FROM patients")
+
+    def test_reasoning_forwards_as_thinking_then_throttles_until_growth(self):
+        seen: dict[str, str] = {}
+        ev = agent_activity_from_part(
+            {"id": "r1", "type": "reasoning", "text": "Cross-checking the dose"}, seen)
+        self.assertIsNotNone(ev)
+        self.assertEqual(ev["kind"], "thinking")
+        self.assertEqual(ev["label"], "Thinking")
+        # Small growth within the same bucket is suppressed (no flood).
+        self.assertIsNone(agent_activity_from_part(
+            {"id": "r1", "type": "reasoning", "text": "Cross-checking the dose now"}, seen))
+        # Crossing the next ~400-char bucket forwards again.
+        big = {"id": "r1", "type": "reasoning", "text": "x" * 450}
+        self.assertIsNotNone(agent_activity_from_part(big, seen))
+
+    def test_reasoning_headline_is_full_text_with_id(self):
+        # The wire carries the FULL text (the FE caps the DISPLAY and expands on
+        # click) and a stable id so chunks upsert into one line.
+        ev = agent_activity_from_part(
+            {"id": "r", "type": "reasoning", "text": "y" * 1000}, {})
+        self.assertEqual(len(ev["headline"]), 1000)
+        self.assertFalse(ev["headline"].endswith("…"))
+        self.assertEqual(ev["id"], "r")
+        self.assertEqual(ev["kind"], "thinking")
+
+    def test_tool_and_thinking_carry_part_id_for_upsert(self):
+        self.assertEqual(
+            agent_activity_from_part(
+                {"id": "t9", "type": "tool", "tool": "sql_execute",
+                 "state": {"status": "running"}}, {})["id"],
+            "t9")
+
+    def test_empty_text_and_unknown_types_are_ignored(self):
+        self.assertIsNone(agent_activity_from_part({"id": "r", "type": "reasoning", "text": "  "}, {}))
+        self.assertIsNone(agent_activity_from_part({"id": "s", "type": "step-start"}, {}))
+        self.assertIsNone(agent_activity_from_part({}, {}))
+        self.assertIsNone(agent_activity_from_part(None, {}))
+
+    def test_tool_with_non_dict_state_does_not_raise(self):
+        # A drifted/garbage frame whose `state` is not an object must return None,
+        # not raise — the call site is outside try/except, so a raise would fail
+        # the whole run.
+        self.assertIsNone(agent_activity_from_part(
+            {"id": "p", "type": "tool", "tool": "x", "state": "oops"}, {}))
+        self.assertIsNone(agent_activity_from_part(
+            {"id": "p", "type": "tool", "tool": "x", "state": ["nope"]}, {}))
+
+
+class AgentTranscriptTest(unittest.TestCase):
+    """The full-fidelity transcript persisted to var/runs/<id>/ for offline
+    evaluation of the agent's process (prompt, reasoning, tool I/O, efficiency)."""
+
+    def test_tool_record_captures_untruncated_io(self):
+        rec = _part_transcript_record({
+            "id": "t1", "type": "tool", "tool": "sql_execute",
+            "state": {
+                "status": "completed", "title": "query patients",
+                "input": {"query": "SELECT * FROM patients"},
+                "output": "z" * 5000, "time": {"start": 1, "end": 2},
+            },
+        })
+        self.assertEqual(rec["kind"], "tool")
+        self.assertEqual(rec["tool"], "sql_execute")
+        self.assertEqual(rec["input"], {"query": "SELECT * FROM patients"})
+        self.assertEqual(len(rec["output"]), 5000)  # NOT truncated (unlike the UI)
+
+    def test_reasoning_record_keeps_full_text(self):
+        rec = _part_transcript_record({"id": "r1", "type": "reasoning", "text": "x" * 2000})
+        self.assertEqual(rec["kind"], "thinking")
+        self.assertEqual(len(rec["text"]), 2000)
+
+    def test_record_skips_markers_and_empty_but_tool_state_is_safe(self):
+        self.assertIsNone(_part_transcript_record({"type": "reasoning", "text": "  "}))
+        self.assertIsNone(_part_transcript_record({"type": "step-start"}))
+        self.assertIsNone(_part_transcript_record(None))
+        # A tool with a non-dict state still records (status None), never raises.
+        rec = _part_transcript_record({"id": "t", "type": "tool", "tool": "x", "state": "bad"})
+        self.assertEqual(rec["kind"], "tool")
+        self.assertIsNone(rec["status"])
+
+    def test_stats_summarize_the_turn(self):
+        records = [
+            {"kind": "thinking", "text": "abc"},
+            {"kind": "tool", "tool": "sql_execute", "status": "completed"},
+            {"kind": "tool", "tool": "sql_execute", "status": "error"},
+            {"kind": "tool", "tool": "lookup_execute", "status": "completed"},
+            {"kind": "text", "text": "hi"},
+        ]
+        s = _transcript_stats(records)
+        self.assertEqual(s["tool_calls"], 3)
+        self.assertEqual(s["tool_calls_by_name"], {"sql_execute": 2, "lookup_execute": 1})
+        self.assertEqual(s["tool_errors"], 1)
+        self.assertEqual(s["thinking_blocks"], 1)
+        self.assertEqual(s["thinking_chars"], 3)
+        self.assertEqual(s["text_blocks"], 1)
+
+    def test_write_log_emits_meta_then_records(self):
+        with tempfile.TemporaryDirectory() as d:
+            t0 = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+            t1 = datetime(2026, 1, 1, 0, 0, 5, tzinfo=timezone.utc)
+            path = write_agent_activity_log(
+                Path(d), run_id="run-1", execution_id=None, session_id="s1",
+                prompt="do the thing", databases=["ehr"],
+                records=[{"id": "r1", "kind": "thinking", "text": "hmm"}],
+                started_at=t0, ended_at=t1, error=None,
+            )
+            self.assertEqual(path.name, "agent-activity.jsonl")
+            lines = path.read_text(encoding="utf-8").strip().split("\n")
+            meta = json.loads(lines[0])
+            self.assertEqual(meta["kind"], "meta")
+            self.assertEqual(meta["prompt"], "do the thing")
+            self.assertEqual(meta["duration_s"], 5.0)
+            self.assertEqual(meta["databases"], ["ehr"])
+            self.assertEqual(meta["stats"]["thinking_blocks"], 1)
+            self.assertEqual(json.loads(lines[1])["text"], "hmm")
+
+    def test_write_log_uses_execution_suffix_for_refresh(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write_agent_activity_log(
+                Path(d), run_id="r", execution_id="exec-9", session_id=None,
+                prompt=None, databases=None, records=[],
+                started_at=None, ended_at=None,
+            )
+            self.assertEqual(path.name, "agent-activity.exec-9.jsonl")
 
 
 if __name__ == "__main__":

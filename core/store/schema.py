@@ -127,6 +127,16 @@ UPDATE cells
        state = 'filled'
  WHERE state = 'needs_verification';
 
+-- Backfill: a filled INTERPRET cell needs clinician sign-off, so it must carry
+-- review_state='not_reviewed' (needs-verification = filled + interpret +
+-- not_reviewed). Earlier writers filled interpret cells without setting it,
+-- leaving review_state NULL — which made the backend's needs_verification
+-- under-count (and the FE chip over-count via its fallback). Idempotent: only
+-- touches the NULLs. New writes are handled by the triggers below.
+UPDATE cells
+   SET review_state = 'not_reviewed'
+ WHERE state = 'filled' AND kind = 'interpret' AND review_state IS NULL;
+
 -- Sources guard — a filled cell must carry a non-empty sources[]. This is the
 -- traceability contract: every value can be re-extracted from its source, and
 -- a clinician clicking the cell sees what produced it
@@ -156,6 +166,30 @@ WHEN NEW.state = 'filled'
       OR json_array_length(NEW.sources) = 0)
 BEGIN
     SELECT RAISE(ABORT, 'sources required: a filled cell must include a non-empty sources array. Each source is a JSON object {database, query, table_column} (with optional row_id + citations for a note): the SQL that surfaces the value alongside the cohort identity (so the value is self-verifying). The patient identity is the cell''s member and is not repeated on the source. Re-issue the UPDATE setting the sources column to a JSON array with at least one such entry.');
+END;
+
+-- Interpret cells need clinician sign-off, so the moment one becomes `filled`
+-- it must carry review_state='not_reviewed' — that is what makes the DERIVED
+-- "needs verification" view (filled + interpret + not_reviewed) accurate for
+-- EVERY writer (Tier 2, the agent's raw SQL), never per-tier discipline, and
+-- what keeps the top-band chip in lock-step with the review summary. Enforced
+-- at the DB like the other cell guards. Idempotent + recursion-safe: the WHEN
+-- guard fires only while review_state IS NULL, and the trigger body UPDATEs
+-- review_state (not state), so it cannot re-fire itself.
+CREATE TRIGGER IF NOT EXISTS cells_interpret_review_state_update
+AFTER UPDATE OF state ON cells
+WHEN NEW.state = 'filled' AND NEW.kind = 'interpret' AND NEW.review_state IS NULL
+BEGIN
+    UPDATE cells SET review_state = 'not_reviewed'
+     WHERE run_id = NEW.run_id AND ref = NEW.ref;
+END;
+
+CREATE TRIGGER IF NOT EXISTS cells_interpret_review_state_insert
+AFTER INSERT ON cells
+WHEN NEW.state = 'filled' AND NEW.kind = 'interpret' AND NEW.review_state IS NULL
+BEGIN
+    UPDATE cells SET review_state = 'not_reviewed'
+     WHERE run_id = NEW.run_id AND ref = NEW.ref;
 END;
 
 CREATE TABLE IF NOT EXISTS run_executions (

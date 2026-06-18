@@ -1,49 +1,33 @@
-"""Deterministic builder for the audit specification (`spec.json`).
+"""Builder for the audit specification (`spec.json`) — T11 rewrite.
 
-**CURRENTLY DEAD CODE IN THE MVP PATH (2026-06-07).** The MVP audit's
-`spec.json` is hand-authored against the contract
-(`docs/mvp/contracts/audit-spec.schema.json`); this LLM-driven builder is
-unused. **Do not delete** — this code will be re-activated when the indexing
-pipeline returns. The known bugs surfaced by the A5 review are left UNFIXED
-so that the resumption work can address them deliberately
-(see `docs/mvp/BUILD-PLAN.md` §A5):
+**The altitude split (mirrors `build_database_model`):** the `fields[]`
+skeleton is extracted MECHANICALLY from the workbook — every non-empty
+row-1 header cell on every sheet becomes one field with its `number`,
+`section` (the sheet), `cell` (column letter), verbatim `name`, and the
+FK-stable `id` (`{slugify(sheet)}/{slugify(header)}` when multi-sheet, the
+bare slug otherwise — `build_populate_spec._field_slug`'s convention, same
+`core.slug.slugify` both sides). One LLM call supplies ONLY the clinical
+judgment: per-field `type`/`unit`/`format`/`permitted_values`/`notes`
+(joined back by `number`), plus the audit-level `title`/`description`/
+`grain`/`version`/`deadline`/section display names and the ~5 suggested
+`inclusion_criteria`. The LLM can never add, drop, rename, or move a field
+— structure is not its to decide.
 
-  - #2 — ``_HEADER_ROW = "1"`` + ``ref.endswith()`` matches ``A11``,
-    ``A21``, ``A101`` etc. as if they were header cells. The right altitude
-    is structural (row index, not string suffix).
-  - #3 — ``_coverage_problems`` runs after ``merge_preserved_state``;
-    library-shortened ids break re-index because the coverage check is
-    blind to the slug rename and reports false-positives.
-  - #4 — ``slugify(header) ≠ slugify(name)`` when the LLM cleans header
-    text into a name. The FK chain depends on the two slugs matching;
-    until the builder copies ``header`` verbatim into ``name`` the seam
-    is fragile.
-  - #7 — ``_coverage_problems`` truncates the missing list to 20 entries
-    in retry feedback; later-sheet misses are silently hidden from the
-    LLM retry and the model never converges.
-  - #8 (altitude) — the whole "EVERY SHEET, EVERY FIELD" prompt + coverage
-    guard + token-cap bumps exist because the LLM is doing field
-    enumeration. The right altitude is mechanically populating the
-    ``fields[]`` skeleton from ``extract_layout`` and letting the LLM only
-    fill prose. That becomes the rewrite premise when the indexer
-    returns.
+This kills the A5 bug list wholesale (BUILD-PLAN §A5): #2 (`ref.endswith("1")`
+matched A11/A21 as headers — rows are now matched structurally), #4
+(`slugify(header) ≠ slugify(name)` — `name` IS the verbatim header), and
+#3/#7/#8 (the coverage guard, its truncated retry feedback, and the whole
+LLM-enumeration altitude — there is nothing to cover-check when the model
+cannot drop a field).
 
----
-
-Emits the structured `spec.json` (mapping-artifact-redesign.md §3.1): the audit's
-per-field specification plus its inclusion criteria. Database-agnostic — built
-before any database is chosen, so it carries NO `kind` (direct/interpret is decided
-at mapping, once the DB is known). The workbook layout is extracted mechanically
-with openpyxl and flows through as data; one LLM call supplies the judgment — field
-meanings, types, permitted value sets, notes (with any standard citation inline),
-and the ~5 suggested inclusion criteria.
-
-The field spec is REGENERABLE; the user-set state the document carries —
-`inclusion_criteria[].default`, and any library-added `notes`/`permitted_values`
-for a local template — is PRESERVED across re-index by a small merge on stable keys
-(`field.number` / `criterion.id`, §6). The model is validated against the S0 schema
-(`audit-spec.schema.json`) before it is returned, so the service never writes a
-broken file.
+The field spec is REGENERABLE and database-agnostic — built before any
+database is chosen, so it carries NO `kind` (direct/interpret is decided at
+mapping). User-set state — `inclusion_criteria[].default`, library-added
+`notes`/`permitted_values`, a shortened `field.id`, the `deadline` — is
+PRESERVED across re-index by a small merge on stable keys (`field.number` /
+`criterion.id`, §6). The model is validated against the S0 schema
+(`audit-spec.schema.json`) before it is returned, so the service never
+writes a broken file.
 """
 
 from __future__ import annotations
@@ -63,16 +47,16 @@ from core.clients import llm
 from core.indexing.profile import validate_against_schema
 from core.slug import slugify
 
-# Header rows are conventionally row 1 — the audit-spec maps one header cell
-# per field. Any non-empty header cell on any sheet contributes one expected
-# field, so a multi-sheet workbook's coverage is the sum across sheets.
-_HEADER_ROW = "1"
-
 logger = logging.getLogger(__name__)
 
 _SCHEMA_FILE = "audit-spec.schema.json"
 _MAX_BUILD_ATTEMPTS = 3
 _VALID_TYPES = {"category", "number", "date", "text", "boolean"}
+
+# "<column letters><row number>" — structural row matching (the old string
+# suffix test was bug #2: ref.endswith("1") matched A11, A21, A101…).
+_CELL_REF = re.compile(r"^([A-Z]+)(\d+)$")
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 class BuilderValidationError(RuntimeError):
@@ -82,16 +66,18 @@ class BuilderValidationError(RuntimeError):
 
 
 _PROMPT = """\
-You write the specification for a clinical audit from its workbook layout. You are
-given the extracted layout of an XLSX audit template (sheets, cells, headers,
-merged ranges). Produce ONLY a single JSON object — no preamble, no markdown
-fences, no commentary.
+You annotate the specification of a clinical audit. The audit's field STRUCTURE
+has already been extracted mechanically from its workbook — you are given the
+final numbered field list (number, sheet, cell, verbatim header) plus the raw
+layout for context. You CANNOT add, drop, rename, renumber, or move fields.
+Produce ONLY a single JSON object — no preamble, no markdown fences, no
+commentary.
 
-This is the AUDIT SPECIFICATION: what each field MEANS and EXPECTS, plus the
-dimensions the audit can be filtered on. It is database-agnostic — you do NOT know
-which database will source the values, so you MUST NOT name any table or column,
-and you MUST NOT say whether a field is copied or interpreted (that is decided
-later, at mapping). Describe only what each field is.
+You supply the CLINICAL JUDGMENT: what each field means and expects, and the
+audit-level prose. The spec is database-agnostic — you do NOT know which
+database will source the values, so you MUST NOT name any table or column, and
+you MUST NOT say whether a field is copied or interpreted (that is decided
+later, at mapping).
 
 Output shape:
 
@@ -100,45 +86,58 @@ Output shape:
   "description": "<one paragraph: what this audit measures and its provenance>",
   "version": "<dataset/spec version if known, else omit>",
   "grain": "<what one row represents, e.g. 'one row per baby / birth record'>",
-  "sections": [ { "id": "<slug>", "name": "<section name>" } ],
+  "deadline": "<the audit's submission deadline as an ISO date YYYY-MM-DD, ONLY if the workbook layout states one; else omit>",
+  "sections": [ { "id": "<sheet name, EXACTLY as given>", "name": "<descriptive display name for that sheet's section>" } ],
   "fields": [
-    { "number": <1-based item number>, "section": "<section slug, optional>",
-      "cell": "<column letter the field is written to, e.g. 'T'>",
-      "name": "<field name>",
+    { "number": <the field's given number — your join key>,
       "type": "category | number | date | text | boolean",
-      "unit": "<unit if numeric, optional>", "format": "<entry format hint, optional>",
+      "unit": "<unit if numeric, optional>",
+      "format": "<entry format hint, optional>",
       "permitted_values": { "<code>": "<meaning>" },
       "notes": "<operational guidance + rationale + any standard citation inline, e.g. [NG18: 1.2.46]>" }
   ],
   "inclusion_criteria": [
     { "id": "<slug>", "label": "<human-readable label>",
-      "type": "category | number | date | number | boolean" }
+      "type": "category | number | date | boolean" }
   ]
 }
 
 Rules:
-1. **EVERY SHEET, EVERY FIELD.** Emit one `fields` entry for EVERY non-empty
-   header cell in EVERY sheet listed under `sheets` in the input. Sheets are
-   sections of the same audit; **never drop a sheet**. If the input has 3 sheets
-   with 39 / 13 / 7 headers, you emit 59 `fields` entries. The example output
-   block above shows a single sheet for brevity; that is NOT a license to flatten
-   a multi-sheet workbook. Cross-check by summing headers per sheet before you
-   start writing.
-2. One `fields` entry per real data field in the template; `number` is its
-   1-based item number across the WHOLE audit (start at 1 on the first sheet,
-   keep counting on the second). Do NOT emit `id`; it is derived deterministically
-   from `name` by the caller. Use `section` to mark which sheet/group a field
-   belongs to (one section per sheet is the natural mapping).
+- Emit one `fields` entry for EVERY number in the given field list, keyed by
+  that exact `number`. Entries for unknown numbers are discarded.
 - `type` is exactly one of: category, number, date, text, boolean.
+  * `number` / `date` from the header's clinical meaning (e.g. "Apgar at 1 min"
+    → number, "Date of birth" → date).
+  * `boolean` for a presence/normality question answered yes/no — "…done?",
+    "…given?", "Admitted to ICU", "Previous caesarean". Most short clinical
+    yes/no headers are boolean even without a question mark.
+  * `category` when the field takes one value from a fixed coded set you can
+    state — the workbook shows it, or it is a well-established set from the
+    audit's domain (e.g. mode-of-delivery codes). Emit the set in
+    `permitted_values`.
+  * `text` for free entry — a finding description, a comorbidity list, a drug
+    list, a ward name. When genuinely unsure between category and text, use
+    text.
 - `permitted_values` is the audit's canonical CODED set as a code -> meaning map
-  (e.g. {"1":"Male","2":"Female"}). Include it ONLY for category fields that have a
-  fixed value set; omit it otherwise. Never write it as prose.
+  (e.g. {"1":"Male","2":"Female"}). It MUST accompany every `category` field —
+  if you cannot state the fixed set, the field is not a category. NEVER invent
+  codes for sets you do not actually know: a wrong coded set silently corrupts
+  every later mapping. Never write it as prose.
 - `notes` is the ONE prose field — fold guidance, rationale, and any standard
-  citation into it. Omit if there is nothing to say.
+  citation into it. Write a useful note for every field (what is recorded, how,
+  any edge rules); a mapper who has never seen the template must understand the
+  field from the note alone.
+- `sections` carries a display name for every sheet in the given structure —
+  keep `id` EXACTLY the sheet name you were given.
 - `inclusion_criteria`: suggest only the ~5 MOST LIKELY dimensions a clinician
-  would filter this audit's cohort on (e.g. gestation, mode of delivery, dates,
-  NICU admission, patient age). Each is a database-agnostic CONCEPT — give it an
-  id, a label, and a type. Do NOT pick default values; defaults are set later.
+  would filter this audit's cohort on. Anchor each one to a dimension the
+  template's OWN fields record, prioritising the audit's PRIMARY clinical
+  measurements — the exposure, the headline outcome scores, the key event/
+  admission flags — over administrative attributes (e.g. for a paediatric
+  diabetes audit: diabetes type, age at visit, HbA1c, hospital admissions —
+  not GP practice codes or postcode). Each is a database-agnostic
+  CONCEPT — give it an id, a label, and a type. Do NOT pick default values;
+  defaults are set later.
 - Do NOT name any database table or column anywhere.
 - Output only the JSON object, starting with `{`.
 """
@@ -220,6 +219,54 @@ def extract_layout(workbook_path: Path) -> list[dict[str, Any]]:
     return [_describe_sheet(workbook[name]) for name in workbook.sheetnames]
 
 
+def extract_field_skeleton(
+    sheets: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """The mechanical `fields[]` skeleton: one field per non-empty row-1 header
+    cell, in workbook order. Returns ``(fields, sheet_names)`` where
+    ``sheet_names`` lists the sheets that contributed at least one field.
+
+    Each field carries the structure the LLM may never touch: `number` (1-based
+    across the whole workbook), `section` (the sheet name — multi-sheet audits
+    only), `cell` (column letter), verbatim `name`, and the FK-stable `id`
+    (sheet-prefixed when multi-sheet; `build_populate_spec._field_slug`'s
+    convention). Duplicate ids raise — two cells must not share a slug.
+    """
+    headers: list[tuple[str, str, str]] = []  # (sheet, column_letter, header)
+    for sheet in sheets:
+        for cell in sheet.get("cells", []):
+            m = _CELL_REF.match(str(cell.get("cell") or ""))
+            value = cell.get("value")
+            if m and m.group(2) == "1" and isinstance(value, str) and value.strip():
+                headers.append((sheet.get("name", "?"), m.group(1), value.strip()))
+
+    sheet_names = sorted({s for s, _, _ in headers},
+                         key=lambda n: [s.get("name") for s in sheets].index(n))
+    multi_sheet = len(sheet_names) > 1
+
+    fields: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for number, (sheet_name, column, header) in enumerate(headers, start=1):
+        base = slugify(header) or f"field_{number}"
+        fid = f"{slugify(sheet_name)}/{base}" if multi_sheet else base
+        if fid in seen:
+            raise BuilderValidationError(
+                f"duplicate field id {fid!r} (cell {sheet_name}!{column}1, header "
+                f"{header!r}); two fields cannot share a slug — rename one at source"
+            )
+        seen.add(fid)
+        field: dict[str, Any] = {
+            "id": fid,
+            "number": number,
+            "name": header,
+            "cell": column,
+        }
+        if multi_sheet:
+            field["section"] = sheet_name
+        fields.append(field)
+    return fields, sheet_names
+
+
 # --- assembly + state preservation --------------------------------------------
 
 def _parse_json(raw: str) -> dict[str, Any]:
@@ -234,60 +281,40 @@ def _parse_json(raw: str) -> dict[str, Any]:
     return json.loads(text)
 
 
-def _clean_field(raw: dict[str, Any]) -> dict[str, Any] | None:
-    """Coerce one LLM field record into the schema shape; drop it if it has no
-    usable number/name/type. `id` is filled later by `_assign_ids` (derived from
-    `name` via `slugify`, with collision suffixes) so it's stable across re-index
-    and matches the mapping FK convention (`build_populate_spec._slug(header)`)."""
-    try:
-        number = int(raw.get("number"))
-    except (TypeError, ValueError):
-        return None
-    name = str(raw.get("name") or "").strip()
-    ftype = str(raw.get("type") or "").strip().lower()
-    if not name or number < 1 or ftype not in _VALID_TYPES:
-        return None
-    field: dict[str, Any] = {"number": number, "name": name, "type": ftype}
-    for key in ("section", "cell", "unit", "format", "notes"):
-        value = str(raw.get(key) or "").strip()
+def _prose_by_number(raw: Any) -> dict[int, dict[str, Any]]:
+    """Index the LLM's per-field prose records by their `number` join key."""
+    out: dict[int, dict[str, Any]] = {}
+    for record in raw if isinstance(raw, list) else []:
+        if not isinstance(record, dict):
+            continue
+        try:
+            number = int(record.get("number"))
+        except (TypeError, ValueError):
+            continue
+        out[number] = record
+    return out
+
+
+def _merge_field_prose(field: dict[str, Any], prose: dict[str, Any]) -> dict[str, Any]:
+    """One spec field = the mechanical skeleton + the LLM's judgment for it.
+    Structure (`id`/`number`/`name`/`cell`/`section`) is never the LLM's to
+    write; a missing/invalid `type` falls back to `text` so the spec stays
+    schema-valid (the eval's type_match shows the gap rather than the build
+    dying on it)."""
+    ftype = str(prose.get("type") or "").strip().lower()
+    field["type"] = ftype if ftype in _VALID_TYPES else "text"
+    for key in ("unit", "format", "notes"):
+        value = str(prose.get(key) or "").strip()
         if value:
             field[key] = value
-    pv = raw.get("permitted_values")
+    pv = prose.get("permitted_values")
     if isinstance(pv, dict) and pv:
         field["permitted_values"] = {str(k): str(v) for k, v in pv.items()}
+    elif field["type"] == "category":
+        # A category WITHOUT its coded set is a guess (the prompt forbids it);
+        # downgrade to text rather than ship a half-specified coded field.
+        field["type"] = "text"
     return field
-
-
-def _assign_ids(fields: list[dict[str, Any]], *, multi_section: bool) -> None:
-    """Derive `field.id` for every field. Convention mirrors the mapping compile
-    (`build_populate_spec._field_slug`): multi-section audits prefix with the
-    section slug (`{slugify(section)}/{slugify(name)}`); single-section audits
-    use the bare slug. Same `core.slug.slugify` both sides — the A4↔A5 FK is
-    one function. `slugify("")` returns `""`; an empty slug falls back to
-    `field_<number>` so the FK is always non-empty.
-
-    **Duplicates raise** — no `_2`/`_3` suffix. Two cells with the same header
-    must be disambiguated at source (by section in a multi-section audit, by
-    the author renaming a header otherwise). Silent suffixing left orphaned
-    audit fields that no mapping cell FK'd into; raising forces the bug to
-    surface at build time. Pure side-effect on each field dict."""
-    seen: set[str] = set()
-    for field in fields:
-        base = slugify(field["name"]) or f"field_{field['number']}"
-        section = field.get("section")
-        slug = (
-            f"{slugify(section)}/{base}"
-            if multi_section and section
-            else base
-        )
-        if slug in seen:
-            raise BuilderValidationError(
-                f"duplicate field id {slug!r} (field number {field['number']!r}, "
-                f"name {field['name']!r}); two fields cannot share a slug — "
-                f"rename one at source"
-            )
-        seen.add(slug)
-        field["id"] = slug
 
 
 def _clean_criterion(raw: dict[str, Any]) -> dict[str, Any] | None:
@@ -301,45 +328,59 @@ def _clean_criterion(raw: dict[str, Any]) -> dict[str, Any] | None:
     return {"id": cid, "label": label, "type": ctype, "suggested": True, "default": None}
 
 
-def _assemble(audit_id: str, prose: dict[str, Any]) -> dict[str, Any]:
-    fields = [f for f in (_clean_field(r) for r in prose.get("fields", []) or [])
-              if f is not None]
-    # Multi-section audits (one section per workbook sheet) get sheet-prefixed
-    # ids — mirrors `build_populate_spec._field_slug`'s multi-sheet detection,
-    # so the FK chain is bijective without `_2` suffixes.
-    multi_section = len({f.get("section") for f in fields if f.get("section")}) > 1
-    _assign_ids(fields, multi_section=multi_section)
-    criteria = [c for c in (_clean_criterion(r) for r in prose.get("inclusion_criteria", []) or [])
+def _assemble(
+    audit_id: str,
+    skeleton: list[dict[str, Any]],
+    sheet_names: list[str],
+    prose: dict[str, Any],
+) -> dict[str, Any]:
+    by_number = _prose_by_number(prose.get("fields"))
+    fields = [
+        _merge_field_prose(dict(field), by_number.get(field["number"], {}))
+        for field in skeleton
+    ]
+    criteria = [c for c in (_clean_criterion(r) for r in prose.get("inclusion_criteria", []) or []
+                            if isinstance(r, dict))
                 if c is not None]
     model: dict[str, Any] = {
         "schema_version": "1",
         "audit": audit_id,
-        "title": (prose.get("title") or audit_id).strip(),
-        "description": (prose.get("description") or f"Audit specification for {audit_id}.").strip(),
-        "grain": (prose.get("grain") or "one row per record").strip(),
+        "title": str(prose.get("title") or audit_id).strip(),
+        "description": str(
+            prose.get("description") or f"Audit specification for {audit_id}."
+        ).strip(),
+        "grain": str(prose.get("grain") or "one row per record").strip(),
         "fields": fields,
         "inclusion_criteria": criteria,
     }
     version = str(prose.get("version") or "").strip()
     if version:
         model["version"] = version
-    sections = [
-        {"id": str(s["id"]).strip(), "name": str(s["name"]).strip()}
-        for s in prose.get("sections", []) or []
-        if isinstance(s, dict) and s.get("id") and s.get("name")
-    ]
-    if sections:
-        model["sections"] = sections
+    deadline = str(prose.get("deadline") or "").strip()
+    if _ISO_DATE.match(deadline):
+        model["deadline"] = deadline
+    # Sections are the sheets (deterministic ids); the LLM supplies only the
+    # display names. Single-sheet audits carry no sections block.
+    if len(sheet_names) > 1:
+        display = {
+            str(s.get("id") or "").strip(): str(s.get("name") or "").strip()
+            for s in prose.get("sections", []) or []
+            if isinstance(s, dict)
+        }
+        model["sections"] = [
+            {"id": name, "name": display.get(name) or name} for name in sheet_names
+        ]
     return model
 
 
 def merge_preserved_state(new_model: dict[str, Any], old_model: dict[str, Any] | None) -> dict[str, Any]:
     """Preserve user-set state across re-index (§6). The regenerated field spec is
     authoritative for structure, but durable user state is carried forward by
-    stable key: `inclusion_criteria[].default` by `id`, and library-added
-    `notes`/`permitted_values` + the **stable `field.id`** by `field.number`.
-    `id` is preserved so a shortened library-set slug (e.g. `delivery` for
-    "Mode of delivery") survives a re-index — the FK that downstream `mapping.json`
+    stable key: `inclusion_criteria[].default` by `id`; library-added
+    `notes`/`permitted_values` + the **stable `field.id`** by `field.number`;
+    and a hand-set `deadline` when the regenerated spec found none. `id` is
+    preserved so a shortened library-set slug (e.g. `delivery` for "Mode of
+    delivery") survives a re-index — the FK that downstream `mapping.json`
     executables already hold-onto cannot be broken by a rename. `notes` /
     `permitted_values` are kept only where the regenerated field left them empty,
     so a fresh spec never blows away a clinical lead's fill."""
@@ -372,51 +413,19 @@ def merge_preserved_state(new_model: dict[str, Any], old_model: dict[str, Any] |
             field["notes"] = old["notes"]
         if not field.get("permitted_values") and old.get("permitted_values"):
             field["permitted_values"] = old["permitted_values"]
+
+    if not new_model.get("deadline") and old_model.get("deadline"):
+        new_model["deadline"] = old_model["deadline"]
     return new_model
 
 
-def _expected_headers(sheets: list[dict[str, Any]]) -> list[tuple[str, str, str]]:
-    """Every non-empty header cell across every sheet, as `(sheet, cell, value)`
-    tuples in workbook order. This is the floor the LLM's `fields[]` must cover —
-    a single sheet getting dropped is the failure mode the multi-sheet guard
-    exists to catch."""
-    headers: list[tuple[str, str, str]] = []
-    for sheet in sheets:
-        name = sheet.get("name", "?")
-        for cell in sheet.get("cells", []):
-            ref = str(cell.get("cell") or "")
-            value = cell.get("value")
-            if ref.endswith(_HEADER_ROW) and isinstance(value, str) and value.strip():
-                headers.append((name, ref, value.strip()))
-    return headers
-
-
-def _coverage_problems(
-    model: dict[str, Any], expected: list[tuple[str, str, str]]
-) -> list[str]:
-    """Report any expected header whose slug doesn't appear in `model.fields[].id`.
-    The slug is the FK the executable will use, so this is the same identity test
-    the A4↔A5 seam runs at verify time — moved upstream into the build loop, so
-    the LLM gets a chance to fix the gap rather than the seam catching it later.
-    The problem message names the missing slugs (concrete, retry-friendly)."""
-    if not expected:
-        return []
-    have = {f.get("id") for f in model.get("fields", []) or []}
-    missing: list[tuple[str, str, str]] = [
-        (sheet, ref, header)
-        for sheet, ref, header in expected
-        if slugify(header) not in have
-    ]
-    if not missing:
-        return []
-    rendered = ", ".join(f"{sheet}!{ref} ({header!r})" for sheet, ref, header in missing[:20])
-    if len(missing) > 20:
-        rendered += f", … (+{len(missing) - 20} more)"
-    return [
-        f"emitted {len(have)} fields, expected at least {len(expected)} "
-        f"(one per workbook header across all sheets); "
-        f"missing: {rendered}"
-    ]
+def _render_skeleton(fields: list[dict[str, Any]]) -> str:
+    """The given field structure, rendered compactly for the prompt."""
+    lines = ["FIELD STRUCTURE (final — annotate by `number`, never restructure):"]
+    for f in fields:
+        section = f" sheet={f['section']!r}" if f.get("section") else ""
+        lines.append(f"  {f['number']}.{section} cell={f['cell']!r} header={f['name']!r}")
+    return "\n".join(lines)
 
 
 async def build_audit_spec(
@@ -426,25 +435,36 @@ async def build_audit_spec(
     display_name: str | None = None,
     previous: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build a validated `spec.json` document (a dict). One LLM call supplies the
-    field spec + suggested inclusion criteria; deterministic code coerces it to the
-    schema, merges preserved user state (`previous`), and validates against the S0
-    schema. Retries on malformed LLM output; raises `BuilderValidationError` after
-    `_MAX_BUILD_ATTEMPTS`."""
+    """Build a validated `spec.json` document (a dict). The `fields[]` skeleton is
+    mechanical (`extract_field_skeleton`); one LLM call supplies the per-field
+    judgment + audit-level prose + suggested inclusion criteria; deterministic
+    code merges them (structure always wins), merges preserved user state
+    (`previous`), and validates against the S0 schema. Retries on malformed LLM
+    output; raises `BuilderValidationError` after `_MAX_BUILD_ATTEMPTS`."""
     sheets = extract_layout(workbook_path)
-    expected = _expected_headers(sheets)
+    skeleton, sheet_names = extract_field_skeleton(sheets)
+    if not skeleton:
+        raise BuilderValidationError(
+            f"no header cells found in {workbook_path.name} — nothing to specify"
+        )
     hint = display_name or workbook_path.stem
-    user_input = json.dumps(
-        {"filename_hint": hint, "sheets": sheets}, ensure_ascii=False, indent=2
+    user_input = (
+        f"filename_hint: {hint}\n\n"
+        + _render_skeleton(skeleton)
+        + "\n\nRAW LAYOUT (context only):\n"
+        + json.dumps({"sheets": sheets}, ensure_ascii=False, indent=2)
     )
 
     instructions = _PROMPT
     problems: list[str] = []
     for attempt in range(1, _MAX_BUILD_ATTEMPTS + 1):
-        # 4000 (the default) truncates a multi-sheet workbook mid-JSON; the
-        # audit-spec dominates output size with one ~50-token field per header.
-        # 8000 carries ~150 fields comfortably; mirrors `build_audit_database_mapping`.
-        raw = await llm.respond(instructions, user_input, max_output_tokens=8000, stage="index_audit")
+        # The prose pass dominates output size — every field gets a type +
+        # note (+ permitted_values for coded fields), ~80 tokens each. 12k
+        # carries ~150 fields comfortably.
+        raw = await llm.respond(
+            instructions, user_input,
+            max_output_tokens=12000, temperature=0.0, stage="index_audit",
+        )
         try:
             prose = _parse_json(raw)
             if not isinstance(prose, dict):
@@ -452,16 +472,22 @@ async def build_audit_spec(
         except (json.JSONDecodeError, ValueError) as exc:
             problems = [f"LLM output was not parseable JSON: {exc}"]
         else:
-            model = merge_preserved_state(_assemble(audit_id, prose), previous)
+            model = merge_preserved_state(
+                _assemble(audit_id, skeleton, sheet_names, prose), previous
+            )
             problems = validate_against_schema(model, _SCHEMA_FILE)
-            if not problems and not model["fields"]:
-                problems = ["no usable fields were produced"]
             if not problems:
-                # Multi-sheet coverage guard: the schema can't enforce this (it
-                # doesn't know the input shape), so the build loop does. Failure
-                # carries the missing slugs back into the LLM retry — a concrete
-                # gap is far easier for the model to close than a generic "more".
-                problems = _coverage_problems(model, expected)
+                # The structure cannot be wrong (it is mechanical); hold the LLM
+                # to its one job instead: every field annotated.
+                unannotated = [
+                    f["number"] for f in model["fields"]
+                    if f["number"] not in _prose_by_number(prose.get("fields"))
+                ]
+                if unannotated:
+                    problems = [
+                        "fields missing an annotation record (join by `number`): "
+                        + ", ".join(str(n) for n in unannotated)
+                    ]
             if not problems:
                 return model
         logger.warning(
@@ -481,5 +507,5 @@ def _retry_feedback(problems: list[str]) -> str:
         "\n\nYOUR PREVIOUS OUTPUT WAS REJECTED for these reasons:\n"
         f"{joined}\n"
         "Produce a corrected JSON object that fixes every issue. Output only the "
-        "JSON object, starting with `{`, with at least one usable field."
+        "JSON object, starting with `{`."
     )

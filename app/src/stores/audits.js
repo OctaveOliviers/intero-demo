@@ -12,6 +12,7 @@
 // no UI/navigation/chat modules — it is pure data.
 import { writable, get } from "svelte/store";
 import { authUser } from "./auth.js";
+import { deleteRun } from "../lib/api.js";
 
 const STORAGE_PREFIX = "intero.audits.v1";
 let currentStorageKey = null;
@@ -98,6 +99,8 @@ function mapServerRun(row) {
     messages: [],
     activity: [],
     workbook: null,
+    runStartedAt: null,
+    runEndedAt: null,
   };
 }
 
@@ -160,6 +163,10 @@ export function startAudit(template, filters, criteria = []) {
     reviewSummary: null,
     workbook: null,
     runId: null,
+    // Epoch ms the live run started / ended — drives the activity-box elapsed
+    // timer. Seeded locally on a fresh run, from the backend on a resume.
+    runStartedAt: null,
+    runEndedAt: null,
   };
   audits.update((list) => [entry, ...list]);
   currentAuditId.set(id);
@@ -179,6 +186,15 @@ export function setAuditRefreshState(id, state = {}) {
 
 export function setAuditRunId(id, runId) {
   updateAudit(id, { runId });
+}
+
+// Set the run's start/end timestamps (epoch ms) for the activity-box timer.
+// Pass only the keys you mean to change; `null` is a meaningful value (reset).
+export function setAuditRunTiming(id, { startedAt, endedAt } = {}) {
+  const patch = {};
+  if (startedAt !== undefined) patch.runStartedAt = startedAt;
+  if (endedAt !== undefined) patch.runEndedAt = endedAt;
+  if (Object.keys(patch).length) updateAudit(id, patch);
 }
 
 export function setAuditStatus(id, status) {
@@ -218,7 +234,16 @@ export function updateCurrentAuditWorkbook(updater) {
   );
 }
 
-export function deleteAudit(id) {
+// Delete a sidebar analysis. If it reached the backend (has a runId), delete it
+// there FIRST — stop its execution and remove its run dir + state-DB rows + the
+// attribution — so it can't resurrect on the next reload via mergeServerRunHistory.
+// Only on backend success (404 counts as already-gone) do we drop it locally.
+// A purely-local entry that never ran (no runId) is just removed locally.
+export async function deleteAudit(id) {
+  const entry = get(audits).find((a) => a.id === id);
+  if (entry?.runId) {
+    await deleteRun(entry.runId);
+  }
   audits.update((list) => list.filter((a) => a.id !== id));
   if (get(currentAuditId) === id) {
     currentAuditId.set(null);

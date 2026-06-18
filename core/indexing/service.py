@@ -324,8 +324,12 @@ async def _run_database_indexing(db_id: str) -> None:
         if d.is_dir() and d.name != db_id and (d / "database.sqlite").exists()
     }
 
+    # The prior model (a ready model on re-index, the stub on first index) carries
+    # the asserted prose to preserve for structurally-unchanged tables (§6).
+    previous = _read_json(_json_path("database", db_id))
     model = await build_database_model(
-        sqlite_path, db_id, display_name=display_name, sibling_databases=siblings
+        sqlite_path, db_id, display_name=display_name,
+        sibling_databases=siblings, previous=previous,
     )
     # The user-chosen display name (from upload or a rename) is authoritative —
     # the builder's LLM title is only a fallback when none was set.

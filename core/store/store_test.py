@@ -235,6 +235,32 @@ class StorePersistenceTest(unittest.TestCase):
             store.update_cell("r", "ALL!ZZ99", state="filled")    # missing cell
         store.close()
 
+    def test_filling_interpret_cell_auto_flags_not_reviewed(self):
+        # An interpret cell needs clinician sign-off: the moment it is filled
+        # (without an explicit review_state) the DB trigger marks it
+        # not_reviewed, so the derived needs_verification count is right for
+        # EVERY writer — including the agent's raw UPDATE. A direct fill never
+        # needs review, so its review_state stays NULL.
+        store = Store(self.db_path)
+        store.create_run(Run(id="r", audit_id="a"))
+        store.insert_pending_cells([
+            Cell(run_id="r", ref="ALL!A2", field="dcc", member="P1",
+                 kind="interpret", state="pending"),
+            Cell(run_id="r", ref="ALL!B2", field="age", member="P1",
+                 kind="direct", state="pending"),
+        ])
+        store.update_cell(
+            "r", "ALL!A2", state="filled", value="Yes", resolved_by="agent",
+            sources=[{"database": "d", "query": "Q", "table_column": "t.c"}],
+        )
+        store.update_cell(
+            "r", "ALL!B2", state="filled", value="40", resolved_by="direct",
+            sources=[{"database": "d", "query": "Q", "table_column": "t.c"}],
+        )
+        self.assertEqual(store.get_cell("r", "ALL!A2").review_state, "not_reviewed")
+        self.assertIsNone(store.get_cell("r", "ALL!B2").review_state)
+        store.close()
+
     def test_status_change_event_atomic_with_status(self):
         # The persisted status and its status_change event always agree.
         store = Store(self.db_path)

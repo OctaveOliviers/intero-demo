@@ -8,21 +8,21 @@ from datetime import datetime, date, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 
 from core.running import stream_runner as runner_mod
 from core import running as run_engine
 from core import mapping as mapping_phase
-from core.catalog import get_audit_by_id
 from core.config import AUDITS_DIR, DATABASES_DIR, RUNS_DIR
 from core.running.sql import run_readonly_sql
-from core.running.build_workbook import build_initial_workbook
-from core.running.workbook_stream import read_workbook_sheets
+from core.running.build_workbook import field_display_names
+from core.running.workbook_stream import sheets_from_cells
 from core.running.try_agent import make_tier_agent
 from core.running.try_direct import try_direct
 from core.running.try_llm import make_tier_llm
 from core.running.orchestrator import precompute_pending_cells
+from core.running.events import build_review_summary_event
 from core.running.cell_ref import DEFAULT_FIRST_DATA_ROW, member_id as format_member_id
 from core.store import Cell, Event, Run, RunExecution, RunMember, RuntimePermissionDenied, Store
 from server.auth import permissions as authz
@@ -70,16 +70,6 @@ def _audit_default_databases(audit_id: str, audit_spec: dict[str, Any]) -> list[
     return []
 
 
-def _resolve_audit_excel(audit_id: str) -> Path:
-    audit = get_audit_by_id(audit_id)
-    if audit is None:
-        raise HTTPException(status_code=404, detail=f"Audit '{audit_id}' not found.")
-    excel_path = AUDITS_DIR / audit_id / audit["excel_path"]
-    if not excel_path.exists():
-        raise HTTPException(status_code=500, detail=f"Audit file missing on server: {audit_id}/{audit['excel_path']}")
-    return excel_path
-
-
 def _read_json(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
@@ -111,15 +101,12 @@ def _new_execution_id() -> str:
 
 def _read_surface_run_status(run_dir: Path) -> str:
     status_path = run_dir / "status.json"
-    result_path = run_dir / "result.xlsx"
     status = "running"
     if status_path.exists():
         try:
             status = json.loads(status_path.read_text(encoding="utf-8")).get("status", "running")
         except (json.JSONDecodeError, OSError):
             status = "running"
-    elif result_path.exists():
-        status = "completed"
     return status
 
 
@@ -715,6 +702,10 @@ class _SpineEventPublisher:
         self._closed = False
         self._drain_task = asyncio.create_task(self._drain())
 
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
     def emit(self, event: dict[str, Any]) -> None:
         if self._closed:
             raise RuntimeError("Spine event publisher is already closed.")
@@ -763,13 +754,16 @@ async def _run_spine(
     audit_id: str,
     database_id: str | None,
     filters: dict[str, str],
-    workbook_path: Path,
     execution_id: str | None = None,
     user_id: str | None = None,
 ) -> None:
     store = Store(runtime_role="api_app")
     publisher = _SpineEventPublisher(run_id)
     orchestrator_store = store.with_runtime_role("orchestrator_runtime")
+    # Flips True the instant orchestration returns normally — lets the
+    # CancelledError handler tell a mid-tier user-stop (must build the summary
+    # itself) apart from a stop that raced in after the run already finished.
+    orchestrate_completed = False
     try:
         def _safe_transition_execution(
             status: str,
@@ -837,7 +831,8 @@ async def _run_spine(
         # for audits not yet mapped); without an early event the user sits on
         # the "Workbook will appear here once available" placeholder with no
         # signal that anything is happening.
-        await _emit_now({"type": "activity", "headline": "Preparing the audit."})
+        await _emit_now({"type": "activity", "headline": "Preparing the audit.",
+                         "label": "Preparing the audit", "kind": "step"})
 
         audit = _read_json(AUDITS_DIR / audit_id / "spec.json")
         if audit is None:
@@ -868,9 +863,11 @@ async def _run_spine(
         # the wait is longer the very first time.
         mapping_cached = (AUDITS_DIR / audit_id / "mapping.json").exists()
         if mapping_cached:
-            await _emit_now({"type": "activity", "headline": "Loading the audit↔database mapping."})
+            await _emit_now({"type": "activity", "headline": "Loading the audit↔database mapping.",
+                             "label": "Loading the mapping", "kind": "step"})
         else:
-            await _emit_now({"type": "activity", "headline": "Building the audit↔database mapping for the first time (this can take a minute)."})
+            await _emit_now({"type": "activity", "headline": "Building the audit↔database mapping for the first time (this can take a minute).",
+                             "label": "Building the mapping", "kind": "step"})
         mapping_json = await mapping_phase.ensure_mapping(audit_id, requested_ids)
         if mapping_json is None:
             raise ValueError(
@@ -904,7 +901,8 @@ async def _run_spine(
             database_id=cohort_db,
             cohort_from=str(executable.get("cohort", {}).get("from") or ""),
         )
-        await _emit_now({"type": "activity", "headline": "Resolving the cohort."})
+        await _emit_now({"type": "activity", "headline": "Resolving the cohort.",
+                         "label": "Resolving the cohort", "kind": "step"})
         cohort = _resolve_cohort(
             executable,
             database_paths,
@@ -914,24 +912,6 @@ async def _run_spine(
         if not cohort:
             raise ValueError("No cohort members matched this run.")
 
-        # Build the initial result.xlsx from spec + cohort size BEFORE the
-        # workbook_created emit. The frontend's `applyCells` drops writes to
-        # rows that don't exist in `data`, so the emit must ship a sheet with
-        # row 1 (headers) + N data rows pre-allocated — otherwise cell_update
-        # events fire into a workbook that has nowhere to put them. The
-        # workbook is regenerated for every run from spec.json; the storage
-        # contract pins var/audits/<id>/workbook.xlsx as "present iff
-        # uploaded" — for spec-only audits we never materialise that file,
-        # only this per-run result.xlsx.
-        if not workbook_path.exists():
-            build_initial_workbook(audit, len(cohort), workbook_path)
-        sheets = read_workbook_sheets(workbook_path)
-        await _emit_now({
-            "type": "workbook_created",
-            "label": "result.xlsx",
-            "sheets": sheets,
-            "cellMetadata": {},
-        })
         is_refresh = existing_run is not None and execution_id is not None
         refresh_stats: dict[str, Any] | None = None
         member_row_index = {
@@ -956,6 +936,21 @@ async def _run_spine(
                 cohort=cohort,
                 member_row_index=member_row_index,
             )
+
+        # Emit the initial (blank) grid the FE renders before any tier runs. It's
+        # built from the precomputed pending cells — the exact SHEET!A1 refs the
+        # run will fill — so the grid the user sees is the grid the cells define;
+        # there is no on-disk result.xlsx. Headers come from the spec's display
+        # names. orchestrate_run re-derives + persists these same pending cells.
+        pending_cells = precompute_pending_cells(
+            run_id, executable, cohort, member_rows=member_row_index
+        )
+        await _emit_now({
+            "type": "workbook_created",
+            "label": "result.xlsx",
+            "sheets": sheets_from_cells(pending_cells, field_display_names(audit)),
+            "cellMetadata": {},
+        })
         anchor = next(iter(executable.get("identity_keys") or []), None)
         cohort_tables: dict[str, list[str]] = {}
         for bound_id in bound_ids:
@@ -1001,7 +996,7 @@ async def _run_spine(
             member_rows=member_row_index,
             active_member_ids=active_member_ids,
         )
-        await publisher.aclose()
+        orchestrate_completed = True
         run = store.get_run(run_id)
         final_status = run.status if run is not None else None
         refresh_summary = _build_refresh_summary(
@@ -1010,26 +1005,68 @@ async def _run_spine(
             execution_id=execution_id,
             refresh_stats=refresh_stats,
         )
+        # Queue refresh_summary + done THROUGH the publisher (not _emit_now), then
+        # close ONCE. orchestrate_run already queued review_summary on the
+        # publisher, so this single aclose() flushes review_summary →
+        # refresh_summary → done in order. Emitting done via _emit_now after the
+        # close (the old shape) left a window where the publisher was shut but
+        # `done` was unsent — a stop racing that window dropped the terminal frame.
         if refresh_summary:
-            await _emit_now({
+            publisher.emit(_with_execution({
                 "type": "refresh_summary",
                 "summary": refresh_summary,
-            })
+            }))
         done_event = deferred_done_event or {"type": "done"}
         if refresh_summary:
             done_event = {**done_event, "summary": refresh_summary}
-        await _emit_now(done_event)
+        publisher.emit(_with_execution(done_event))
+        await publisher.aclose()
         _write_run_status(run_dir, "completed", run_status=final_status)
         _safe_transition_execution(
             "completed",
             summary_json={"run_status": final_status, **refresh_summary},
         )
     except asyncio.CancelledError:
+        # Two cancellations finish GRACEFULLY (recorded "completed", never
+        # "stopped"):
+        #   1. orchestrate_completed — the tiers already finished and the terminal
+        #      frames are queued/flushing; this cancel just raced the close. The
+        #      publisher's drain task still delivers review_summary + done, so we
+        #      only need to record completion (do NOT rewrite to "stopped").
+        #   2. a USER PAUSE mid-tier (broker stop_requested) — finalize with a
+        #      review_summary of the work done so far, then done.
+        # Any OTHER cancel (delete, server shutdown) keeps the terminal error.
+        stop_to_finalize = (
+            runner_mod.runner is not None
+            and runner_mod.runner.is_stop_requested(run_id)
+        )
+        if orchestrate_completed or stop_to_finalize:
+            try:
+                if not orchestrate_completed and not publisher.closed:
+                    # Mid-tier pause: build + stream a summary of the work so far.
+                    orchestrator_store.recompute_status(run_id)
+                    review_summary = build_review_summary_event(
+                        orchestrator_store.get_cells(run_id)
+                    )
+                    publisher.emit(_with_execution(review_summary))
+                    publisher.emit(_with_execution({"type": "done"}))
+            except Exception:
+                logger.exception("Run %s: stop-finalize emit failed", run_id)
+            await publisher.aclose()
+            run = store.get_run(run_id)
+            final_status = run.status if run is not None else None
+            _write_run_status(run_dir, "completed", run_status=final_status)
+            _safe_transition_execution(
+                "completed",
+                summary_json={"run_status": final_status, "stopped_by_user": stop_to_finalize},
+            )
+            return
         _write_run_status(run_dir, "stopped", detail="Stopped by user.")
         error_event = {"type": "error", "message": "Run stopped by user."}
         if execution_id:
             error_event["executionId"] = execution_id
-        publisher.emit(error_event)
+        if not publisher.closed:
+            publisher.emit(error_event)
         await publisher.aclose()
         _safe_transition_execution("stopped")
         raise
@@ -1063,7 +1100,6 @@ def _start_spine_run(
     audit_id: str,
     database_id: str | None,
     filters: dict[str, str],
-    workbook_path: Path,
     execution_id: str | None = None,
     user_id: str | None = None,
 ) -> None:
@@ -1076,7 +1112,6 @@ def _start_spine_run(
         audit_id,
         database_id,
         filters,
-        workbook_path,
         execution_id=execution_id,
         user_id=user_id,
     ))
@@ -1117,55 +1152,21 @@ def _build_clinician_cell_updates(cell, patch: RunCellEditRequest) -> dict[str, 
 @router.post("/api/runs", response_model=RunCreateResponse, status_code=200)
 async def create_run(request: Request):
     content_type = request.headers.get("content-type", "")
-    filters: dict[str, str] = {}
-    database_id: str | None = None
-    request_text: str | None = None
+    if "application/json" not in content_type:
+        raise HTTPException(status_code=415, detail="Unsupported content type. Use application/json.")
 
     run_id = run_engine.new_run_id()
     run_dir = RUNS_DIR / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
-    workbook_path = run_dir / "result.xlsx"
 
-    if "application/json" in content_type:
-        body = await request.json()
-        req = RunCreateFromAuditRequest.model_validate(body)
-        filters = req.filters or {}
-        database_id = req.database
-        # No template copy here — _run_spine builds result.xlsx from
-        # spec.json + cohort size once the cohort is known. The storage
-        # contract (§3) makes var/audits/<id>/workbook.xlsx optional: it's
-        # only present when the audit was uploaded as a workbook.
-        audit_id = req.audit_id
-        request_text = req.prompt
-
-    elif "multipart/form-data" in content_type:
-        form = await request.form()
-        template_file = form.get("template")
-        if template_file is None or not getattr(template_file, "filename", None):
-            raise HTTPException(status_code=400, detail="Template file is required.")
-        ext = Path(template_file.filename).suffix.lower()
-        if ext not in (".xlsx", ".xlsm"):
-            raise HTTPException(status_code=415, detail="Only .xlsx and .xlsm files are supported.")
-        raw_filters = form.get("filters")
-        if raw_filters:
-            try:
-                parsed = json.loads(raw_filters)
-                if isinstance(parsed, dict):
-                    filters = {str(k): str(v) for k, v in parsed.items()}
-            except json.JSONDecodeError:
-                pass
-        db_field = form.get("database")
-        database_id = str(db_field) if db_field else None
-        try:
-            workbook_path.write_bytes(await template_file.read())
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to save template: {e}")
-        audit_id = "custom"
-        prompt_field = form.get("prompt")
-        request_text = str(prompt_field) if prompt_field else None
-
-    else:
-        raise HTTPException(status_code=415, detail="Unsupported content type. Use application/json or multipart/form-data.")
+    body = await request.json()
+    req = RunCreateFromAuditRequest.model_validate(body)
+    filters = req.filters or {}
+    database_id = req.database
+    # No workbook on disk — _run_spine emits the initial grid from precomputed
+    # pending cells and every value lives in state.db (the single source of truth).
+    audit_id = req.audit_id
+    request_text = req.prompt
 
     user_id = current_user_id(request)
     _start_spine_run(
@@ -1174,7 +1175,6 @@ async def create_run(request: Request):
         audit_id,
         database_id,
         filters,
-        workbook_path,
         user_id=user_id,
     )
 
@@ -1208,11 +1208,30 @@ async def stream_run(run_id: str):
     )
 
 
-@router.post("/api/runs/{run_id}/stop")
-async def stop_run(run_id: str):
-    if runner_mod.runner is None:
-        raise HTTPException(status_code=503, detail="Run worker is not ready.")
-    stopped_by_runner = await runner_mod.runner.stop(run_id)
+async def _stop_run_internal(run_id: str, *, finalize: bool = True) -> bool:
+    """Stop a run's live execution by cancelling the in-flight spine task and
+    waiting for it to wind down (the cancel aborts the opencode agent session
+    via the session driver's cleanup).
+
+    ``finalize`` picks the semantics:
+
+    * ``True`` (user PAUSE): flag a cooperative stop on the broker so the spine's
+      CancelledError handler emits a ``review_summary`` of the work done so far +
+      ``done`` — the run reads as finished early, not failed.
+    * ``False`` (DELETE): hard kill — the broker pushes a terminal error and
+      marks the run done before the row is wiped; no summary is built.
+
+    Returns True if anything was actually stopped (a flagged/killed live run or a
+    running spine task), False if the run was already finished/unknown. Never
+    raises on an already-finished run — callers that need the 404 semantics check
+    the return value themselves.
+    """
+    stopped_by_runner = False
+    if runner_mod.runner is not None:
+        if finalize:
+            stopped_by_runner = runner_mod.runner.request_stop(run_id)
+        else:
+            stopped_by_runner = await runner_mod.runner.stop(run_id)
     task = _SPINE_TASKS.get(run_id)
     cancelled_task = False
     if task is not None and not task.done():
@@ -1224,9 +1243,60 @@ async def stop_run(run_id: str):
             pass
         except asyncio.TimeoutError:
             logger.warning("Timed out waiting for spine task %s to stop", run_id)
-    if not stopped_by_runner and not cancelled_task:
+    return stopped_by_runner or cancelled_task
+
+
+@router.post("/api/runs/{run_id}/stop")
+async def stop_run(run_id: str):
+    if runner_mod.runner is None:
+        raise HTTPException(status_code=503, detail="Run worker is not ready.")
+    # User pause → finalize with a summary (not a hard kill).
+    if not await _stop_run_internal(run_id, finalize=True):
         raise HTTPException(status_code=404, detail="Run not found or already finished.")
     return {"status": "stopped"}
+
+
+@router.delete("/api/runs/{run_id}", status_code=204)
+async def delete_run(run_id: str, request: Request):
+    """Delete a run end-to-end: stop its live execution, then remove every trace
+    of it so the frontend and backend stay in lock-step. Order matters — we stop
+    BEFORE deleting so neither the opencode agent nor the spine can write a cell
+    or recreate a file mid-teardown.
+
+    Removes the run from all three storage locations:
+    - ``var/state.db``: the ``runs`` row + every child row (cells, field_codes,
+      run_executions, run_members, events) via ``ON DELETE CASCADE``;
+    - ``var/runs/<run_id>/``: the run directory (context.json, the
+      ``cells.sqlite`` symlink — the real DB lives at ``var/state.db`` and is
+      already cleared by the cascade);
+    - ``auth.sqlite``: the attribution row, so the run no longer reappears in the
+      user's sidebar history on reload.
+    """
+    user = current_user(request)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    store = Store(runtime_role="api_app")
+    try:
+        run = store.get_run(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail="Run not found.")
+        if run.user_id is None or run.user_id != user["id"]:
+            raise HTTPException(status_code=403, detail="Run ownership required to delete.")
+
+        # 1. STOP the live execution (opencode session + spine task) and wait.
+        #    Hard kill — the run is about to be deleted, so don't spend effort
+        #    finalizing a summary for it.
+        await _stop_run_internal(run_id, finalize=False)
+
+        # 2. DELETE from all three stores.
+        store.delete_run(run_id)
+        _SPINE_TASKS.pop(run_id, None)
+        shutil.rmtree(RUNS_DIR / run_id, ignore_errors=True)
+        auth_store.delete_run_attribution(run_id)
+    finally:
+        store.close()
+    return Response(status_code=204)
 
 
 @router.post("/api/runs/{run_id}/refresh", response_model=RunRefreshResponse, status_code=200)
@@ -1273,21 +1343,6 @@ async def refresh_run(run_id: str):
         finally:
             store.close()
 
-        workbook_path = run_dir / "result.xlsx"
-        if not workbook_path.exists():
-            try:
-                workbook_source = _resolve_audit_excel(audit_id)
-            except HTTPException as exc:
-                detail = exc.detail
-                message = detail.get("message") if isinstance(detail, dict) else str(detail)
-                _raise_refresh_error(
-                    409,
-                    "RUN_NOT_REFRESHABLE",
-                    "Run cannot be refreshed because neither result workbook nor source audit file "
-                    f"is available: {message}",
-                )
-            shutil.copy2(workbook_source, workbook_path)
-
         execution_id = _new_execution_id()
         _start_spine_run(
             run_id,
@@ -1295,7 +1350,6 @@ async def refresh_run(run_id: str):
             audit_id,
             database_id,
             refresh_filters,
-            workbook_path,
             execution_id=execution_id,
         )
         return RunRefreshResponse(runId=run_id, executionId=execution_id, status="started")

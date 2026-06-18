@@ -57,6 +57,7 @@ class _MappingLLMOutput(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     description: Any = None
+    database_summaries: Any = None
     identity: Any = None
     regions: Any = Field(default_factory=list)
     fields: Any = Field(default_factory=list)
@@ -76,6 +77,9 @@ criteria_bindings; those are added by the caller):
 
 {
   "description": "<one paragraph: which database/table holds the primary entity and where each major group of fields comes from>",
+  "database_summaries": {
+    "<db slug>": "<ONE sentence: what THIS audit draws from THIS database, e.g. 'Patient demographics and registration details joined per visit.'>"
+  },
   "identity": {
     "anchor": "<db> -> <table>.<column>",
     "grain": "<prose, e.g. 'one patient per birth record'>",
@@ -97,6 +101,10 @@ criteria_bindings; those are added by the caller):
 }
 
 Rules:
+- `database_summaries` carries one entry PER database you were given (key = the db
+  slug, exactly as given): a single TEMPLATE-SPECIFIC sentence saying what this
+  audit draws from that database — name the role its bound tables play for THIS
+  audit, not a generic description of the database.
 - Map EVERY audit field into its region, keeping the SAME `cell` letter and `header`
   text. Do not add, drop, rename, or reorder fields.
 - Carry each region's `sheet`, `data_range`, and `row_id` THROUGH from the audit —
@@ -187,9 +195,31 @@ def _render_database_model(db: dict[str, Any]) -> str:
                 f"  {db.get('database')} -> {link.get('column')}"
                 f"  =  {link.get('target')}  ({link.get('evidence')})"
             )
+    fks = db.get("foreign_keys") or []
+    if fks:
+        lines.append(
+            "Within-database foreign keys (FACTS — value-overlap profiled at "
+            "indexing; use these to author join_path and to reach columns in "
+            "non-anchor tables, never a name-based guess):"
+        )
+        for fk in fks:
+            trust = "declared" if fk.get("declared") else fk.get("evidence")
+            lines.append(
+                f"  {fk.get('column')} -> {fk.get('target')}"
+                f"  [{fk.get('cardinality')}]  ({trust})"
+            )
+    notes = ((db.get("conventions") or {}).get("notes")) or []
+    if notes:
+        lines.append("Database-wide conventions (orientation):")
+        for note in notes:
+            lines.append(f"  - {note}")
     lines.append("Tables:")
     for t in db.get("tables", []) or []:
-        lines.append(f"  {t.get('name', '?')} — {t.get('description', '')}")
+        grain = t.get("grain")
+        head = f"  {t.get('name', '?')} — {t.get('description', '')}"
+        if grain:
+            head += f" [grain: {grain}]"
+        lines.append(head)
         for col in t.get("columns", []) or []:
             lines.append(_render_column(col))
     return "\n".join(lines)
@@ -286,6 +316,15 @@ def _assemble(audit_id: str, database_ids: list[str], prose: dict[str, Any]) -> 
     a `criteria_bindings: []` skeleton owned by A6.1 (§3.3)."""
     regions = [r for r in (_clean_region(x) for x in _as_item_list(prose.get("regions"))) if r]
     fields = [f for f in (_clean_field(x) for x in _as_item_list(prose.get("fields"))) if f]
+    # Template-specific per-database one-liners for the library chips (doc 9).
+    # Only entries for databases actually bound survive; absent/empty entries
+    # simply fall back to the model.json summary in the UI (schema: optional).
+    raw_summaries = prose.get("database_summaries")
+    database_summaries = {
+        db: _clean_str(raw_summaries.get(db))
+        for db in database_ids
+        if isinstance(raw_summaries, dict) and _clean_str(raw_summaries.get(db))
+    }
     model: dict[str, Any] = {
         "schema_version": "1",
         "audit": audit_id,
@@ -301,6 +340,8 @@ def _assemble(audit_id: str, database_ids: list[str], prose: dict[str, Any]) -> 
         # build_criteria.py; emitted empty here so the skeleton stays schema-valid.
         "fixed_criteria": [],
     }
+    if database_summaries:
+        model["database_summaries"] = database_summaries
     return model
 
 
@@ -385,6 +426,18 @@ async def build_audit_database_mapping(
             if not problems and not model["fields"]:
                 problems = ["no usable fields were produced"]
             if not problems:
+                # Builder-level requirement (schema keeps the key optional for old
+                # documents): a fresh mapping carries one summary per bound db.
+                missing = [
+                    db for db in database_ids
+                    if not (model.get("database_summaries") or {}).get(db)
+                ]
+                if missing:
+                    problems = [
+                        "database_summaries is missing an entry for: "
+                        + ", ".join(missing)
+                    ]
+            if not problems:
                 # A6.1 fills the criteria_bindings/not_expressible skeleton via its
                 # own (second) LLM call, linking to the identity just resolved.
                 model = await attach_criteria_bindings(model, audit, databases)
@@ -396,7 +449,12 @@ async def build_audit_database_mapping(
                 # the error into `problems` so the match gets another LLM attempt rather
                 # than dying on a fixable mistake.
                 try:
-                    return fold_executable(model)
+                    # Thread the measured within-database FK graph + conventions so
+                    # the compiler can emit multi-hop direct JOINs (Phase C) instead
+                    # of demoting non-key-table fields to interpret.
+                    join_graph = {db: m.get("foreign_keys", []) for db, m in databases}
+                    convs = {db: m.get("conventions", {}) for db, m in databases}
+                    return fold_executable(model, join_graph=join_graph, conventions=convs)
                 except BuildError as exc:
                     problems = [f"the match did not compile into an executable: {exc}"]
         logger.warning(

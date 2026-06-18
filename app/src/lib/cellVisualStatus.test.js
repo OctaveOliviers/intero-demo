@@ -2,6 +2,34 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { CELL_VISUAL_STATUS, mapCellVisualStatus } from "./cellVisualStatus.js";
 
+test("maps state=blocked to its own blocked status (not needs_review)", () => {
+  // A blocked cell carries confidence=low + agent provenance; it must read as
+  // blocked, not be mis-coloured as needs_review via the confidence rule.
+  const status = mapCellVisualStatus({
+    state: "blocked",
+    confidence: "low",
+    reason_code: "NOT_LOCATED",
+  });
+  assert.equal(status, CELL_VISUAL_STATUS.BLOCKED);
+});
+
+test("a blocked cell acknowledged on dwell (review_state=reviewed) reads as blocked_seen", () => {
+  // The viewer sets review_state=reviewed after the dwell; blocked then recedes
+  // from red to gray (mirrors needs_review -> reviewed) while unseen blocks stay red.
+  const status = mapCellVisualStatus({
+    state: "blocked",
+    confidence: "low",
+    reason_code: "NOT_LOCATED",
+    review_state: "reviewed",
+  });
+  assert.equal(status, CELL_VISUAL_STATUS.BLOCKED_SEEN);
+});
+
+test("a reviewed cell is settled even at low confidence", () => {
+  const status = mapCellVisualStatus({ review_state: "reviewed", confidence: "low" });
+  assert.equal(status, CELL_VISUAL_STATUS.REVIEWED);
+});
+
 test("maps state=not_applicable to legacy even when review signals exist", () => {
   const status = mapCellVisualStatus({
     state: "not_applicable",

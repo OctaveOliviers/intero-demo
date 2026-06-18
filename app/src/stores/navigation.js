@@ -6,6 +6,7 @@
 import { writable, get } from "svelte/store";
 import { audits, currentAuditId } from "./audits.js";
 import { closePanel as closeResultPanel, activeCommand } from "./resultViewUi.js";
+import { openWorkbook } from "./chat.js";
 
 export const currentView = writable("home");
 export const selectedTemplate = writable(null);
@@ -54,9 +55,17 @@ export function selectTemplate(template) {
   currentView.set("config");
 }
 
-// Open an audit from the sidebar. The derived live views pick up the record's
-// stored activity/workbook/summary the moment currentAuditId changes; a run
-// that is still the active stream reads as "running" via the derived status.
+// Open an audit from the sidebar. Switch the view immediately (the derived live
+// views pick up the record the moment currentAuditId changes), then recover the
+// run from the backend: openWorkbook re-fetches the state.db snapshot — so a run
+// reopened after a sign-out, a closed browser, or a fresh session shows EVERY
+// cell the agent wrote (out-of-process, straight to state.db), not the stale
+// localStorage copy — and reconnects the live SSE stream when the run is still
+// in flight, so any remaining streamed events keep filling the grid. This is the
+// trigger PR #241's recovery was missing: its only other caller (the spreadsheet
+// chip) is not mounted anywhere. Fire-and-forget: the view is already up; the
+// snapshot + reconnect land when they resolve. openWorkbook focuses (never
+// refetches) the run that is actively streaming, so this can't clobber a live fill.
 export function selectAudit(id) {
   const entry = get(audits).find((a) => a.id === id);
   if (!entry) return;
@@ -65,6 +74,7 @@ export function selectAudit(id) {
   currentAuditId.set(id);
   selectedTemplate.set(null);
   currentView.set("results");
+  if (entry.runId) void openWorkbook(entry.runId);
 }
 
 export function goHome() {

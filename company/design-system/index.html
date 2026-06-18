@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Melodic Health Design System</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="top__inner">
+        <p class="kicker">Melodic Health</p>
+        <h1>Design System</h1>
+        <p class="subtitle">
+          A single visual reference for brand tokens, typography, spacing, UI conventions, and
+          reusable HTML slide style.
+        </p>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="toc">
+        <h2>Contents</h2>
+        <nav>
+          <a href="#color">Color Tokens</a>
+          <a href="#type">Typography</a>
+          <a href="#spacing">Spacing Scale</a>
+          <a href="#components">Components</a>
+          <a href="#slide">Slide Style</a>
+        </nav>
+      </aside>
+
+      <section class="content">
+        <article id="color" class="card">
+          <h2>Color Tokens</h2>
+          <p class="desc">Use these variables in all website and slide CSS.</p>
+          <div class="swatch-grid">
+            <div class="swatch">
+              <span class="chip chip--bg"></span>
+              <strong>--bg</strong>
+              <code>#081622</code>
+            </div>
+            <div class="swatch">
+              <span class="chip chip--surface"></span>
+              <strong>--surface</strong>
+              <code>#0f2436</code>
+            </div>
+            <div class="swatch">
+              <span class="chip chip--brand"></span>
+              <strong>--brand</strong>
+              <code>#38b6ff</code>
+            </div>
+            <div class="swatch">
+              <span class="chip chip--accent"></span>
+              <strong>--accent</strong>
+              <code>#2dd4bf</code>
+            </div>
+            <div class="swatch">
+              <span class="chip chip--text"></span>
+              <strong>--text</strong>
+              <code>#f5fbff</code>
+            </div>
+            <div class="swatch">
+              <span class="chip chip--muted"></span>
+              <strong>--muted</strong>
+              <code>#adc7dd</code>
+            </div>
+          </div>
+        </article>
+
+        <article id="type" class="card">
+          <h2>Typography</h2>
+          <p class="desc">Default stack: Satoshi, Outfit, Avenir Next, Segoe UI, sans-serif.</p>
+          <div class="type-specs">
+            <p class="display">Display 56 / 1.05 / -0.03em</p>
+            <p class="h2">Heading 32 / 1.15 / -0.02em</p>
+            <p class="body">Body 18 / 1.55 regular for product and narrative text.</p>
+            <p class="meta">Meta 13 / 0.14em uppercase for labels only.</p>
+          </div>
+        </article>
+
+        <article id="spacing" class="card">
+          <h2>Spacing Scale</h2>
+          <p class="desc">Base unit = 4px. Use token steps only.</p>
+          <div class="space-list">
+            <div class="space-row"><code>--s-1: 4px</code><span style="width: 4px"></span></div>
+            <div class="space-row"><code>--s-2: 8px</code><span style="width: 8px"></span></div>
+            <div class="space-row"><code>--s-3: 12px</code><span style="width: 12px"></span></div>
+            <div class="space-row"><code>--s-4: 16px</code><span style="width: 16px"></span></div>
+            <div class="space-row"><code>--s-6: 24px</code><span style="width: 24px"></span></div>
+            <div class="space-row"><code>--s-8: 32px</code><span style="width: 32px"></span></div>
+            <div class="space-row"><code>--s-12: 48px</code><span style="width: 48px"></span></div>
+          </div>
+        </article>
+
+        <article id="components" class="card">
+          <h2>Components</h2>
+          <p class="desc">Reference styling for buttons, cards, and fields.</p>
+          <div class="component-grid">
+            <div class="component-block">
+              <h3>Buttons</h3>
+              <div class="button-row">
+                <button class="btn btn--primary">Primary Action</button>
+                <button class="btn btn--secondary">Secondary Action</button>
+              </div>
+            </div>
+            <div class="component-block">
+              <h3>Card</h3>
+              <div class="sample-card">
+                <p class="sample-kicker">Status</p>
+                <h4>Ready for Review</h4>
+                <p>Use 16px radius, soft border, and subtle gradient surface.</p>
+              </div>
+            </div>
+            <div class="component-block">
+              <h3>Form Field</h3>
+              <label class="field">
+                <span>Label</span>
+                <input type="text" value="Example value" />
+              </label>
+            </div>
+          </div>
+        </article>
+
+        <article id="slide" class="card">
+          <h2>Slide Style (HTML)</h2>
+          <p class="desc">Template style for future presentation pages.</p>
+          <div class="slide-preview">
+            <div>
+              <p class="slide-eyebrow">Q3 Strategy</p>
+              <h3>Care coordination at system scale</h3>
+              <p>
+                Collaboration across clinical, operational, and data teams drives measurable
+                progress in quality and outcomes.
+              </p>
+            </div>
+            <ul>
+              <li>One message per slide</li>
+              <li>High contrast typography</li>
+              <li>One accent color per deck</li>
+            </ul>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

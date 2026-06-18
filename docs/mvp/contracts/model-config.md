@@ -61,6 +61,25 @@ Example `models.local.json` — point mapping at a cloud model, leave everything
 }
 ```
 
+Example — point `tier2` (one fast LLM call per unresolved cell) at a small,
+fast model with **reasoning switched off**. "Off reasoning" is spelled
+differently per endpoint, so it rides on the raw `extra_body` passthrough:
+
+```jsonc
+{
+  "stages": {
+    "tier2": {
+      "provider": "openai-compatible",
+      "model": "fast-mini",
+      "endpoint": "https://my-fast-endpoint/v1",
+      "api_key_env": "FAST_LLM_API_KEY",
+      "extra_body": { "reasoning_effort": "none" }   // or {"enable_thinking": false},
+                                                      // or {"chat_template_kwargs": {"enable_thinking": false}}
+    }
+  }
+}
+```
+
 ### Stage keys (closed set)
 
 | Stage | Consumer |
@@ -84,6 +103,7 @@ An unknown stage key in either file is a **startup error** (typos must not silen
 | `api_key_env` | no | Name of the env var holding the bearer key. Omit for local endpoints. |
 | `temperature` | no | Per-stage override; stage code's default applies if omitted. |
 | `max_tokens` | no | Per-stage override; stage code's default applies if omitted. |
+| `extra_body` | no | An object merged **verbatim, last** into the chat/completions request body — the escape hatch for endpoint-specific params the closed set above doesn't name (most often disabling a model's reasoning/thinking; the key varies by vendor — `reasoning_effort`, `enable_thinking`, `chat_template_kwargs`). A key here overrides the computed body, so it's a raw passthrough: only put what the endpoint understands. A value of **`null` DROPS that key** from the body — the way to swap a computed default for an endpoint-specific name. E.g. OpenAI **reasoning models** (o-series / GPT-5 family) reject `max_tokens` and a non-default `temperature`: `"extra_body": {"max_tokens": null, "max_completion_tokens": 10000, "temperature": null, "reasoning_effort": "minimal"}`. |
 
 ## Startup behaviour — endpoint readiness, never downloads
 

@@ -17,50 +17,31 @@ from core.mapping.build_audit_database_map import build_audit_database_mapping
 _SCHEMA_FILE = "mapping.schema.json"
 
 
-def _resolve_existing_path(paths: list[Path]) -> Path | None:
-    for path in paths:
-        if path.exists():
-            return path
-    return None
-
-
-def _load_first_existing_json(kind: str, candidates: list[Path]) -> tuple[Path, dict] | None:
-    path = _resolve_existing_path(candidates)
-    if path is None:
-        attempted = ", ".join(str(p) for p in candidates)
-        print(f"ERROR: {kind} not found. Tried: {attempted}", file=sys.stderr)
+def _load_json(kind: str, path: Path) -> dict | None:
+    if not path.exists():
+        print(f"ERROR: {kind} not found: {path}", file=sys.stderr)
         return None
-    return path, json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _check_inputs(audit_id: str, database_ids: list[str]) -> tuple[dict, list[tuple[str, dict]]]:
-    audit_candidates = [
-        AUDITS_DIR / audit_id / "spec.json",
-        AUDITS_DIR / audit_id / "audit.json",  # legacy fixture name
-    ]
+    audit_path = AUDITS_DIR / audit_id / "spec.json"
     ok = True
-    audit_loaded = _load_first_existing_json(f"audit '{audit_id}'", audit_candidates)
-    if audit_loaded is None:
+    audit = _load_json(f"audit '{audit_id}'", audit_path)
+    if audit is None:
         ok = False
 
     database_payloads: list[tuple[str, dict]] = []
     for database_id in database_ids:
-        db_candidates = [
-            DATABASES_DIR / database_id / "model.json",
-            DATABASES_DIR / database_id / "database.json",  # legacy fixture name
-        ]
-        db_loaded = _load_first_existing_json(f"database '{database_id}'", db_candidates)
-        if db_loaded is None:
+        db_path = DATABASES_DIR / database_id / "model.json"
+        database = _load_json(f"database '{database_id}'", db_path)
+        if database is None:
             ok = False
         else:
-            _, database = db_loaded
             database_payloads.append((database_id, database))
 
     if not ok:
         sys.exit(1)
-
-    assert audit_loaded is not None
-    _, audit = audit_loaded
     return audit, database_payloads
 
 

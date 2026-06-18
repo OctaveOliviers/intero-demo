@@ -19,7 +19,7 @@ export const execute = tool({
 
   • {"field": "delivery"}                 -> the field's type, permitted codes, and notes
   • {"audit": true}                       -> the audit's field list (ids + names)
-  • {"database": "cord-ph"}               -> that database's table names
+  • {"database": "cord-ph"}               -> the database digest: per-table grain + row counts, the foreign-key/identity join graph, and conventions (use the graph to write multi-hop joins)
   • {"database": "cord-ph", "table": "t"} -> that table's columns`,
   args: {
     field: tool.schema.string().optional().describe("An audit field id, e.g. \"delivery\"."),

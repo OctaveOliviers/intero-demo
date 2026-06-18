@@ -273,22 +273,6 @@ export async function createRunFromDescription(prompt) {
   return res.json();
 }
 
-export async function createRun(templateFile, prompt) {
-  const form = new FormData();
-  form.append("template", templateFile);
-  form.append("prompt", prompt);
-  const res = await fetch(`${API_BASE}/api/runs`, {
-    method: "POST",
-    body: form,
-  });
-  await throwIfUnauthorized(res);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || "Upload failed");
-  }
-  return res.json();
-}
-
 export async function getWorkbook(runId) {
   if (isMockMode("runs")) return mockGetWorkbook(runId);
   const res = await fetch(`${API_BASE}/api/runs/${runId}/workbook`);
@@ -322,6 +306,20 @@ export async function stopRun(runId) {
     throw new Error(err.detail || "Stop failed");
   }
   return res.json();
+}
+
+// Delete a run end-to-end on the backend: stops its live execution, then removes
+// its state-DB rows (cells included), its var/runs/<id> directory, and its
+// attribution. A 404 means it is already gone — treat that as success so the
+// sidebar entry is still removed locally.
+export async function deleteRun(runId) {
+  if (isMockMode("runs")) return;
+  const res = await fetch(`${API_BASE}/api/runs/${runId}`, { method: "DELETE" });
+  await throwIfUnauthorized(res);
+  if (!res.ok && res.status !== 404) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Delete failed");
+  }
 }
 
 export async function refreshRun(runId) {

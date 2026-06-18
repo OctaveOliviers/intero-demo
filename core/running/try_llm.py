@@ -41,7 +41,10 @@ class TriageDecision(BaseModel):
     """The Tier-2 LLM's per-cell decision — a constrained structured output. The
     field descriptions ARE the prompt schema sent to the model."""
 
-    model_config = {"extra": "forbid"}
+    # Tolerant of surplus fields: a real model often adds a stray key, and
+    # rejecting the whole reply over it just strands the cell. Unknown fields
+    # are ignored; shape mismatches are COERCED (see the validator below).
+    model_config = {"extra": "ignore"}
 
     decision: Literal["solution", "retry", "escalate"] = Field(
         description=(
@@ -81,16 +84,23 @@ class TriageDecision(BaseModel):
     )
 
     @model_validator(mode="after")
-    def _shape_matches_decision(self) -> "TriageDecision":
-        if self.decision in ("solution", "retry"):
-            if not (self.output and self.output.strip()):
-                raise ValueError(f"output required when decision={self.decision!r}")
-        elif self.output is not None:
-            raise ValueError("output must be null when decision='escalate'")
-        if self.decision != "solution" and (
-            self.citations or self.explanation or self.source_column
-        ):
-            raise ValueError("citations/explanation/source_column are solution-only")
+    def _coerce_to_valid_shape(self) -> "TriageDecision":
+        """Coerce a reply into a valid decision shape rather than reject it.
+
+        Real models attach solution-only context (``citations`` /
+        ``explanation`` / ``source_column``) to a ``retry`` / ``escalate`` reply,
+        or leave a stray ``output`` on an ``escalate``. A VALID decision must
+        never be thrown away over those surplus fields — that strands the cell in
+        a "triage failed" limbo instead of letting it retry / escalate. We never
+        FABRICATE, though: a ``solution`` or ``retry`` that carries no usable
+        output has nothing to act on, so it degrades to ``escalate`` (hand to the
+        agent) rather than fill a value out of thin air."""
+        if self.decision in ("solution", "retry") and not (self.output and self.output.strip()):
+            self.decision = "escalate"
+        if self.decision == "escalate":
+            self.output = None
+        if self.decision != "solution":
+            self.citations = self.explanation = self.source_column = None
         return self
 
 
@@ -198,6 +208,21 @@ def _schema_hint_for_cell(cell, model: dict[str, Any] | None) -> str | None:
             cdesc = _render_value(col.get("description") or "")
             lines.append(f"    - {tname}.{cname} [{ctype}] {cdesc}".rstrip())
             shown += 1
+
+    # Measured within-database joins among the shown tables, so Tier 2 can author a
+    # multi-hop SQL to reach a column in a non-anchor table instead of guessing.
+    chosen_names = {str(t.get("name") or "") for t in chosen}
+    fks = model.get("foreign_keys") if isinstance(model.get("foreign_keys"), list) else []
+    join_lines = [
+        f"  {fk.get('column')} -> {fk.get('target')} [{fk.get('cardinality')}]"
+        for fk in fks
+        if isinstance(fk, dict)
+        and str(fk.get("column", "")).split(".", 1)[0] in chosen_names
+        and str(fk.get("target", "")).split(".", 1)[0] in chosen_names
+    ][:_MAX_SCHEMA_TABLES]
+    if join_lines:
+        lines.append("joins:")
+        lines.extend(join_lines)
     return "\n".join(lines)
 
 

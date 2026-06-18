@@ -15,6 +15,8 @@
 
 export const CELL_VISUAL_STATUS = Object.freeze({
   LEGACY: "legacy",
+  BLOCKED: "blocked",
+  BLOCKED_SEEN: "blocked_seen",
   NEEDS_REVIEW: "needs_review",
   REVIEWED: "reviewed",
 });
@@ -57,17 +59,22 @@ function readMetaField(meta, keys) {
 }
 
 /**
- * Map cell metadata to a visual status.
+ * Map cell metadata to a visual status (drives the cell background colour).
  *
  * Precedence:
- * 1) state=not_applicable -> legacy
- * 2) confidence=low|medium -> needs_review
- * 3) review_state=not_reviewed -> needs_review
- * 4) kind=interpret|interpretive with missing review_state -> needs_review
- * 5) otherwise -> reviewed
+ * 1) state=blocked -> blocked (red) until the user has dwelt on it, then
+ *    blocked_seen (gray) once review_state=reviewed — mirrors needs_review ->
+ *    reviewed, so seen blocks recede and unseen ones still stand out in red.
+ * 2) state=not_applicable -> legacy
+ * 3) review_state=reviewed -> reviewed (clinician signed off; settled even if
+ *    low confidence)
+ * 4) review_state=not_reviewed -> needs_review
+ * 5) confidence=low|medium -> needs_review
+ * 6) kind=interpret|interpretive with missing review_state -> needs_review
+ * 7) otherwise -> reviewed
  *
  * @param {CellVisualStatusMeta | null | undefined} meta
- * @returns {"legacy" | "needs_review" | "reviewed"}
+ * @returns {"legacy" | "blocked" | "needs_review" | "reviewed"}
  */
 export function mapCellVisualStatus(meta) {
   const state = normalize(readMetaField(meta, ["state", "audit_state"]));
@@ -75,15 +82,30 @@ export function mapCellVisualStatus(meta) {
   const reviewState = normalize(readMetaField(meta, ["review_state", "reviewState"]));
   const kind = normalize(readMetaField(meta, ["kind"]));
 
+  if (state === "blocked") {
+    // Same acknowledge-on-dwell semantics as interpret cells: a blocked cell
+    // is red until the user has looked at it (the viewer sets review_state=
+    // reviewed after the dwell), then gray. The backend never sets review_state
+    // on blocked cells (the triggers touch only filled interpret cells), so
+    // "reviewed" here can only have come from that client-side acknowledgement.
+    return reviewState === "reviewed"
+      ? CELL_VISUAL_STATUS.BLOCKED_SEEN
+      : CELL_VISUAL_STATUS.BLOCKED;
+  }
+
   if (state === "not_applicable") {
     return CELL_VISUAL_STATUS.LEGACY;
   }
 
-  if (confidence === "low" || confidence === "medium") {
-    return CELL_VISUAL_STATUS.NEEDS_REVIEW;
+  if (reviewState === "reviewed") {
+    return CELL_VISUAL_STATUS.REVIEWED;
   }
 
   if (reviewState === "not_reviewed") {
+    return CELL_VISUAL_STATUS.NEEDS_REVIEW;
+  }
+
+  if (confidence === "low" || confidence === "medium") {
     return CELL_VISUAL_STATUS.NEEDS_REVIEW;
   }
 

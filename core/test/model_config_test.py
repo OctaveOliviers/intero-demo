@@ -24,7 +24,7 @@ def _entry(**overrides):
 
 
 class _Root:
-    """Context manager: a temp repo root with optional models(.local).json."""
+    """Context manager: a temp repo root with optional models(.local).yaml."""
 
     def __init__(self, models=None, local=None):
         self.models = models
@@ -33,10 +33,12 @@ class _Root:
     def __enter__(self):
         self._tmp = tempfile.TemporaryDirectory()
         root = Path(self._tmp.name)
+        # JSON is a YAML subset, so dumping the fixtures as JSON keeps the
+        # fixtures simple AND pins that JSON-style content still loads.
         if self.models is not None:
-            (root / "models.json").write_text(json.dumps({"stages": self.models}))
+            (root / "models.yaml").write_text(json.dumps({"stages": self.models}))
         if self.local is not None:
-            (root / "models.local.json").write_text(json.dumps({"stages": self.local}))
+            (root / "models.local.yaml").write_text(json.dumps({"stages": self.local}))
         return root
 
     def __exit__(self, *exc):
@@ -51,9 +53,9 @@ class LoadMergeTest(unittest.TestCase):
         ) as root:
             merged = model_config.load_merged(root)
             self.assertEqual(merged["tier2"]["model"], "cloud")
-            self.assertEqual(merged["tier2"]["_source"], "models.local.json")
+            self.assertEqual(merged["tier2"]["_source"], "models.local.yaml")
             self.assertEqual(merged["mapping"]["model"], "map-model")
-            self.assertEqual(merged["mapping"]["_source"], "models.json")
+            self.assertEqual(merged["mapping"]["_source"], "models.yaml")
 
     def test_no_config_files_is_empty(self):
         with _Root() as root:
@@ -63,7 +65,7 @@ class LoadMergeTest(unittest.TestCase):
         with _Root(models={"tier9": _entry()}) as root:
             with self.assertRaises(ModelConfigError) as ctx:
                 model_config.load_merged(root)
-            self.assertIn("models.json", str(ctx.exception))
+            self.assertIn("models.yaml", str(ctx.exception))
             self.assertIn("tier9", str(ctx.exception))
 
     def test_reserved_filters_stage_is_rejected(self):
@@ -87,12 +89,18 @@ class LoadMergeTest(unittest.TestCase):
             with self.assertRaises(ModelConfigError):
                 model_config.load_merged(root)
 
-    def test_invalid_json_errors_naming_file(self):
+    def test_invalid_yaml_errors_naming_file(self):
         with _Root() as root:
-            (root / "models.json").write_text("{not json")
+            (root / "models.yaml").write_text("{not yaml")
             with self.assertRaises(ModelConfigError) as ctx:
                 model_config.load_merged(root)
-            self.assertIn("models.json", str(ctx.exception))
+            self.assertIn("models.yaml", str(ctx.exception))
+
+    def test_non_object_extra_body_is_rejected(self):
+        with _Root(models={"tier2": _entry(extra_body="reasoning=off")}) as root:
+            with self.assertRaises(ModelConfigError) as ctx:
+                model_config.load_merged(root)
+            self.assertIn("extra_body", str(ctx.exception))
 
 
 class ResolveStageTest(unittest.TestCase):
@@ -120,7 +128,15 @@ class ResolveStageTest(unittest.TestCase):
         self.assertEqual(cfg.api_key, "secret")
         self.assertEqual(cfg.temperature, 0.1)
         self.assertEqual(cfg.max_tokens, 512)
-        self.assertEqual(cfg.source, "models.json")
+        self.assertEqual(cfg.source, "models.yaml")
+
+    def test_extra_body_resolves_and_defaults_empty(self):
+        body = {"reasoning_effort": "none", "enable_thinking": False}
+        with _Root(models={"tier2": _entry(extra_body=body)}) as root:
+            self.assertEqual(model_config.resolve_stage("tier2", root).extra_body, body)
+        # Absent → empty dict (the merge is then a no-op).
+        with _Root(models={"tier2": _entry()}) as root:
+            self.assertEqual(model_config.resolve_stage("tier2", root).extra_body, {})
 
     def test_unknown_stage_name_errors(self):
         with self.assertRaises(ModelConfigError):

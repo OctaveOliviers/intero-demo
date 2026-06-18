@@ -32,7 +32,6 @@ from server.models.runs import (
 )
 from server.models.sql import SqlQuery, SqlResponse
 from server.models.workbook import (
-    CellMetadata,
     SheetColumnMeta,
     SheetData,
     SheetMeta,
@@ -44,7 +43,6 @@ __all__ = [
     "AuditDetailResponse",
     "AuditRenameRequest",
     "AuditUploadResponse",
-    "CellMetadata",
     "ChipMessage",
     "DatabaseInfo",
     "DatabaseDetailResponse",

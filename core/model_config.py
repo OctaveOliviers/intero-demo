@@ -2,8 +2,8 @@
 
 Two files at the repo root:
 
-* ``models.json`` (committed) — working defaults for every stage.
-* ``models.local.json`` (gitignored) — per-deployment override, merged **per
+* ``models.yaml`` (committed) — working defaults for every stage.
+* ``models.local.yaml`` (gitignored) — per-deployment override, merged **per
   stage key** (a stage present locally replaces that stage's entry entirely;
   absent stages fall through to the default).
 
@@ -19,15 +19,15 @@ needed) and stops on shutdown only what it spawned itself.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import subprocess
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,10 @@ _RESERVED_STAGES = ("filters",)
 
 _REQUIRED_FIELDS = ("provider", "model", "endpoint")
 _PROVIDERS = ("ollama", "openai-compatible")
-_ALLOWED_FIELDS = {"provider", "model", "endpoint", "api_key_env", "temperature", "max_tokens"}
+_ALLOWED_FIELDS = {
+    "provider", "model", "endpoint", "api_key_env", "temperature", "max_tokens",
+    "extra_body",
+}
 
 # Ollama servers this module spawned itself (and may therefore stop).
 _spawned: list[subprocess.Popen] = []
@@ -60,7 +63,14 @@ class StageConfig:
     api_key: str
     temperature: float | None = None
     max_tokens: int | None = None
-    # "models.json" / "models.local.json" / "env" — for logs and the run record.
+    # Raw passthrough merged into the chat/completions request body — the escape
+    # hatch for provider-specific params the closed config set does not name, most
+    # notably disabling a model's reasoning/thinking (the spelling varies per
+    # endpoint: e.g. `{"reasoning_effort": "none"}`, `{"enable_thinking": false}`,
+    # `{"chat_template_kwargs": {"enable_thinking": false}}`). Merged LAST, so a key
+    # here wins over the computed body. Empty dict when unset.
+    extra_body: dict = field(default_factory=dict)
+    # "models.yaml" / "models.local.yaml" / "env" — for logs and the run record.
     source: str = "env"
 
 
@@ -68,11 +78,11 @@ def _read_config_file(path: Path) -> dict:
     if not path.is_file():
         return {}
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ModelConfigError(f"{path.name}: not valid JSON ({exc})") from exc
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise ModelConfigError(f"{path.name}: not valid YAML ({exc})") from exc
     if not isinstance(raw, dict):
-        raise ModelConfigError(f"{path.name}: top level must be a JSON object")
+        raise ModelConfigError(f"{path.name}: top level must be a YAML mapping")
     stages = raw.get("stages")
     if stages is None:
         return {}
@@ -126,15 +136,20 @@ def _validate_entry(filename: str, stage: str, entry: object) -> dict:
             raise ModelConfigError(
                 f"{filename}: stage `{stage}` `api_key_env` looks like a literal key — it must NAME an env var"
             )
+    extra_body = entry.get("extra_body")
+    if extra_body is not None and not isinstance(extra_body, dict):
+        raise ModelConfigError(
+            f"{filename}: stage `{stage}` `extra_body` must be an object (merged into the request body)"
+        )
     return entry
 
 
 def load_merged(root: Path | None = None) -> dict[str, dict]:
-    """The merged per-stage config: models.local.json overrides models.json
+    """The merged per-stage config: models.local.yaml overrides models.yaml
     PER STAGE KEY. Raises :class:`ModelConfigError` on any malformed entry."""
     base = root or _ROOT
     merged: dict[str, dict] = {}
-    for filename in ("models.json", "models.local.json"):
+    for filename in ("models.yaml", "models.local.yaml"):
         for stage, entry in _read_config_file(base / filename).items():
             merged[stage] = {**_validate_entry(filename, stage, entry), "_source": filename}
     return merged
@@ -160,6 +175,7 @@ def resolve_stage(stage: str, root: Path | None = None) -> StageConfig:
     api_key_env = entry.get("api_key_env")
     temperature = entry.get("temperature")
     max_tokens = entry.get("max_tokens")
+    extra_body = entry.get("extra_body")
     return StageConfig(
         stage=stage,
         provider=entry["provider"],
@@ -168,6 +184,7 @@ def resolve_stage(stage: str, root: Path | None = None) -> StageConfig:
         api_key=os.environ.get(api_key_env, "") if api_key_env else "",
         temperature=float(temperature) if temperature is not None else None,
         max_tokens=int(max_tokens) if max_tokens is not None else None,
+        extra_body=dict(extra_body) if isinstance(extra_body, dict) else {},
         source=entry["_source"],
     )
 

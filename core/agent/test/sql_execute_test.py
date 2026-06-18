@@ -54,10 +54,23 @@ def _audit() -> dict:
 
 
 def _model() -> dict:
-    return {"database": "cord-ph", "tables": [
-        {"name": "cord_ph_birth_records",
-         "columns": [{"name": "patient_code"}, {"name": "delivery"},
-                     {"name": "cord_arterial_ph"}]}]}
+    return {
+        "database": "cord-ph",
+        "foreign_keys": [
+            {"column": "observations.patient",
+             "target": "cord_ph_birth_records.baby_patient",
+             "cardinality": "to-many", "declared": False,
+             "evidence": "40/40 sampled values found in target"},
+        ],
+        "conventions": {"notes": ["All timestamps are UTC"]},
+        "tables": [
+            {"name": "cord_ph_birth_records", "grain": "one row per baby", "row_count": 10,
+             "columns": [{"name": "patient_code"}, {"name": "delivery"},
+                         {"name": "cord_arterial_ph"}, {"name": "baby_patient"}]},
+            {"name": "observations", "grain": "many rows per baby", "row_count": 40,
+             "columns": [{"name": "patient"}, {"name": "value"}]},
+        ],
+    }
 
 
 class AgentToolsTest(unittest.TestCase):
@@ -286,10 +299,17 @@ class AgentToolsTest(unittest.TestCase):
         self.assertTrue(res["ok"], res)
         self.assertEqual(res["field"]["permitted_values"]["3"], "Forceps")
 
-    def test_lookup_database_lists_tables(self):
+    def test_lookup_database_returns_digest(self):
+        # The {database} selector returns the digest the agent needs to write a
+        # join: per-table grain + the foreign-key graph + conventions.
         res = self._tool("lookup.py", {"database": "cord-ph"})
         self.assertTrue(res["ok"], res)
-        self.assertIn("cord_ph_birth_records", res["tables"])
+        by_name = {t["name"]: t for t in res["tables"]}
+        self.assertEqual(by_name["cord_ph_birth_records"]["grain"], "one row per baby")
+        self.assertEqual(
+            res["foreign_keys"][0]["target"], "cord_ph_birth_records.baby_patient"
+        )
+        self.assertIn("All timestamps are UTC", res["conventions"]["notes"])
 
     def test_lookup_table_lists_columns(self):
         res = self._tool("lookup.py", {"database": "cord-ph", "table": "cord_ph_birth_records"})

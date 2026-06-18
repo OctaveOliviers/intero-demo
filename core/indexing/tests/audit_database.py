@@ -31,6 +31,7 @@ import jsonschema  # noqa: E402
 from core.indexing.build_audit_spec import (  # noqa: E402
     BuilderValidationError,
     _assemble,
+    extract_field_skeleton,
     merge_preserved_state,
 )
 from core.indexing.build_database_model import _assemble as _db_assemble  # noqa: E402
@@ -146,35 +147,38 @@ class FKSeamTest(unittest.TestCase):
         )
 
 
+def _skeleton_sheets(*sheets: tuple[str, list[str]]) -> list[dict]:
+    """Layout stubs: (sheet_name, [header, ...]) pairs → extract_layout shape."""
+    out = []
+    for name, headers in sheets:
+        cells = [
+            {"cell": f"{chr(ord('A') + i)}1", "value": h}
+            for i, h in enumerate(headers)
+        ]
+        out.append({"name": name, "cells": cells})
+    return out
+
+
 class IdDerivationTest(unittest.TestCase):
-    """`_assemble` (paused-but-still-tested) derives `field.id` and mirrors the
-    mapping compile's prefix convention: bare slug for single-section audits,
-    `{section}/{name}` for multi-section ones. Collisions raise — no `_2` suffix,
-    no orphan. These tests pin the contract behavior the resumption work will
-    have to honor."""
+    """`extract_field_skeleton` derives `field.id` MECHANICALLY (T11) and mirrors
+    the mapping compile's prefix convention: bare slug for single-sheet audits,
+    `{sheet}/{header}` for multi-sheet ones. Collisions raise — no `_2` suffix,
+    no orphan."""
 
-    def _spec(self, fields):
-        return {
-            "title": "T", "description": "d", "grain": "g",
-            "sections": [], "fields": fields, "inclusion_criteria": [],
-        }
-
-    def test_single_section_ids_are_bare_slugs_from_name(self):
-        model = _assemble("t", self._spec([
-            {"number": 1, "name": "Patient code", "type": "text"},
-            {"number": 2, "name": "Gestation (weeks)", "type": "number"},
-        ]))
-        self.assertEqual([f["id"] for f in model["fields"]],
+    def test_single_sheet_ids_are_bare_slugs_from_header(self):
+        fields, _ = extract_field_skeleton(
+            _skeleton_sheets(("Data", ["Patient code", "Gestation (weeks)"]))
+        )
+        self.assertEqual([f["id"] for f in fields],
                          ["patient_code", "gestation_weeks"])
 
-    def test_multi_section_ids_are_section_prefixed(self):
-        # Two sections → every id carries the section slug as a prefix. Mirrors
+    def test_multi_sheet_ids_are_sheet_prefixed(self):
+        # Two sheets → every id carries the sheet slug as a prefix. Mirrors
         # `build_populate_spec._field_slug` so the FK chain stays bijective.
-        model = _assemble("t", self._spec([
-            {"number": 1, "section": "ALL", "name": "Patient code", "type": "text"},
-            {"number": 2, "section": "NICU", "name": "Cooled", "type": "category"},
-        ]))
-        self.assertEqual([f["id"] for f in model["fields"]],
+        fields, _ = extract_field_skeleton(
+            _skeleton_sheets(("ALL", ["Patient code"]), ("NICU", ["Cooled"]))
+        )
+        self.assertEqual([f["id"] for f in fields],
                          ["all/patient_code", "nicu/cooled"])
 
     def test_id_collisions_raise_rather_than_suffix(self):
@@ -182,19 +186,14 @@ class IdDerivationTest(unittest.TestCase):
         # mapping cell FK'd into. Duplicates must surface at build time so the
         # source can be disambiguated.
         with self.assertRaises(BuilderValidationError) as cm:
-            _assemble("t", self._spec([
-                {"number": 1, "name": "Apgar", "type": "number"},
-                {"number": 2, "name": "Apgar", "type": "number"},  # collides
-            ]))
+            extract_field_skeleton(_skeleton_sheets(("ALL", ["Apgar", "Apgar"])))
         self.assertIn("duplicate field id", str(cm.exception).lower())
 
     def test_empty_slug_falls_back_to_field_number(self):
-        # An exotic name (CJK, punctuation) can slug to ""; the FK must still be
-        # non-empty and unique.
-        model = _assemble("t", self._spec([
-            {"number": 7, "name": "—", "type": "text"},
-        ]))
-        self.assertEqual(model["fields"][0]["id"], "field_7")
+        # An exotic header (CJK, punctuation) can slug to ""; the FK must still
+        # be non-empty and unique.
+        fields, _ = extract_field_skeleton(_skeleton_sheets(("Data", ["—"])))
+        self.assertEqual(fields[0]["id"], "field_1")
 
 
 class StatePreservationTest(unittest.TestCase):
@@ -204,8 +203,13 @@ class StatePreservationTest(unittest.TestCase):
     (`criterion.id`, `field.number`), so a renamed name or a redrawn field list
     doesn't lose state."""
 
-    def _build(self, prose, previous=None):
-        return merge_preserved_state(_assemble("t", prose), previous)
+    def _build(self, headers, prose, previous=None):
+        skeleton, sheet_names = extract_field_skeleton(
+            _skeleton_sheets(("Data", headers))
+        )
+        return merge_preserved_state(
+            _assemble("t", skeleton, sheet_names, prose), previous
+        )
 
     def test_default_survives_reindex(self):
         old = {
@@ -215,8 +219,9 @@ class StatePreservationTest(unittest.TestCase):
             ],
         }
         new = self._build(
+            ["X"],
             {"title": "T", "description": "d", "grain": "g",
-             "fields": [{"number": 1, "name": "X", "type": "text"}],
+             "fields": [{"number": 1, "type": "text"}],
              "inclusion_criteria": [
                  {"id": "gestation_weeks", "label": "G", "type": "number"},
              ]},
@@ -225,15 +230,17 @@ class StatePreservationTest(unittest.TestCase):
         self.assertEqual(new["inclusion_criteria"][0]["default"], 37)
 
     def test_library_set_field_id_survives_reindex(self):
-        # The seed pattern: `name = "Mode of delivery"` (slugs to
-        # "mode_of_delivery") but the library set `id = "delivery"` so executable
+        # The seed pattern: the header "Mode of delivery" slugs to
+        # "mode_of_delivery", but the library set `id = "delivery"` so executable
         # FKs already in flight stay valid. Re-index must keep "delivery".
         old = {"fields": [
-            {"id": "delivery", "number": 17, "name": "Mode of delivery", "type": "category"},
+            {"id": "delivery", "number": 1, "name": "Mode of delivery", "type": "category"},
         ]}
         new = self._build(
+            ["Mode of delivery"],
             {"title": "T", "description": "d", "grain": "g",
-             "fields": [{"number": 17, "name": "Mode of delivery", "type": "category"}],
+             "fields": [{"number": 1, "type": "category",
+                         "permitted_values": {"1": "SVD"}}],
              "inclusion_criteria": []},
             previous=old,
         )
@@ -242,12 +249,13 @@ class StatePreservationTest(unittest.TestCase):
 
     def test_notes_and_permitted_values_survive_when_regen_left_them_empty(self):
         old = {"fields": [
-            {"id": "delivery", "number": 17, "name": "Mode of delivery", "type": "category",
+            {"id": "delivery", "number": 1, "name": "Mode of delivery", "type": "category",
              "notes": "library-written", "permitted_values": {"1": "SVD", "2": "CS"}},
         ]}
         new = self._build(
+            ["Mode of delivery"],
             {"title": "T", "description": "d", "grain": "g",
-             "fields": [{"number": 17, "name": "Mode of delivery", "type": "category"}],
+             "fields": [{"number": 1, "type": "text"}],
              "inclusion_criteria": []},
             previous=old,
         )
@@ -262,8 +270,9 @@ class StatePreservationTest(unittest.TestCase):
             {"id": "x", "number": 1, "name": "X", "type": "text", "notes": "old"},
         ]}
         new = self._build(
+            ["X"],
             {"title": "T", "description": "d", "grain": "g",
-             "fields": [{"number": 1, "name": "X", "type": "text", "notes": "fresh"}],
+             "fields": [{"number": 1, "type": "text", "notes": "fresh"}],
              "inclusion_criteria": []},
             previous=old,
         )

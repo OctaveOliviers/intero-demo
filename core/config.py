@@ -4,7 +4,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
+# `.env` is the templated base (README quickstart copies `.env.example` → `.env`,
+# which clobbers anything you'd added). `.env.local` is the gitignored,
+# never-templated override for secrets — same precedence pattern as
+# models.local.yaml over models.yaml — so a `.env` reset can't wipe your keys.
+# `.env.local` is loaded second with override=True, so it always wins.
 load_dotenv(ROOT / ".env")
+load_dotenv(ROOT / ".env.local", override=True)
 APP_DIR = ROOT / "app"
 STATIC_DIR = APP_DIR / "static"
 
@@ -42,6 +48,30 @@ LLM_API_BASE = os.environ.get("LLM_API_BASE", "")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
 LLM_MODEL = os.environ.get("LLM_MODEL", "")
 LLM_TIMEOUT = float(os.environ.get("LLM_TIMEOUT", "120"))
+
+
+def tier_enabled(tier: str) -> bool:
+    """Run-engine tier toggle for perf isolation. ``TIER2_ENABLED=0`` skips the
+    per-cell LLM tier (cells go Tier 1 → Tier 3 agent); ``TIER3_ENABLED=0`` skips
+    the agent. Both default on. Read at RUN TIME (not import) so the server's
+    ``--no-tier2`` / ``--no-tier3`` flags — which set these env vars for the
+    reload worker — take effect. Accepts 0/false/no/off (case-insensitive)."""
+    value = os.environ.get(f"{tier.upper()}_ENABLED")
+    if value is None:
+        return True
+    return value.strip().lower() not in ("0", "false", "no", "off", "")
+
+
+def tier_env_overrides(*, no_tier2: bool, no_tier3: bool) -> dict[str, str]:
+    """Map the server's ``--no-tier2`` / ``--no-tier3`` flags to the
+    ``TIER*_ENABLED`` env the run worker reads. Each var is set EXPLICITLY (not
+    only when disabling), so a flag-less start always runs every tier regardless
+    of any stale value left in the shell — the flag, not a sticky export, is the
+    authority for that run."""
+    return {
+        "TIER2_ENABLED": "0" if no_tier2 else "1",
+        "TIER3_ENABLED": "0" if no_tier3 else "1",
+    }
 
 
 def ensure_runs_storage() -> None:

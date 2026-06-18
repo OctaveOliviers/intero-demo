@@ -72,6 +72,20 @@ class PerturbationTest(unittest.TestCase):
         self.assertLess(scored["metrics"]["code_set_match"], 1.0)
         self.assertTrue(any("permitted_values drift" in m for m in scored["mismatches"]))
 
+    def test_criteria_are_matched_at_the_concept_level(self):
+        # Criteria are a ~5-item judgment: a suggested 'gestation' recalls the
+        # golden 'gestation_weeks' (shared significant token), while a genuinely
+        # absent concept still lowers the rate AND is named.
+        cand = copy.deepcopy(SPEC)
+        cand["inclusion_criteria"] = [
+            {"id": "gestation", "label": "Gestation at delivery", "type": "number"},
+            {"id": "mode_of_delivery", "label": "Mode of delivery", "type": "category"},
+        ]
+        scored = score_audit_spec(SPEC, cand)
+        golden_n = len(SPEC["inclusion_criteria"])
+        self.assertEqual(scored["metrics"]["criteria_recall"], round(2 / golden_n, 4))
+        self.assertTrue(any("missing inclusion criterion" in m for m in scored["mismatches"]))
+
     def test_filterable_drift_is_detected(self):
         cand = copy.deepcopy(MODEL)
         flipped = None

@@ -14,6 +14,7 @@
   import { resetChatRuntime } from "../stores/chat.js";
   import { authLogout } from "../lib/api.js";
   import { clearAuth } from "../stores/auth.js";
+  import { addToast } from "../stores/toasts.js";
   import Icon from "./Icon.svelte";
   import SettingsModal from "./SettingsModal.svelte";
   import FeedbackModal from "./FeedbackModal.svelte";
@@ -161,9 +162,18 @@
     }
   }
 
-  function handleDelete(id) {
+  async function handleDelete(id) {
     menuOpenId = null;
-    deleteAudit(id);
+    if (!confirm("Delete this analysis? This permanently removes its run and all its data.")) {
+      return;
+    }
+    try {
+      await deleteAudit(id);
+    } catch (err) {
+      // Backend delete failed — keep the row so the UI never lies about what's stored.
+      addToast({ kind: "error", message: "Could not delete the analysis. Please try again." });
+      console.warn("Delete analysis failed:", err);
+    }
   }
 
   function closeMenus() {
@@ -328,10 +338,12 @@
         <Icon name="feedback" size={18} />
         <span>Feedback</span>
       </button>
+      <!--
       <button class="menu-row" on:click={() => (showSettings = true)}>
         <Icon name="settings" size={18} />
         <span>Settings</span>
       </button>
+      -->
       <button class="menu-row" on:click={handleLogout} disabled={logoutBusy}>
         <Icon name="logout" size={18} />
         <span>{logoutBusy ? "Signing out…" : "Sign out"}</span>
@@ -397,6 +409,7 @@
       >
         <Icon name="feedback" />
       </button>
+      <!--
       <button
         class="icon-btn rail-settings"
         on:click={() => (showSettings = true)}
@@ -405,6 +418,7 @@
       >
         <Icon name="settings" />
       </button>
+      -->
       <button
         class="icon-btn"
         on:click={handleLogout}
@@ -418,9 +432,11 @@
   {/if}
 </aside>
 
+<!--
 {#if showSettings}
   <SettingsModal on:close={() => (showSettings = false)} />
 {/if}
+-->
 
 {#if showFeedback}
   <FeedbackModal on:close={() => (showFeedback = false)} />

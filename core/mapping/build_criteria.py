@@ -117,6 +117,11 @@ Rules:
 - `join_path` and `grain_rule` keep the cohort COUNT correct: every criterion means
   "this cohort member has >=1 matching row" (EXISTS/IN over the anchor), never a
   count-inflating join.
+- When a chosen column lives in a NON-anchor table, express its `join_path` as the
+  measured `foreign_keys` chain reaching the anchor, copied VERBATIM from the
+  facts each database lists (e.g. "registrations.patient_id -> patients.patient_id";
+  cross-database hops follow the `identity_links`). Never invent a join a fact does
+  not support.
 - A concept the database can satisfy ONLY from a free-text column goes in
   `not_expressible` (not in criteria_bindings) — structured filtering only for now.
 - Do NOT include `values`, `range`, or any default value anywhere.
@@ -304,7 +309,13 @@ async def build_criteria_bindings(
                 "fields": audit.get("fields", []),
             },
             "databases": [
-                {"database": db_id, "tables": model.get("tables", [])}
+                {
+                    "database": db_id,
+                    "tables": model.get("tables", []),
+                    "foreign_keys": model.get("foreign_keys", []),
+                    "identity_links": model.get("identity_links", []),
+                    "conventions": model.get("conventions", {}),
+                }
                 for db_id, model in databases
             ],
         },

@@ -9,7 +9,9 @@ table's columns — so the agent never pulls a whole file to check one thing.
 Selectors (one per call):
   {"field": "delivery"}                  -> that audit field's spec (type, codes, notes)
   {"audit": true}                        -> the audit's field list (ids + names)
-  {"database": "cord-ph"}                -> that database's tables (names)
+  {"database": "cord-ph"}                -> that database's digest: per-table grain +
+                                           row counts, the foreign-key/identity graph,
+                                           and conventions
   {"database": "cord-ph", "table": "t"}  -> that table's columns
 """
 
@@ -73,14 +75,29 @@ def _lookup(request: dict, cwd: Path) -> dict:
             raise ToolError(
                 f"no table {table!r} in database {database!r}. The tables here are: {names}."
             )
-        return {"ok": True, "database": database,
-                "tables": [t.get("name") for t in tables]}
+        # The database digest: per-table grain + row counts plus the join graph
+        # (foreign_keys within this DB, identity_links to siblings) and any
+        # database-wide conventions. This is how the agent learns which join to
+        # write to reach a column in a non-anchor table — never guessed from names.
+        return {
+            "ok": True,
+            "database": database,
+            "tables": [
+                {"name": t.get("name"), "grain": t.get("grain"),
+                 "row_count": t.get("row_count")}
+                for t in tables
+            ],
+            "foreign_keys": model.get("foreign_keys", []),
+            "identity_links": model.get("identity_links", []),
+            "conventions": model.get("conventions", {}),
+        }
 
     raise ToolError(
         "lookup needs a selector. Use one of: "
         "{\"field\": \"<id>\"} for a field's codes + notes, "
         "{\"audit\": true} for the audit's field list, "
-        "{\"database\": \"<name>\"} for that database's table names, or "
+        "{\"database\": \"<name>\"} for the database digest (per-table grain + row "
+        "counts, the foreign-key/identity graph, and conventions), or "
         "{\"database\": \"<name>\", \"table\": \"<name>\"} for a table's columns."
     )
 

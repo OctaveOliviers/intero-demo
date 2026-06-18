@@ -252,8 +252,6 @@ class RunCellEditAuthzTest(unittest.TestCase):
 
     def test_create_run_passes_authenticated_user_id_to_start_spine(self):
         run_id = "r_new_owner"
-        audit_excel = self.tmp_path / "audit.xlsx"
-        audit_excel.write_bytes(b"PK")
         captured: dict[str, object] = {}
 
         class Req:
@@ -266,11 +264,9 @@ class RunCellEditAuthzTest(unittest.TestCase):
                 return {"auditId": "a1", "filters": {}, "database": "db1", "prompt": "p"}
 
         original_new_run_id = runs.run_engine.new_run_id
-        original_resolve_excel = runs._resolve_audit_excel
         original_start_spine = runs._start_spine_run
         try:
             runs.run_engine.new_run_id = lambda: run_id
-            runs._resolve_audit_excel = lambda _audit_id: audit_excel
 
             def fake_start_spine(
                 run_id: str,
@@ -278,8 +274,8 @@ class RunCellEditAuthzTest(unittest.TestCase):
                 audit_id: str,
                 database_id: str | None,
                 filters: dict[str, str],
-                workbook_path: Path,
-                user_id: str | None,
+                execution_id: str | None = None,
+                user_id: str | None = None,
             ) -> None:
                 captured["run_id"] = run_id
                 captured["user_id"] = user_id
@@ -288,7 +284,6 @@ class RunCellEditAuthzTest(unittest.TestCase):
             out = asyncio.run(runs.create_run(Req(self.owner_user["id"])))
         finally:
             runs.run_engine.new_run_id = original_new_run_id
-            runs._resolve_audit_excel = original_resolve_excel
             runs._start_spine_run = original_start_spine
 
         self.assertEqual(out.run_id, run_id)
@@ -299,8 +294,6 @@ class RunCellEditAuthzTest(unittest.TestCase):
         run_id = "r_spine_owner"
         run_dir = self.tmp_path / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
-        workbook_path = run_dir / "result.xlsx"
-        workbook_path.write_bytes(b"PK")
 
         database_id = "db1"
         database_dir = self.tmp_path / "databases" / database_id
@@ -309,7 +302,6 @@ class RunCellEditAuthzTest(unittest.TestCase):
         sqlite3.connect(sqlite_path).close()
 
         original_databases_dir = runs.DATABASES_DIR
-        original_read_sheets = runs.read_workbook_sheets
         original_read_json = runs._read_json
         original_ensure_mapping = runs.mapping_phase.ensure_mapping
         original_resolve_filters = runs._resolve_runtime_filter_predicates
@@ -318,10 +310,9 @@ class RunCellEditAuthzTest(unittest.TestCase):
         original_orchestrate = runs.run_engine.orchestrate_run
         try:
             runs.DATABASES_DIR = self.tmp_path / "databases"
-            runs.read_workbook_sheets = lambda _path: []
             runs._read_json = lambda _path: {"fields": []}
             async def fake_ensure_mapping(*_args, **_kwargs):
-                return json.dumps({"executable": {"identity_keys": ["id"], "cohort": {"from": "stub"}}})
+                return json.dumps({"executable": {"identity_keys": ["id"], "cohort": {"from": "stub"}, "regions": []}})
 
             runs.mapping_phase.ensure_mapping = fake_ensure_mapping
             runs._resolve_runtime_filter_predicates = lambda *_args, **_kwargs: ("", [])
@@ -340,13 +331,11 @@ class RunCellEditAuthzTest(unittest.TestCase):
                     audit_id="a1",
                     database_id=database_id,
                     filters={},
-                    workbook_path=workbook_path,
                     user_id=self.owner_user["id"],
                 )
             )
         finally:
             runs.DATABASES_DIR = original_databases_dir
-            runs.read_workbook_sheets = original_read_sheets
             runs._read_json = original_read_json
             runs.mapping_phase.ensure_mapping = original_ensure_mapping
             runs._resolve_runtime_filter_predicates = original_resolve_filters

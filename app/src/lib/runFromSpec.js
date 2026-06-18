@@ -35,6 +35,40 @@ export function normalizeDatabaseValidationError(err) {
   return null;
 }
 
+// Demo-spec cohort fields → the mapping criterion the run engine binds them
+// to (server _resolve_binding matches criterion_id / label / source column).
+// The NPDA appointment window is the audit-year criterion on
+// clinic_visits.visit_date.
+const FILTER_KEY_BY_FIELD = { appointmentDate: "audit_year" };
+
+// Criteria the runtime cannot apply yet: the cohort SELECT runs on the
+// cohort's own database only (runs.py::_resolve_runtime_filter_predicates),
+// and these bind to a column on a different bound database. The chip stays in
+// the displayed contract; sending it as a filter would fail the whole run.
+const DISPLAY_ONLY_FIELDS = new Set(["dateOfBirth"]);
+
+// Flatten cohort chips → the { key: value, … } filters object POST /api/runs
+// binds against the audit's criteria. Date chips that share a field carry a
+// "to" connector on the second chip (one displayed range row) — merge them
+// into a single "from to to" value instead of letting the later chip
+// overwrite the earlier one. Prefer a chip's machine value (`raw`, ISO dates)
+// over its display text.
+export function filtersFromCohort(cohort) {
+  const filters = {};
+  for (const c of cohort || []) {
+    if (!c?.field || DISPLAY_ONLY_FIELDS.has(c.field)) continue;
+    const key = FILTER_KEY_BY_FIELD[c.field] || c.field;
+    const value = c.raw ?? c.value;
+    if (value == null || String(value).trim() === "") continue;
+    if (c.connector === "to" && key in filters) {
+      filters[key] = `${filters[key]} to ${value}`;
+    } else {
+      filters[key] = String(value);
+    }
+  }
+  return filters;
+}
+
 // Plain multi-line string — messages render with white-space: pre-wrap, not
 // markdown. Includes the original request, the
 // cohort (label: value per line), the resolved count, and the output (summary
@@ -72,8 +106,7 @@ export async function runFromSpec(spec) {
     }
   }
 
-  // Flatten cohort chips → a { field: value, … } filters object.
-  const filters = Object.fromEntries((spec.cohort || []).map((c) => [c.field, c.value]));
+  const filters = filtersFromCohort(spec.cohort);
 
   let selectedDatabase = pickDatabaseForRun(spec.cohort, {
     mockDatabases: isMockMode("databases"),

@@ -625,6 +625,23 @@ function repeatGasField({ r, ref, db, column, value, label }) {
 
 // Build one populated cell for the ALL sheet.
 function makeCordAllCell(colKey, { r, ref, db }) {
+  // One genuinely unresolvable cell, so the blocked state + its reason are
+  // visible in the demo: CPH009 was transferred to the regional centre on day 7
+  // and never discharged home from this unit, so there is no age-at-discharge.
+  if (r.code === "CPH009" && colKey === "ageDischargeHome") {
+    return {
+      ref,
+      value: "",
+      meta: {
+        kind: "direct",
+        state: "blocked",
+        database: db,
+        reason_code: "NOT_LOCATED",
+        reason_detail:
+          "CPH009 was transferred out to the regional cooling and neurology centre on day 7 and was never discharged home from this unit, so no age at discharge home is recorded (searched cord_ph_birth_records and the transfer summary).",
+      },
+    };
+  }
   const i = r.i;
   switch (colKey) {
     case "patient": {
@@ -1737,7 +1754,26 @@ function buildDataset({ id, sheet, label, columns, rowOrder, records, makeCell }
     const code = rowOrder[rowIdx];
     const r = records[code];
     const ref = colLetter(colIndex(colKey)) + (rowIdx + 2);
-    return makeCell(colKey, { code, r, ref, db: MOCK_DATABASE.id, rowIdx });
+    const c = makeCell(colKey, { code, r, ref, db: MOCK_DATABASE.id, rowIdx });
+    // Carry the cell-state metadata the real backend sends, so the FE's status
+    // counter + colours behave identically against the mock: a value-bearing
+    // cell is `filled`, and a filled INTERPRET cell awaits clinician sign-off
+    // (review_state='not_reviewed') — exactly what the store's trigger sets.
+    // Builders that set their own state (a blocked cell) are left untouched.
+    if (c && c.meta) {
+      const meta = { ...c.meta };
+      if (!meta.state) meta.state = "filled";
+      const k = meta.kind;
+      if (
+        (k === "interpret" || k === "interpretive") &&
+        meta.state === "filled" &&
+        !meta.review_state
+      ) {
+        meta.review_state = "not_reviewed";
+      }
+      c.meta = meta;
+    }
+    return c;
   };
 
   // A cell is included in a populate batch when it has a value OR metadata
@@ -1974,14 +2010,52 @@ export function buildPopulatedWorkbook() {
 // §5) plus a fuller `detail`. Waits are randomized so population no longer
 // marches column-by-column on a fixed clock.
 
+// A crisp 3–5 word "now" line derived from a fuller headline — what the activity
+// box shows folded. Strips trailing punctuation and keeps the first few words.
+const shortLabel = (headline) => {
+  const clean = String(headline || "").replace(/[….\s]+$/, "").trim();
+  return clean.split(/\s+/).slice(0, 5).join(" ");
+};
+
+// Three activity KINDS the box distinguishes (doc 11 §agent_activity), matching
+// the backend contract: orchestrator `step`s, agent `tool` calls, and `thinking`
+// snippets. Each carries `label` (folded now-line) + `kind`.
 const act = (wait, headline, detail, extra = {}) => ({
   kind: "activity", wait,
-  event: { type: "activity", headline, detail, ...extra },
+  event: { type: "activity", headline, detail, label: shortLabel(headline), kind: "step", ...extra },
 });
-const tool = (wait, name, status, headline) => ({
+const tool = (wait, name, status, headline, label) => ({
   kind: "activity", wait,
-  event: { type: "activity", name, status, headline },
+  event: {
+    type: "activity", name, status, headline,
+    label: label || shortLabel(headline), kind: "tool",
+  },
 });
+const think = (wait, text, label = "Thinking") => ({
+  kind: "activity", wait,
+  event: { type: "activity", headline: text, label, kind: "thinking" },
+});
+
+// Derive the review-summary totals from the SAME cell metadata the live chip
+// counts (countWorkbookStatus uses blocked + needs_verification), so the mock
+// summary at the end of the run matches the top-band chip exactly — the whole
+// point of the count-alignment fix. Computed from the populated workbook, which
+// shares the cell() builder (hence the same state/review_state) with the stream.
+function totalsFromCellMetadata(cellMetadata) {
+  let cells = 0, filled = 0, blocked = 0, needs_verification = 0, low_confidence = 0;
+  for (const meta of Object.values(cellMetadata || {})) {
+    if (!meta || typeof meta !== "object") continue;
+    cells += 1;
+    const state = String(meta.state || "").toLowerCase();
+    const reviewState = String(meta.review_state || "").toLowerCase();
+    const confidence = String(meta.confidence || "").toLowerCase();
+    if (state === "blocked") blocked += 1;
+    else if (state === "filled") filled += 1;
+    if (state === "filled" && reviewState === "not_reviewed") needs_verification += 1;
+    if (confidence === "low" || confidence === "medium") low_confidence += 1;
+  }
+  return { cells, filled, blocked, needs_verification, low_confidence };
+}
 
 const reviewSummary = (wait, { totals }) => ({
   kind: "review_summary",
@@ -2038,6 +2112,8 @@ function cordPhPopulation(all, nicu) {
   // INTERPRETIVE: obstetric + midwifery notes, read baby by baby.
   steps.push(act(rnd(550, 750), "Reading the obstetric and midwifery notes…",
     "Combining each obstetrician birth-summary with the matching midwife delivery note to confirm delayed cord clamping, the state of the liquor, chorioamnionitis and any sentinel event."));
+  steps.push(think(rnd(350, 550),
+    "CPH002 was a category-1 caesarean with a flat baby — the cord was clamped immediately for resuscitation, so delayed cord clamping reads as \"No\" despite unit policy."));
   steps.push(...all.streamColumns(ic, ["dcc", "liquorMeconium", "chorioamnionitis", "sentinelEvent"]));
 
   // INTERPRETIVE: resuscitation records, read one at a time.
@@ -2068,6 +2144,8 @@ function cordPhPopulation(all, nicu) {
   // INTERPRETIVE: cooling + CFM reconciliation, cell by cell.
   steps.push(act(rnd(550, 750), "Reading the cooling and CFM notes…",
     "Reading each NICU admission note for therapeutic cooling and reconciling the bedside CFM impression against the formal neurology report. One case disagrees with the structured record; one preterm sepsis admission had no CFM, recorded explicitly."));
+  steps.push(think(rnd(400, 600),
+    "**CPH009 — reconciling the CFM conflict.** The bedside CFM note reads a *normal background*, but the formal neurology report records **electrographic seizures** with `basal ganglia and thalamic injury` on MRI. These disagree, so rather than silently picking one source I am flagging this cell as a **conflict** for clinician review:\n\n- Bedside CFM: normal background\n- Formal aEEG: abnormal, electrographic seizures\n- MRI: basal ganglia / thalamic injury\n\nThe formal report is the more authoritative source, but the discrepancy itself is the finding worth surfacing."));
   steps.push(...nicu.streamColumns(ic, ["cooled", "ageCooling", "cfm"]));
 
   // INTERPRETIVE: neurology reports, read one at a time.
@@ -2083,7 +2161,7 @@ function cordPhPopulation(all, nicu) {
   steps.push(act(rnd(450, 650), "Finalizing the audit…",
     "All cells populated and traceable to the EHR record or the source notes across both the ALL and NICU sheets."));
   steps.push(reviewSummary(rnd(250, 450), {
-    totals: { cells: 328, filled: 318, blocked: 2, needs_verification: 8, low_confidence: 5 },
+    totals: totalsFromCellMetadata(cordPopulatedWorkbook().cellMetadata),
   }));
   steps.push({ kind: "done", wait: rnd(400, 600), event: { type: "done" } });
   return steps;
@@ -2121,7 +2199,7 @@ function chestPainPopulation(ds) {
   steps.push(act(rnd(450, 650), "Finalizing the audit…",
     "All cells populated and traceable to the EHR record or the source notes."));
   steps.push(reviewSummary(rnd(250, 450), {
-    totals: { cells: 72, filled: 69, blocked: 1, needs_verification: 2, low_confidence: 1 },
+    totals: totalsFromCellMetadata(ds.populatedWorkbook().cellMetadata),
   }));
   steps.push({ kind: "done", wait: rnd(400, 600), event: { type: "done" } });
   return steps;
@@ -2219,7 +2297,7 @@ function npdaPopulation(ds) {
   steps.push(act(rnd(450, 650), "Finalizing the audit…",
     "All cells populated and traceable to the EHR record or the source notes."));
   steps.push(reviewSummary(rnd(250, 450), {
-    totals: { cells: 420, filled: 403, blocked: 3, needs_verification: 14, low_confidence: 9 },
+    totals: totalsFromCellMetadata(ds.populatedWorkbook().cellMetadata),
   }));
   steps.push({ kind: "done", wait: rnd(400, 600), event: { type: "done" } });
   return steps;
