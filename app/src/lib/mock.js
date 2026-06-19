@@ -17,6 +17,8 @@ import {
 } from "./mockData.js";
 import { dispatchMockTimelineStep } from "./mockTimeline.js";
 import { TEMPLATE_CATALOG } from "./templateCatalog.js";
+import { CONTENT } from "./mock/content/index.js";
+import { predicateDisplay } from "./auditDetailChips.js";
 
 // Flatten the agent-side template catalog so Settings shows the same
 // audits the agent proposes in the InputSpec / OutputSpec pickers.
@@ -181,6 +183,23 @@ export async function mockGetAuditDetail(id) {
     sources: ["mock-db -> mock_table.mock_column"],
     ...(i === 2 ? { code: { 1: "Yes", 2: "No", 9: "Not recorded" } } : {}),
   }));
+  const ageCriterion = {
+    criterion_id: "age_years",
+    label: CONTENT.auditDetail.criteria.age.label,
+    type: "number",
+    predicate: { op: "gte", value: 18, unit: CONTENT.auditDetail.criteria.age.unit },
+  };
+  const admissionDateCriterion = {
+    criterion_id: "admission_date",
+    label: CONTENT.auditDetail.criteria.admissionDate.label,
+    type: "date",
+    predicate: { op: "between", value: ["2025-04-01", "2026-03-31"] },
+  };
+  const fixedCriteria = [ageCriterion, admissionDateCriterion].map((criterion) => ({
+    ...criterion,
+    display: predicateDisplay(criterion),
+  }));
+
   return {
     id: base.id,
     name: base.name,
@@ -199,13 +218,13 @@ export async function mockGetAuditDetail(id) {
     mapping: {
       databases: ["mock-db"],
       database_summaries: {
-        "mock-db": "Demographics, admissions and coded clinical events for the cohort join.",
+        "mock-db": CONTENT.auditDetail.databaseSummary,
       },
       fields: mappingFields,
       criteria_bindings: [
         {
           criterion_id: "age_years",
-          label: "Patient age",
+          label: CONTENT.auditDetail.criteria.age.label,
           source: "mock-db -> patients.age_years",
           type: "number",
           join_path: "direct column on the anchor row (no join)",
@@ -214,7 +233,7 @@ export async function mockGetAuditDetail(id) {
         },
         {
           criterion_id: "admission_date",
-          label: "Admission date",
+          label: CONTENT.auditDetail.criteria.admissionDate.label,
           source: "mock-db -> admissions.start",
           type: "date",
           join_path: "direct column on the anchor row (no join)",
@@ -222,22 +241,7 @@ export async function mockGetAuditDetail(id) {
           from: "db_column",
         },
       ],
-      fixed_criteria: [
-        {
-          criterion_id: "age_years",
-          label: "Patient age",
-          type: "number",
-          predicate: { op: "gte", value: 18, unit: "years" },
-          display: "Patient age ≥ 18 years",
-        },
-        {
-          criterion_id: "admission_date",
-          label: "Admission date",
-          type: "date",
-          predicate: { op: "between", value: ["2025-04-01", "2026-03-31"] },
-          display: "Admission date 1 Apr 2025 – 31 Mar 2026",
-        },
-      ],
+      fixed_criteria: fixedCriteria,
       executable: { source: "mock" },
     },
   };

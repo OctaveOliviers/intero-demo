@@ -41,6 +41,8 @@
 import { allTemplatesFlat, getTemplateById } from "./templateCatalog.js";
 import { isMockMode } from "./mock.js";
 import { CORDPH_PATIENT_COUNT, NPDA_PATIENT_COUNT } from "./mockData.js";
+import { CONTENT } from "./mock/content/index.js";
+import { monthNames } from "../i18n/localeTag.js";
 
 // The seed cohort resolves to exactly the number of patient rows the results
 // workbook populates, so the contract's "N patients match" health-check equals
@@ -80,7 +82,53 @@ const NPDA_YEAR = {
 // born after (1 Apr 2026 − 25 years) = 1 Apr 2001.
 const NPDA_DOB_CUTOFF = new Date("2001-04-01T00:00:00");
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS = monthNames("short");
+
+const SPEC_VALUES = CONTENT.specValues || {
+  condition: {
+    cordBloodGasSampling: "cord blood gas sampling",
+    neonatalAdmission: "neonatal admission",
+    acuteSoreThroat: "acute sore throat",
+    chestPain: "chest pain",
+  },
+  specialty: {
+    neonatology: "Neonatology",
+    obstetrics: "Obstetrics",
+    paediatrics: "Paediatrics",
+    ent: "ENT",
+    cardiology: "Cardiology",
+    generalMedicine: "General Medicine",
+    emergencyMedicine: "Emergency Medicine",
+  },
+  ward: {
+    nicu: "NICU",
+    emergencyDepartment: "Emergency Department",
+    maternityUnit: "Maternity unit",
+    wardPrefix: "Ward",
+  },
+  admissionMethod: {
+    emergency: "Emergency",
+    elective: "Elective",
+    transfer: "Transfer",
+    dayCase: "Day case",
+  },
+  age: {
+    neonates: "Neonates",
+    paediatric: "Paediatric",
+    overPrefix: "Over",
+    underPrefix: "Under",
+  },
+  sex: {
+    male: "Male",
+    female: "Female",
+  },
+  gestation: {
+    minWeeks: "≥ 34 weeks",
+  },
+  fallback: {
+    customFilter: "custom filter",
+  },
+};
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -114,26 +162,41 @@ function chip({ kind, field, label, value, raw, options, connector }) {
 
 export function defaultDatabaseChipsForMode({ mockDatabases }) {
   if (!mockDatabases) return [];
+  const namesById = new Map((CONTENT.databases || []).map((db) => [db.id, db.name]));
   return [
-    chip({ kind: "database", field: "database", label: "Database", value: "Patient notes", raw: "patient-notes-db" }),
-    chip({ kind: "database", field: "database", label: "Database", value: "Lab results", raw: "lab-results-db" }),
+    chip({
+      kind: "database",
+      field: "database",
+      label: "Database",
+      value: namesById.get("patient-notes-db") || "Patient notes",
+      raw: "patient-notes-db",
+    }),
+    chip({
+      kind: "database",
+      field: "database",
+      label: "Database",
+      value: namesById.get("lab-results-db") || "Lab results",
+      raw: "lab-results-db",
+    }),
   ];
 }
 
 const SPECIALTY_OPTIONS = [
-  "Neonatology",
-  "Obstetrics",
-  "Paediatrics",
-  "ENT",
-  "Cardiology",
-  "General Medicine",
-  "Emergency Medicine",
+  SPEC_VALUES.specialty.neonatology,
+  SPEC_VALUES.specialty.obstetrics,
+  SPEC_VALUES.specialty.paediatrics,
+  SPEC_VALUES.specialty.ent,
+  SPEC_VALUES.specialty.cardiology,
+  SPEC_VALUES.specialty.generalMedicine,
+  SPEC_VALUES.specialty.emergencyMedicine,
 ].map((s) => ({ value: s, label: s }));
 
-const ADMISSION_OPTIONS = ["Emergency", "Elective", "Transfer", "Day case"].map((s) => ({
-  value: s,
-  label: s,
-}));
+const ADMISSION_OPTIONS = [
+  SPEC_VALUES.admissionMethod.emergency,
+  SPEC_VALUES.admissionMethod.elective,
+  SPEC_VALUES.admissionMethod.transfer,
+  SPEC_VALUES.admissionMethod.dayCase,
+].map((s) => ({ value: s, label: s }));
 
 // ─────────────────────────────────────────────────────────────────────────
 // Date extraction. Handles the phrasings the demo uses: "last 6 months",
@@ -213,27 +276,27 @@ export async function parseRequest(text, { templates = null } = {}) {
     summary = "Local paediatric diabetes audit (NPDA)";
     branch = "diabetes";
   } else if (/cord|\bph\b|blood gas|acidosis|cord gas/.test(t)) {
-    condition = "cord blood gas sampling";
-    specialty = "Neonatology";
+    condition = SPEC_VALUES.condition.cordBloodGasSampling;
+    specialty = SPEC_VALUES.specialty.neonatology;
     templateId = "cord-ph-lo-audit";
     summary = "Local medical Cord audit";
     branch = "cord";
   } else if (/sore throat|tonsill|pharyng|throat/.test(t)) {
-    condition = "acute sore throat";
-    specialty = "ENT";
+    condition = SPEC_VALUES.condition.acuteSoreThroat;
+    specialty = SPEC_VALUES.specialty.ent;
     templateId = "acute-sore-throat-audit";
     summary = "Local acute sore throat audit";
     branch = "sore-throat";
   } else if (/chest pain|cardiac|myocard|angina|coronary/.test(t)) {
-    condition = "chest pain";
-    specialty = "Cardiology";
+    condition = SPEC_VALUES.condition.chestPain;
+    specialty = SPEC_VALUES.specialty.cardiology;
     templateId = "chest-pain-audit";
     summary = "Local chest pain audit";
     branch = "chest-pain";
   } else if (/neonat|newborn|baby|babies/.test(t)) {
     // generic neonatal request → default to the cord-pH local audit.
-    condition = "neonatal admission";
-    specialty = "Neonatology";
+    condition = SPEC_VALUES.condition.neonatalAdmission;
+    specialty = SPEC_VALUES.specialty.neonatology;
     templateId = "cord-ph-lo-audit";
     summary = "Local medical Cord audit";
     branch = "cord";
@@ -278,10 +341,10 @@ export async function parseRequest(text, { templates = null } = {}) {
   }
 
   // Specialty — overridden by an explicit mention if present.
-  if (/\bent\b/.test(t)) specialty = "ENT";
-  else if (/cardiolog/.test(t)) specialty = "Cardiology";
-  else if (/obstetric/.test(t)) specialty = "Obstetrics";
-  else if (/paediatric|pediatric/.test(t)) specialty = specialty || "Paediatrics";
+  if (/\bent\b/.test(t)) specialty = SPEC_VALUES.specialty.ent;
+  else if (/cardiolog/.test(t)) specialty = SPEC_VALUES.specialty.cardiology;
+  else if (/obstetric/.test(t)) specialty = SPEC_VALUES.specialty.obstetrics;
+  else if (/paediatric|pediatric/.test(t)) specialty = specialty || SPEC_VALUES.specialty.paediatrics;
   if (specialty && !isDiabetes) {
     cohort.push(
       chip({
@@ -297,21 +360,21 @@ export async function parseRequest(text, { templates = null } = {}) {
   // Ward / care setting. The cord audit spans the maternity unit (incl. NICU),
   // so default to that when the request doesn't name a ward.
   let ward = null;
-  if (/\bnicu\b|neonatal unit|nnu/.test(t)) ward = "NICU";
-  else if (/\bed\b|emergency department|a&e|a and e/.test(t)) ward = "Emergency Department";
+  if (/\bnicu\b|neonatal unit|nnu/.test(t)) ward = SPEC_VALUES.ward.nicu;
+  else if (/\bed\b|emergency department|a&e|a and e/.test(t)) ward = SPEC_VALUES.ward.emergencyDepartment;
   else {
     const w = t.match(/ward\s+([a-z0-9]+)/);
-    if (w) ward = `Ward ${w[1].toUpperCase()}`;
+    if (w) ward = `${SPEC_VALUES.ward.wardPrefix} ${w[1].toUpperCase()}`;
   }
-  if (!ward && isCord) ward = "Maternity unit";
+  if (!ward && isCord) ward = SPEC_VALUES.ward.maternityUnit;
   if (ward && !isDiabetes) {
     cohort.push(chip({ kind: "value", field: "ward", label: "Ward", value: ward }));
   }
 
   // Admission method.
   let admission = null;
-  if (/emergency admission|emergenc/.test(t)) admission = "Emergency";
-  else if (/elective/.test(t)) admission = "Elective";
+  if (/emergency admission|emergenc/.test(t)) admission = SPEC_VALUES.admissionMethod.emergency;
+  else if (/elective/.test(t)) admission = SPEC_VALUES.admissionMethod.elective;
   if (admission) {
     cohort.push(
       chip({
@@ -327,13 +390,13 @@ export async function parseRequest(text, { templates = null } = {}) {
   // Age. The cord branch uses a Gestation inclusion criterion instead, so skip
   // the generic Age chip there.
   let age = null;
-  if (/neonat|newborn|baby|babies/.test(t)) age = "Neonates";
-  else if (/paediatric|pediatric|child/.test(t)) age = "Paediatric";
+  if (/neonat|newborn|baby|babies/.test(t)) age = SPEC_VALUES.age.neonates;
+  else if (/paediatric|pediatric|child/.test(t)) age = SPEC_VALUES.age.paediatric;
   else {
     const over = t.match(/over\s+(\d+)/);
     const under = t.match(/under\s+(\d+)/);
-    if (over) age = `Over ${over[1]}`;
-    else if (under) age = `Under ${under[1]}`;
+    if (over) age = `${SPEC_VALUES.age.overPrefix} ${over[1]}`;
+    else if (under) age = `${SPEC_VALUES.age.underPrefix} ${under[1]}`;
   }
   if (age && !isCord && !isDiabetes) {
     cohort.push(chip({ kind: "value", field: "age", label: "Age", value: age }));
@@ -342,7 +405,7 @@ export async function parseRequest(text, { templates = null } = {}) {
   // Cord audit: a gestation inclusion criterion (every baby in the dataset is
   // ≥ 34 weeks, so the cohort and the populated rows stay consistent).
   if (isCord) {
-    cohort.push(chip({ kind: "value", field: "gestation", label: "Gestation", value: "≥ 34 weeks" }));
+    cohort.push(chip({ kind: "value", field: "gestation", label: "Gestation", value: SPEC_VALUES.gestation.minWeeks }));
   }
 
   // Diabetes audit (NPDA): the inclusion criteria are the audit's fixed
@@ -479,18 +542,18 @@ export async function parseAdditionalFilters(text) {
   const add = (c) => chips.push({ ...c, added: true });
 
   if (/\bmale\b|\bmen\b|\bboys?\b/.test(t)) {
-    add(chip({ kind: "value", field: "sex", label: "Sex", value: "Male" }));
+    add(chip({ kind: "value", field: "sex", label: "Sex", value: SPEC_VALUES.sex.male }));
   } else if (/\bfemale\b|\bwomen\b|\bgirls?\b/.test(t)) {
-    add(chip({ kind: "value", field: "sex", label: "Sex", value: "Female" }));
+    add(chip({ kind: "value", field: "sex", label: "Sex", value: SPEC_VALUES.sex.female }));
   }
 
   const over = t.match(/over\s+(\d+)/);
   const under = t.match(/under\s+(\d+)/);
-  if (over) add(chip({ kind: "value", field: "age", label: "Age", value: `Over ${over[1]}` }));
-  else if (under) add(chip({ kind: "value", field: "age", label: "Age", value: `Under ${under[1]}` }));
+  if (over) add(chip({ kind: "value", field: "age", label: "Age", value: `${SPEC_VALUES.age.overPrefix} ${over[1]}` }));
+  else if (under) add(chip({ kind: "value", field: "age", label: "Age", value: `${SPEC_VALUES.age.underPrefix} ${under[1]}` }));
 
   if (/\bnicu\b|neonatal unit/.test(t)) {
-    add(chip({ kind: "value", field: "ward", label: "Ward", value: "NICU" }));
+    add(chip({ kind: "value", field: "ward", label: "Ward", value: SPEC_VALUES.ward.nicu }));
   }
 
   const dates = extractDates(text || "");
@@ -514,7 +577,7 @@ export async function parseAdditionalFilters(text) {
         kind: "value",
         field: "custom",
         label: "Filter",
-        value: trimmed || "custom filter",
+        value: trimmed || SPEC_VALUES.fallback.customFilter,
       }),
     );
   }

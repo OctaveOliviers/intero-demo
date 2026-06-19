@@ -18,6 +18,8 @@
 //   records          — { cord, chest, npda } the WHOLE record objects (human text translatable; numbers/dates/codes/ids/types not)
 //   codeMaps         — { sex, ethnicity, diabetesType, insulinRegime, cgm, yesNo, smoking, retinal, admissionDka, adhdAsd, yesNo99, leavingReason, otherMed, albuminuriaStage, thyroidTx, mentalHealthAppt, dkaTherapy } — code→label maps (labels translatable; keys/codes not)
 //   labels           — short value labels (N/A, Not recorded, Unavailable, …)
+//   auditDetail      — mock audit-detail localization (database summary + fixed-criteria labels/units)
+//   specValues       — mock parse chip VALUES (cohort defaults/options)
 //   explain          — namespace of FUNCTIONS returning the right-panel explanation strings (preserve ${…} interpolation)
 //   blockedReason    — the blocked-cell reason_detail (CPH009 age-at-discharge)
 //   timeline         — { activities, tools, thinks, summaryWords, email parsing } headline/detail/think strings keyed sensibly
@@ -1267,6 +1269,61 @@ const labels = {
   no: "Nee",
 };
 
+// --- Mock audit-detail strings (criteria + summary) -------------------------
+const auditDetail = {
+  databaseSummary: "Demografie, opnames en gecodeerde klinische gebeurtenissen voor de cohortkoppeling.",
+  criteria: {
+    age: { label: "Leeftijd patiënt", unit: "jaar" },
+    admissionDate: { label: "Opnamedatum" },
+  },
+};
+
+const specValues = {
+  condition: {
+    cordBloodGasSampling: "Navelstrengbloedgasanalyse",
+    neonatalAdmission: "Neonatale opname",
+    acuteSoreThroat: "Acute keelpijn",
+    chestPain: "Pijn op de borst",
+  },
+  specialty: {
+    neonatology: "Neonatologie",
+    obstetrics: "Verloskunde",
+    paediatrics: "Kindergeneeskunde",
+    ent: "KNO",
+    cardiology: "Cardiologie",
+    generalMedicine: "Algemene geneeskunde",
+    emergencyMedicine: "Spoedeisende geneeskunde",
+  },
+  ward: {
+    nicu: "NICU",
+    emergencyDepartment: "Spoedeisende hulp",
+    maternityUnit: "Kraamafdeling",
+    wardPrefix: "Afdeling",
+  },
+  admissionMethod: {
+    emergency: "Spoed",
+    elective: "Electief",
+    transfer: "Overplaatsing",
+    dayCase: "Dagbehandeling",
+  },
+  age: {
+    neonates: "Pasgeborenen",
+    paediatric: "Pediatrisch",
+    overPrefix: "Boven",
+    underPrefix: "Onder",
+  },
+  sex: {
+    male: "Man",
+    female: "Vrouw",
+  },
+  gestation: {
+    minWeeks: "≥ 34 weken",
+  },
+  fallback: {
+    customFilter: "Aangepaste filter",
+  },
+};
+
 // --- Right-panel explanation strings (FUNCTIONS; preserve ${…}) -------------
 // Each function takes the args it interpolates and returns the user-visible
 // explanation. Keyed by builder + field; translate the returned strings, keeping
@@ -1539,6 +1596,8 @@ export default {
   records: { cord, chest, npda },
   codeMaps,
   labels,
+  auditDetail,
+  specValues,
   explain,
   blockedReason,
   timeline,
