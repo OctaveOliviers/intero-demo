@@ -41,6 +41,25 @@ def _database_model(cwd: Path, slug: str) -> dict:
     return _read_json(cwd / "database" / f"{slug}.model.json")
 
 
+def _suggest_field_ids(field: str, available: list) -> list:
+    """Closest canonical field ids for a miss — suggestion only, never a resolve.
+
+    Audit field ids are canonical slugs like ``patient-details/ethnic_category``;
+    the agent often tries the short tail (``ethnic_category``). Match on the slug:
+    an exact tail match (segment after the last ``/``) first, then any substring
+    match. Stay STRICT — we only point at the canonical id, never substitute it.
+    """
+    needle = (field or "").strip().lower()
+    if not needle:
+        return []
+    ids = [i for i in available if isinstance(i, str)]
+    tail = [i for i in ids if i.rsplit("/", 1)[-1].lower() == needle]
+    if tail:
+        return tail
+    sub = [i for i in ids if needle in i.lower() or i.lower() in needle]
+    return sub[:3]
+
+
 def _lookup(request: dict, cwd: Path) -> dict:
     field = optional_string(request.get("field"), "field")
     database = optional_string(request.get("database"), "database")
@@ -52,8 +71,14 @@ def _lookup(request: dict, cwd: Path) -> dict:
             if f.get("id") == field:
                 return {"ok": True, "field": f}
         available = [f.get("id") for f in spec.get("fields", []) or []]
+        suggestions = _suggest_field_ids(field, available)
+        hint = (
+            f" Did you mean: {suggestions}? Field ids are canonical slugs "
+            f"(e.g. 'patient-details/ethnic_category') — use the full id, not a short name."
+            if suggestions else ""
+        )
         raise ToolError(
-            f"no field {field!r} in the audit spec. The field ids in this audit are: "
+            f"no field {field!r} in the audit spec.{hint} The field ids in this audit are: "
             f"{available}. Use lookup({{\"audit\": true}}) for the full list with names."
         )
 

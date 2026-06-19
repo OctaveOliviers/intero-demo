@@ -11,6 +11,7 @@
   import RightPanel from "./components/RightPanel.svelte";
   import Toasts from "./components/Toasts.svelte";
   import { startIndexingSubscription } from "./stores/indexing.js";
+  import { _ } from "svelte-i18n";
 
   let indexingStarted = false;
   let historyHydratingFor = null;
@@ -94,7 +95,7 @@
 <svelte:window on:mousemove={handleMouseMove} on:mouseup={handleMouseUp} />
 
 {#if $authStatus === "booting"}
-  <div class="auth-loading">Loading session…</div>
+  <div class="auth-loading">{$_("app.loadingSession")}</div>
 {:else if $authStatus === "unauthenticated"}
   <Login on:authenticated={(e) => setAuthenticated(e.detail)} />
 {:else}

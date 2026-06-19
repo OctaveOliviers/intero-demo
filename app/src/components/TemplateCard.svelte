@@ -1,4 +1,5 @@
 <script>
+  import { _ } from "svelte-i18n";
   import { createEventDispatcher } from "svelte";
   import Icon from "./Icon.svelte";
   import {
@@ -64,17 +65,11 @@
   }
 
   function labelFromKey(key) {
-    return key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
+    return $_("template.filterLabel." + key);
   }
 
   function placeholderFromKey(key) {
-    const hints = {
-      dateFrom: "e.g. 2024-01-01",
-      dateTo: "e.g. 2024-12-31",
-      hospitals: "e.g. Royal Infirmary, Western General",
-      cohort: "e.g. paediatric",
-    };
-    return hints[key] || "";
+    return $_("template.filterPlaceholder." + key);
   }
 
   function buildUserMessage(audit, activeFilters) {
@@ -96,7 +91,7 @@
   async function handleRename(e) {
     e.stopPropagation();
     menuOpen = false;
-    const next = window.prompt("Rename audit", template.name);
+    const next = window.prompt($_("template.renamePrompt"), template.name);
     if (next == null) return;
     const name = next.trim();
     if (!name || name === template.name) return;
@@ -105,7 +100,7 @@
       await renameAudit(template.id, name);
       await refreshTemplates();
     } catch (err) {
-      window.alert("Rename failed: " + err.message);
+      window.alert($_("template.renameFailed", { values: { error: err.message } }));
     } finally {
       busy = false;
     }
@@ -114,13 +109,13 @@
   async function handleDelete(e) {
     e.stopPropagation();
     menuOpen = false;
-    if (!window.confirm(`Delete "${template.name}"? This cannot be undone.`)) return;
+    if (!window.confirm($_("template.deleteConfirm", { values: { name: template.name } }))) return;
     busy = true;
     try {
       await deleteAudit(template.id);
       await refreshTemplates();
     } catch (err) {
-      window.alert("Delete failed: " + err.message);
+      window.alert($_("template.deleteFailed", { values: { error: err.message } }));
     } finally {
       busy = false;
     }
@@ -134,7 +129,7 @@
     try {
       await reindexAudit(template.id);
     } catch (err) {
-      window.alert("Retry failed: " + err.message);
+      window.alert($_("template.retryFailed", { values: { error: err.message } }));
     } finally {
       busy = false;
     }
@@ -192,15 +187,12 @@
     <div class="content">
       <h3>
         {template.name}
-        {#if chip === "indexing"}<span class="badge indexing">Indexing</span>{/if}
-        {#if chip === "ready"}<span class="badge ready">Ready</span>{/if}
-        {#if chip === "error"}<span class="badge error" title={errorOf("audit", template.id, $indexingMap)}>Error</span>{/if}
+        {#if chip === "indexing"}<span class="badge indexing">{$_("common.indexing")}</span>{/if}
+        {#if chip === "ready"}<span class="badge ready">{$_("common.ready")}</span>{/if}
+        {#if chip === "error"}<span class="badge error" title={errorOf("audit", template.id, $indexingMap)}>{$_("common.error")}</span>{/if}
       </h3>
       {#if chip === "indexing"}
-        <p class="indexing-note">
-          Reading your spreadsheet so the agent learns its columns and structure.
-          This takes a few seconds — you can open it once it's ready.
-        </p>
+        <p class="indexing-note">{$_("template.indexingHelp")}</p>
       {:else if !expanded && template.description}
         <p>{template.description}</p>
       {/if}
@@ -214,10 +206,10 @@
     <!-- svelte-ignore a11y-no-static-element-interactions a11y-click-events-have-key-events -->
     <div class="menu" on:click|stopPropagation>
       {#if chip === "error"}
-        <button class="menu-item" on:click={handleReindex}>Try indexing again</button>
+        <button class="menu-item" on:click={handleReindex}>{$_("common.tryIndexingAgain")}</button>
       {/if}
-      <button class="menu-item" on:click={handleRename}>Rename</button>
-      <button class="menu-item danger" on:click={handleDelete}>Delete</button>
+      <button class="menu-item" on:click={handleRename}>{$_("common.rename")}</button>
+      <button class="menu-item danger" on:click={handleDelete}>{$_("common.delete")}</button>
     </div>
   {/if}
 
@@ -227,7 +219,7 @@
         <label for="{initializedFor}-database">Database</label>
         <select id="{initializedFor}-database" bind:value={selectedDatabase}>
           <option value="" disabled>
-            {readyDatabases.length ? "Select a database…" : "No indexed databases available"}
+            {readyDatabases.length ? $_("template.selectDatabase") : $_("template.noDatabases")}
           </option>
           {#each readyDatabases as d (d.id)}
             <option value={d.id}>{d.name}</option>
@@ -252,7 +244,7 @@
 
       <div class="actions">
         <button class="run-btn" on:click={handleRun} disabled={runDisabled}>
-          {$isSubmitting ? "Running…" : "Run audit"}
+          {$isSubmitting ? $_("template.running") : $_("template.runAudit")}
         </button>
       </div>
     </div>

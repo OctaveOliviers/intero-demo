@@ -1,0 +1,47 @@
+:root {
+  /* Color tokens (deep blue + emerald) */
+  --color-bg: #030d1c;
+  --color-surface: #0a1f35;
+  --color-surface-elevated: #122b45;
+  --color-primary: #4d72ff;
+  --color-emerald: #17b88d;
+  --color-text: #edf6ff;
+  --color-muted: #98b3cc;
+  --color-line: #285173;
+
+  /* Semantic aliases */
+  --bg: var(--color-bg);
+  --surface: var(--color-surface);
+  --surface-2: var(--color-surface-elevated);
+  --brand: var(--color-primary);
+  --accent: var(--color-emerald);
+  --text: var(--color-text);
+  --muted: var(--color-muted);
+  --line: var(--color-line);
+
+  /* Typography tokens */
+  --font-display: "Cabinet Grotesk", "Satoshi", "Outfit", "Avenir Next", "Segoe UI", sans-serif;
+  --font-body: "Satoshi", "Outfit", "Avenir Next", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Cascadia Code", "Menlo", monospace;
+  --type-display-xl: clamp(2.7rem, 10vw, 6.4rem);
+  --type-display-lg: clamp(2.2rem, 5vw, 3.9rem);
+  --type-heading: clamp(1.55rem, 3.5vw, 2.1rem);
+  --type-body-lg: 1.1rem;
+  --type-body: 1rem;
+  --type-meta: 0.78rem;
+
+  /* Spacing + radius tokens */
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-12: 48px;
+
+  /* Reusable gradients */
+  --gradient-brand: linear-gradient(135deg, #395cff 0%, var(--brand) 48%, var(--accent) 100%);
+}

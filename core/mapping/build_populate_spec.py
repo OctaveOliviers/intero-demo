@@ -208,7 +208,15 @@ def _fk_adjacency(edges: list[dict] | None) -> dict[str, list[tuple[str, str, st
     """Undirected adjacency over TO-ONE FK edges only: ``table -> [(col_here,
     other_table, col_there), …]``. A to-one edge is 1:1 (the FK column is
     all-distinct), so it is safe to traverse in either direction; to-many edges
-    are omitted — joining from the key side would fan out."""
+    are omitted — Tier 1 COPIES values into the cell by JOINing along this path,
+    and a to-many hop would join one row to many and duplicate the value.
+
+    DELIBERATELY NOT IDENTICAL to the agent tool's reachability
+    (``core/agent/.opencode/tools/_run_sql._scope_adjacency`` / ``_scope_path``).
+    The agent only FILTERS rows via an ``EXISTS`` (it never copies), so it can also
+    DESCEND a to-many FK and reach the child tables Tier 1 must skip. That broader
+    rule is intentional — do NOT "re-sync" the two; see the Tier-1/Tier-3 note in
+    that module."""
     adj: dict[str, list[tuple[str, str, str]]] = {}
     for e in edges or []:
         if e.get("cardinality") != "to-one":

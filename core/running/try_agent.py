@@ -78,22 +78,48 @@ def _current_commit_sha() -> str | None:
     return sha if result.returncode == 0 and sha else None
 
 
-def write_run_context(run_store, run_dir: Path) -> Path:
+def _canonical_navigation(databases_dir: Path, slug: str) -> tuple[list, list]:
+    """``(identity_links, foreign_keys)`` from ``<databases_dir>/<slug>/model.json``.
+
+    The SAME canonical map Tier 1 reads (and :func:`provision_worktree` copies for
+    ``lookup_execute``) — never a hand-authored copy. A missing/unreadable model
+    yields empty lists: the tool then bounds only anchor-bearing tables for that
+    slug (today's behavior) rather than over-reaching."""
+    src = databases_dir / slug / "model.json"
+    try:
+        model = json.loads(src.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("write_run_context: could not read %s (%s)", src, exc)
+        return [], []
+    return (list(model.get("identity_links") or []),
+            list(model.get("foreign_keys") or []))
+
+
+def write_run_context(
+    run_store, run_dir: Path, *, databases_dir: Path = DATABASES_DIR
+) -> Path:
     """Write ``<run_dir>/context.json`` — the sidecar the agent's tools read.
 
     Uses :func:`core/agent/.opencode/tools/_run_sql.build_context` so the
     WRITER here and the READER in ``sql_execute.py`` agree on the schema by
     construction. Carries NO filesystem paths: the databases are symlinked
     into the run dir (see :func:`provision_worktree`) and the tool opens them
-    by name relative to its working directory. The context only holds what a
-    symlink can't convey — the cohort identities, the cohort anchor, which
-    tables of each bound database carry that anchor, and the **provenance
-    SHA** (storage-layout §6).
+    by name relative to its working directory. The context holds what a
+    symlink can't convey — the cohort identities, the cohort anchor, and per
+    bound database the navigation map the tool scopes with: which tables carry
+    the anchor (``cohort_tables``), the cross-database bridges (``identity_links``)
+    and the within-database to-one hops (``foreign_keys``) — read from the same
+    canonical ``model.json`` Tier 1 uses — plus the **provenance SHA**
+    (storage-layout §6).
     """
-    databases = {
-        slug: {"cohort_tables": list(run_store.cohort_tables.get(slug, []))}
-        for slug in run_store.database_paths
-    }
+    databases = {}
+    for slug in run_store.database_paths:
+        identity_links, foreign_keys = _canonical_navigation(databases_dir, slug)
+        databases[slug] = {
+            "cohort_tables": list(run_store.cohort_tables.get(slug, [])),
+            "identity_links": identity_links,
+            "foreign_keys": foreign_keys,
+        }
     context = build_context(
         run_id=run_store.run_id,
         anchor=run_store.anchor or "",
@@ -183,7 +209,7 @@ def provision_worktree(
     shutil.copy2(AGENT_OPENCODE_CONFIG, run_dir / "opencode.json")
     _symlink(run_dir / ".opencode", str(AGENT_OPENCODE_DIR))
 
-    write_run_context(run_store, run_dir)
+    write_run_context(run_store, run_dir, databases_dir=databases_dir)
 
     audit_dir = run_dir / "audit"
     audit_dir.mkdir(parents=True, exist_ok=True)

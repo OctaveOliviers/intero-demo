@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from "svelte";
+  import { _ } from "svelte-i18n";
   import { getDatabaseDetail } from "../lib/api.js";
 
   export let database;
@@ -49,31 +50,31 @@
 </script>
 
 <div class="detail">
-  <button class="back" on:click={() => dispatch("back")}>‹ Databases</button>
+  <button class="back" on:click={() => dispatch("back")}>{$_("database.back")}</button>
 
   <header class="detail-head">
     <h3>{database.name}</h3>
     {#if description}<p class="desc">{description}</p>{/if}
     <div class="meta-row">
-      <span class="level level-{metaLevel.toLowerCase()}">{metaLevel}</span>
-      {#if metaReadOnly}<span class="badge readonly">Read-only</span>{/if}
+      <span class="level level-{metaLevel.toLowerCase()}">{$_("level." + metaLevel.toLowerCase())}</span>
+      {#if metaReadOnly}<span class="badge readonly">{$_("common.readOnly")}</span>{/if}
       {#if metaScheme || metaVersion}
         <span class="scheme">{metaScheme || metaVersion}</span>
         <span class="dot">·</span>
         <span>
           {#if metaLastPulled}
-            Last pulled {metaLastPulled}
+            {$_("database.lastPulled", { values: { date: metaLastPulled } })}
           {:else}
-            No pull date
+            {$_("database.noPullDate")}
           {/if}
         </span>
       {:else}
-        <span>User-managed · no published source</span>
+        <span>{$_("database.userManaged")}</span>
       {/if}
-      {#if metaStale}<span class="stale">⚠ Newer source may exist</span>{/if}
+      {#if metaStale}<span class="stale">{$_("database.newerSource")}</span>{/if}
     </div>
     <div class="meta-row">
-      <span class="source-label">Source:</span>
+      <span class="source-label">{$_("database.sourceLabel")}</span>
       {#if metaProvenanceRef || metaProvenanceUrl}
         {#if metaProvenanceUrl}
           <a class="source-link" href={metaProvenanceUrl} target="_blank" rel="noreferrer">
@@ -83,21 +84,21 @@
           <span>{metaProvenanceRef}</span>
         {/if}
       {:else}
-        <span>No source reference</span>
+        <span>{$_("database.noSourceRef")}</span>
       {/if}
     </div>
   </header>
 
   <section class="pane">
-    <h4 class="pane-title">Database model</h4>
-    <p class="pane-sub">Model loaded from <code>var/databases/&lt;id&gt;/model.json</code>.</p>
+    <h4 class="pane-title">{$_("database.model")}</h4>
+    <p class="pane-sub">{$_("database.modelLoadedFrom", { values: { path: "var/databases/<id>/model.json" } })}</p>
 
     {#if loading}
-      <p class="state">Loading database detail…</p>
+      <p class="state">{$_("database.loadingDetail")}</p>
     {:else if error}
       <p class="error">{error}</p>
     {:else if model}
-      <h5 class="art">Tables &amp; key fields</h5>
+      <h5 class="art">{$_("database.tables")}</h5>
       <div class="entities">
         {#each tables as t (t.name)}
           <div class="entity">
@@ -112,20 +113,20 @@
       </div>
 
       {#if identifiers.length}
-        <h5 class="art">Identifiers / join keys</h5>
+        <h5 class="art">{$_("database.identifiers")}</h5>
         <ul class="plain">
           {#each identifiers as id}<li>{typeof id === "string" ? id : JSON.stringify(id)}</li>{/each}
         </ul>
       {/if}
 
       {#if coded.length}
-        <h5 class="art">Coded columns</h5>
+        <h5 class="art">{$_("database.codedColumns")}</h5>
         <ul class="plain">
           {#each coded as c}<li>{typeof c === "string" ? c : JSON.stringify(c)}</li>{/each}
         </ul>
       {/if}
     {:else}
-      <p class="pane-sub">No indexed model yet for this source.</p>
+      <p class="pane-sub">{$_("database.noModel")}</p>
     {/if}
   </section>
 </div>

@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher, tick } from "svelte";
+  import { _ } from "svelte-i18n";
 
   // A "+ Add filter" pill that expands in place into an inline text input.
   // Enter dispatches 'submit' { text }; Escape collapses. While `loading` is
@@ -51,18 +52,18 @@
 {#if !expanded}
   <button type="button" class="chip add" on:click={expand}>
     <span class="plus" aria-hidden="true">+</span>
-    <span>Add filter</span>
+    <span>{$_("spec.addFilter")}</span>
   </button>
 {:else}
   <span class="input-wrap" class:loading>
     {#if loading}
-      <span class="thinking">thinking…</span>
+      <span class="thinking">{$_("spec.thinking")}</span>
     {:else}
       <input
         bind:this={input}
         bind:value={text}
         type="text"
-        placeholder="Describe a filter, e.g. only male patients over 60…"
+        placeholder={$_("spec.addFilterPlaceholder")}
         on:keydown={handleKeydown}
         on:blur={() => !text.trim() && collapse()}
       />

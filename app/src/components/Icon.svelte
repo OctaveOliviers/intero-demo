@@ -54,6 +54,9 @@
     <!-- x -->
     <path d="M18 6 6 18" />
     <path d="m6 6 12 12" />
+  {:else if name === "check"}
+    <!-- checkmark -->
+    <path d="M20 6 9 17l-5-5" />
   {:else if name === "chevron"}
     <!-- canonical disclosure caret (rotate via transform) -->
     <path d="m9 18 6-6-6-6" />

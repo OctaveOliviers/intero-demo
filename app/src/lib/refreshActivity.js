@@ -1,10 +1,15 @@
+import { get } from "svelte/store";
+import { _ } from "svelte-i18n";
+
+// [summary field, i18n key] — the label is resolved per-call against the active
+// locale so the downstream-update rows render in the chosen language.
 const SUMMARY_KEYS = [
-  ["new_members_count", "New members"],
-  ["departed_members_count", "Departed members"],
-  ["retried_blocked_count", "Retried blocked"],
-  ["resolved_blocked_count", "Resolved blocked"],
-  ["remaining_blocked_count", "Remaining blocked"],
-  ["updated_cells_count", "Updated cells"],
+  ["new_members_count", "refresh.newMembers"],
+  ["departed_members_count", "refresh.departedMembers"],
+  ["retried_blocked_count", "refresh.retriedBlocked"],
+  ["resolved_blocked_count", "refresh.resolvedBlocked"],
+  ["remaining_blocked_count", "refresh.remainingBlocked"],
+  ["updated_cells_count", "refresh.updatedCells"],
 ];
 
 function normalizeExecutionId(value) {
@@ -36,7 +41,10 @@ export function groupActivityByExecution(events) {
     const key = executionId || "__initial__";
     let group = byKey.get(key);
     if (!group) {
-      const label = executionId ? `Refresh ${++refreshOrdinal}` : "Initial run";
+      const t = get(_);
+      const label = executionId
+        ? t("refresh.refreshN", { values: { n: ++refreshOrdinal } })
+        : t("refresh.initialRun");
       group = { key, executionId, label, events: [] };
       byKey.set(key, group);
       groups.push(group);
@@ -62,9 +70,10 @@ export function latestRefreshSummaryEvent(events) {
 }
 
 export function summaryRows(summary) {
-  return SUMMARY_KEYS.map(([key, label]) => ({
+  const t = get(_);
+  return SUMMARY_KEYS.map(([key, labelKey]) => ({
     key,
-    label,
+    label: t(labelKey),
     value: countValue(summary, key),
   }));
 }

@@ -1,12 +1,13 @@
 <script>
   import { createEventDispatcher, tick, onDestroy } from "svelte";
+  import { _ } from "svelte-i18n";
 
   // Floating popover shell, anchored under its trigger. The consumer owns `open`
   // and is responsible for wrapping trigger + popover in a position:relative span.
   export let open = false;
   export let searchable = false;
   export let query = "";
-  export let placeholder = "Search…";
+  export let placeholder = null;
 
   const dispatch = createEventDispatcher();
 
@@ -60,7 +61,7 @@
         type="text"
         bind:this={searchInput}
         bind:value={query}
-        {placeholder}
+        placeholder={placeholder ?? $_("spec.search")}
       />
     {/if}
     <div class="body">

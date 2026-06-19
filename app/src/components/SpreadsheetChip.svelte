@@ -1,4 +1,5 @@
 <script>
+  import { _ } from "svelte-i18n";
   import { openWorkbook, downloadWorkbook } from "../stores/chat.js";
   import Icon from "./Icon.svelte";
 
@@ -40,8 +41,8 @@
     type="button"
     class="download"
     on:click={handleDownload}
-    title="Download"
-    aria-label="Download"
+    title={$_("spreadsheetChip.download")}
+    aria-label={$_("spreadsheetChip.download")}
   >
     <Icon name="download" size={16} />
   </button>

@@ -44,12 +44,19 @@ generic file access — you cannot open or read any other file.
     Use the exact name as listed in the prompt; never a file path. **A run may
     bind several clinical databases** — the prompt lists every name. Different
     fields may live in different databases; query each by its own name, and use
-    `lookup_execute({"database": "<name>"})` to see what each one holds.
+    `lookup_execute({"database": "<name>"})` to see what each one holds. **You may
+    read ANY bound clinical database**, and a single query may join across them
+    (see "Reaching another database" below).
   - **Write plain SQL.** Do not add cohort/patient filters or any other scoping
-    — the tool injects them. Do not pass an identifier; the tool knows which
-    run/cohort it is serving.
+    — the tool injects them, bounding every table to the cohort (directly, or
+    through the map's bridges/joins). Do not pass an identifier; the tool knows
+    which run/cohort it is serving. **One statement only** — never write `ATTACH`,
+    `PRAGMA`, or DDL; the tool wires the databases together for you.
 - `lookup_execute(...)` — read what a field expects or what a database holds.
-  - `{"field": "<id>"}` — that field's type, permitted codes, notes.
+  - `{"field": "<id>"}` — that field's type, permitted codes, notes. The `<id>`
+    is the **full canonical slug** (e.g. `patient-details/ethnic_category`), not a
+    short name (`ethnic_category`). If a lookup misses, it suggests the closest
+    canonical id — re-issue with that id; do not guess other variants.
   - `{"audit": true}` — every field's id + name.
   - `{"database": "<name>"}` — the database digest: per-table grain + row counts,
     the foreign-key/identity join graph, and conventions.
@@ -59,7 +66,59 @@ generic file access — you cannot open or read any other file.
     follow that measured graph to write the join — never guess a join from column
     names.
 
+### Reaching another database
+
+A field's data may live in a database other than the one a visit is anchored in
+(e.g. patient demographics, or a registration/diagnosis narrative, in a separate
+database). You can read it. Address that database by its own name with
+`sql_execute`, or reach it from another in **one** query: qualify a table in a
+different bound database as `"<database-name>".<table>` and join on the linking
+column. The tool bounds every table to the cohort for you — including the foreign
+one, translated through the map — so write the join, not the scope.
+
+To know which column links two databases (and which columns join tables within
+one), read `lookup_execute({"database": "<name>"})`: its `identity_links` give the
+cross-database bridges (this database's column = a sibling database's key) and its
+`foreign_keys` give the within-database joins. Follow that measured graph — never
+guess a cross-database key from column names. If the tool reports a table cannot
+be scoped to the cohort, it is not reachable through the map from a cohort table;
+pick a table the `identity_links`/`foreign_keys` do connect.
+
 ## Steps
+
+**The routine — follow it, do not re-derive it.** Per field/column, in order:
+
+1. Look up the field spec **once**, with the full canonical id
+   (`lookup_execute {"field": "patient-details/ethnic_category"}`). If it misses,
+   re-issue with the id it suggests — never guess other variants.
+2. From the field spec + the database map (`lookup_execute {"database": …}`),
+   list the **distinct plausible sources** for the field — every table/column/
+   database where its value could live (e.g. a structured column, a clinical
+   note, a second database). There is usually more than one.
+3. Query those sources for the column's members.
+4. For each member: **fill** it if the value is found, else **block it with a
+   reason**. **Fill before you block** — never run a column-wide
+   `state='blocked'` before the fills; block only the members genuinely empty
+   *after* the fill attempt. (A block-first UPDATE leaves the fill matching 0
+   rows and wrongly blocks the whole column.)
+5. **Block a cell only once you have checked every distinct plausible source for
+   it and none has the value.** A miss in the first source is NOT a reason to
+   block — try the other plausible sources first.
+
+**Retrying — what counts and what doesn't.** A query that comes back with an
+**error** (malformed SQL, wrong column/table name, bad syntax) has checked
+*nothing* — fix it and re-run it against the same source; that is correct, not
+thrashing. A query that **ran successfully and returned no value** *has* checked
+that source — don't re-run the identical query; move to the next plausible
+source. Block a cell only after every distinct plausible source has been
+**successfully queried** and missed.
+
+The cap is on **wasted** work, not on breadth or on error-recovery: don't re-run
+an identical query that already executed, and don't re-decide a question you've
+already settled or loop without new information — but DO fix-and-retry an errored
+query, and DO check every genuinely-different source before blocking. The spec +
+map bound the number of sources, so this terminates on its own. Decide and write;
+don't narrate "on one hand… but the rules say…" — the rules are here, apply them.
 
 ### 1. Triage the work by column — `sql_execute`
 
@@ -116,8 +175,17 @@ For each EMPTY column, once:
    into its own statement — and re-issue; a rejection aborts the whole
    statement, no cell is half-written.
 
-5. Members the source query did not return get blocked **in one statement**
-   the same way (see step 5), with `member IN (...)` listing the absentees.
+   **Read broad, write narrow.** Keep reading the column in one broad query —
+   that is efficient and correct. You attach the same column-wide query as the
+   shared source, and the tool **narrows each cell's stored source to that cell's
+   own member** (`… WHERE patient_code = '<member>'`), so clicking a cell shows
+   only that patient's row — never the whole column. You don't write the per-cell
+   filter; the tool adds it.
+
+5. **Only after the fill UPDATE has run**, block the members the source query
+   did not return — **in one statement** the same way (see §6), with
+   `member IN (...)` listing exactly those absentees. Never block the column
+   first: a block-before-fill leaves your fill matching 0 rows.
 
 ### 3. Phase B — resolve the PARTIAL columns' stragglers
 
@@ -140,23 +208,32 @@ where the data lives. For each PARTIAL column:
 ### 4. Phase C — INTERPRET cells, one by one
 
 Interpreted values are judged from free text and worked **cell-by-cell** —
-this is the one phase where per-cell effort is irreducible. For an interpreted
-cell, set `state='filled'` (the store automatically flags an interpret cell as
-awaiting clinician review — you do NOT write a `needs_verification` state, which
-is not a valid stored state and will be rejected) and put the verbatim evidence
-**inside the source as `citations`** — a list of **exact substrings** of the note that
-justify the value — alongside the note's `row_id` (its own primary key, e.g.
-the note id or date). The source's `query` must project the patient identity,
-that row identifier, and the source text — so a reviewer finds the exact note.
-One source per note; one note can carry several citations.
+this is the one phase where per-cell effort is irreducible. **Fill one interpret
+cell per UPDATE** (`WHERE ref='<one cell>'`): each interpret cell has its own
+explanation and its own note, so the tool **rejects an UPDATE that fills more than
+one interpret cell** at once. You may still read broadly to find the right note —
+only the write is per-cell.
+
+For an interpreted cell, set `state='filled'` (the store automatically flags an
+interpret cell as awaiting clinician review — you do NOT write a
+`needs_verification` state, which is not a valid stored state and will be
+rejected) and put the verbatim evidence **inside the source as `citations`** — a
+list of **exact substrings** of the note that justify the value — alongside the
+note's `row_id` (its own primary key) and `row_key` (the column that primary key
+is in, e.g. `note_id`). Scope the source's `query` to **that one note**
+(`… WHERE <row_key> = '<row_id>'`) and project the patient identity, that row
+identifier, and the source text — so clicking the cell shows the single cited
+note, not every note for the patient. One source per note; one note can carry
+several citations.
 
 ```json
-{"database": "cells", "sql": "UPDATE cells SET value='Patient declined dose increase', state='filled', confidence='medium', resolved_by='agent', explanation='Note from 2024-03-12 for P042 documents the patient''s refusal — per the field instruction the documented reason is the patient''s own decision.', sources='[{\"database\":\"cord-ph\",\"query\":\"SELECT patient_code, note_id, note_date, note_text FROM clinician_notes WHERE patient_code = ''P042'' ORDER BY note_date\",\"table_column\":\"clinician_notes.note_text\",\"row_id\":\"note-2291\",\"citations\":[\"patient declined dose increase, prefers to retry diet first\"]}]' WHERE ref='ALL!G42'"}
+{"database": "cells", "sql": "UPDATE cells SET value='Patient declined dose increase', state='filled', confidence='medium', resolved_by='agent', explanation='Note from 2024-03-12 for P042 documents the patient''s refusal — per the field instruction the documented reason is the patient''s own decision.', sources='[{\"database\":\"cord-ph\",\"query\":\"SELECT patient_code, note_id, note_date, note_text FROM clinician_notes WHERE patient_code = ''P042'' AND note_id = ''note-2291''\",\"table_column\":\"clinician_notes.note_text\",\"row_id\":\"note-2291\",\"row_key\":\"note_id\",\"citations\":[\"patient declined dose increase, prefers to retry diet first\"]}]' WHERE ref='ALL!G42'"}
 ```
 
 Each citation must be an **exact substring** of the note text — not a paraphrase.
 If the value draws on several notes, include **one source per note**, each with
-its own `row_id` and `citations`, so every contributing note is highlighted.
+its own `row_id`, `row_key`, and `citations`, so every contributing note is
+highlighted. Write each interpret cell in its own UPDATE.
 
 ### 5. What every write must carry
 
@@ -167,8 +244,8 @@ rules. Every write must:
 - Set `state`, `confidence`, `resolved_by='agent'`, and a short `explanation`.
 - **Set `sources` to a JSON array with at least one source.** A source is a JSON
   object: `{"database": "<name>", "query": "<sql>", "table_column": "<table.column>"}`,
-  plus `"row_id"` + `"citations"` for a note (see Phase C). The write is **rejected**
-  if `sources` is empty. You do NOT repeat the patient identity on the source — it
+  plus `"row_id"` + `"row_key"` + `"citations"` for a note (see Phase C). The write is
+  **rejected** if `sources` is empty. You do NOT repeat the patient identity on the source — it
   is the cell's `member` already; just make the `query` project it so the value is
   verifiable. For a column-wide write, the one shared query that returns every
   value **alongside the patient identity** is the source — never a bare

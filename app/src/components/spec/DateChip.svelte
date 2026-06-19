@@ -3,13 +3,14 @@
   import Chip from "./Chip.svelte";
   import ChipPopover from "./ChipPopover.svelte";
   import Calendar from "./Calendar.svelte";
+  import { monthNames } from "../../i18n/localeTag.js";
 
   // A `date` chip: `raw` holds the ISO date, `value` the human display string.
   export let chip;
 
   const dispatch = createEventDispatcher();
 
-  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const MONTHS = monthNames("short");
 
   let open = false;
 

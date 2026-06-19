@@ -1,6 +1,10 @@
-// Pure deadline subtitle logic for Results top-band rendering.
+// Deadline subtitle logic for Results top-band rendering.
 // Input: template deadline date + optional now override.
-// Output: { mode, text } | null
+// Output: { mode, text } | null — `text` is localized to the active language.
+
+import { get } from "svelte/store";
+import { _ } from "svelte-i18n";
+import { LOCALE_TAG } from "../i18n/index.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -28,7 +32,7 @@ function toUtcDateOnly(value) {
 }
 
 function formatDateUtc(date) {
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat(LOCALE_TAG, {
     timeZone: "UTC",
     day: "2-digit",
     month: "short",
@@ -43,16 +47,17 @@ export function getDeadlineSubtitle(deadlineDate, now = new Date()) {
   const today = toUtcDateOnly(now);
   if (!today) return null;
 
+  const t = get(_);
   const daysUntil = Math.floor((deadline.getTime() - today.getTime()) / DAY_MS);
   if (daysUntil === 0) {
-    return { mode: "today", text: "submission due today" };
+    return { mode: "today", text: t("deadline.dueToday") };
   }
   if (daysUntil > 0 && daysUntil <= 10) {
     return {
       mode: "countdown",
-      text: `${daysUntil} day${daysUntil === 1 ? "" : "s"} until submission`,
+      text: t("deadline.daysUntil", { values: { days: daysUntil } }),
     };
   }
 
-  return { mode: "date", text: `submission deadline: ${formatDateUtc(deadline)}` };
+  return { mode: "date", text: t("deadline.deadline", { values: { date: formatDateUtc(deadline) } }) };
 }

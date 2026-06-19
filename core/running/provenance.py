@@ -23,6 +23,10 @@ class Source(BaseModel):
     # The evidence row's own PK — recorded for one-to-many / interpreted sources so
     # the exact row is recoverable; omitted for a one-row-per-identity direct copy.
     row_id: str | None = None
+    # The column ``row_id`` is a value of (e.g. ``note_id``) — lets the run store
+    # scope a note source's ``query`` to that one row (``WHERE <row_key> = <row_id>``)
+    # so clicking the cell shows the single cited note, not all of a patient's notes.
+    row_key: str | None = None
     # Verbatim passage(s) from THIS row (note sources only); min_length guards a
     # caller passing [] (the contract forbids an empty citations array).
     citations: list[str] | None = Field(default=None, min_length=1)

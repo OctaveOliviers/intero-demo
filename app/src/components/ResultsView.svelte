@@ -11,9 +11,10 @@
   import SpreadsheetViewer from "./SpreadsheetViewer.svelte";
   import Icon from "./Icon.svelte";
   import ScanningEye from "./ScanningEye.svelte";
+  import { _ } from "svelte-i18n";
 
   $: currentAudit = $audits.find((a) => a.id === $currentAuditId) || null;
-  $: title = currentAudit?.title || "Audit results";
+  $: title = currentAudit?.title || $_("results.title");
   $: activeRunId = $activeWorkbook?.runId || currentAudit?.runId || null;
   $: templateDeadline = currentAudit?.submissionDeadline || null;
   $: deadlineSubtitle = getDeadlineSubtitle(templateDeadline)?.text || null;
@@ -40,28 +41,28 @@
     <div class="title-block">
       <div class="title-row">
         <h1>{title}</h1>
-        <div class="band-controls" aria-label="Result controls">
+        <div class="band-controls" aria-label={$_("results.controlsAria")}>
           <button
             type="button"
             class="control"
             on:click={onDownload}
             disabled={!activeRunId}
-            title={activeRunId ? "Download workbook" : "Workbook not ready"}
-            aria-label="Download workbook"
+            title={activeRunId ? $_("results.downloadWorkbook") : $_("results.workbookNotReady")}
+            aria-label={$_("results.downloadWorkbook")}
           >
             <Icon name="download" size={14} />
-            <span class="sr-only">Download</span>
+            <span class="sr-only">{$_("common.download")}</span>
           </button>
 
           <button
             type="button"
             class="control"
             on:click={() => togglePanel(RIGHT_PANEL_MODES.INCLUSION_CRITERIA)}
-            aria-label="Toggle inclusion criteria panel"
-            title="Inclusion criteria"
+            aria-label={$_("results.toggleInclusion")}
+            title={$_("results.inclusionCriteria")}
           >
             <Icon name="settings" size={14} />
-            <span class="sr-only">Inclusion criteria</span>
+            <span class="sr-only">{$_("results.inclusionCriteria")}</span>
           </button>
 
           <button
@@ -70,15 +71,15 @@
             class:is-running={activityRunning}
             class:is-complete={!activityRunning}
             on:click={onActivityControlClick}
-            aria-label="Toggle activity panel"
-            title="Activity"
+            aria-label={$_("results.toggleActivity")}
+            title={$_("results.activity")}
           >
             {#if activityRunning}
               <ScanningEye size={14} />
-              <span class="sr-only">Activity running</span>
+              <span class="sr-only">{$_("results.activityRunning")}</span>
             {:else}
               <Icon name="eye" size={14} />
-              <span class="sr-only">Activity idle</span>
+              <span class="sr-only">{$_("results.activityIdle")}</span>
             {/if}
           </button>
         </div>
@@ -86,16 +87,16 @@
         <!-- Status counters: far right of the SAME band (doc 11 §Status
              counters) — hidden at zero, live-updating, click = pure
              open/scroll to the review summary in the activity feed. -->
-        <div class="status-counters" aria-label="Run status counters">
+        <div class="status-counters" aria-label={$_("results.countersAria")}>
           {#if counters.blocked > 0}
             <button
               type="button"
               class="counter is-blocked"
               on:click={requestSummaryScroll}
-              title="Open the review summary"
-              aria-label="{counters.blocked} blocked cells — open the review summary"
+              title={$_("results.openReviewSummary")}
+              aria-label={$_("results.blockedAria", { values: { count: counters.blocked } })}
             >
-              Blocked <strong>{counters.blocked}</strong>
+              {$_("results.blocked")} <strong>{counters.blocked}</strong>
             </button>
           {/if}
           {#if counters.needsReview > 0}
@@ -103,10 +104,10 @@
               type="button"
               class="counter is-needs-review"
               on:click={requestSummaryScroll}
-              title="Open the review summary"
-              aria-label="{counters.needsReview} cells need review — open the review summary"
+              title={$_("results.openReviewSummary")}
+              aria-label={$_("results.needsReviewAria", { values: { count: counters.needsReview } })}
             >
-              Needs review <strong>{counters.needsReview}</strong>
+              {$_("results.needsReview")} <strong>{counters.needsReview}</strong>
             </button>
           {/if}
         </div>
@@ -122,7 +123,7 @@
     {#if $activeWorkbook}
       <SpreadsheetViewer />
     {:else}
-      <div class="empty-state">Workbook will appear here once available.</div>
+      <div class="empty-state">{$_("results.workbookPlaceholder")}</div>
     {/if}
   </section>
 </div>

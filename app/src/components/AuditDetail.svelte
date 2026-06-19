@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher, onMount } from "svelte";
+  import { _ } from "svelte-i18n";
   import { getAuditDetail, saveAuditCriteria } from "../lib/api.js";
   import { getDeadlineSubtitle } from "../lib/deadlineSubtitle.js";
   import {
@@ -140,7 +141,7 @@
 </script>
 
 <div class="detail">
-  <button class="back" on:click={() => dispatch("back")}>‹ Templates</button>
+  <button class="back" on:click={() => dispatch("back")}>{$_("audit.back")}</button>
 
   <header class="detail-head">
     <div class="titles">
@@ -148,25 +149,25 @@
       {#if template.description}<p class="desc">{template.description}</p>{/if}
       {#if deadline}<p class="deadline">{deadline.text}</p>{/if}
       {#if metaReadOnly}
-        <div class="meta-row"><span class="badge readonly">Read-only</span></div>
+        <div class="meta-row"><span class="badge readonly">{$_("common.readOnly")}</span></div>
       {/if}
     </div>
     {#if metaReadOnly}
-      <button class="clone-btn" on:click={() => dispatch("clone")}>Clone to local</button>
+      <button class="clone-btn" on:click={() => dispatch("clone")}>{$_("common.cloneToLocal")}</button>
     {/if}
   </header>
 
   {#if loading}
-    <div class="state">Loading audit detail…</div>
+    <div class="state">{$_("audit.loadingDetail")}</div>
   {:else if error}
     <div class="error">{error}</div>
   {:else if detail}
     <section class="section">
-      <h4 class="section-title">Inclusion criteria</h4>
+      <h4 class="section-title">{$_("audit.inclusionCriteria")}</h4>
       {#if !mapping}
-        <p class="hint">No inclusion criteria yet — pair a database with this audit to define its cohort.</p>
+        <p class="hint">{$_("audit.noCriteriaYet")}</p>
       {:else if criteria.length === 0}
-        <p class="hint">No fixed inclusion criteria — every patient record is in scope.</p>
+        <p class="hint">{$_("audit.noFixedCriteria")}</p>
       {:else}
         <div class="chips">
           {#each criteria as c (c.criterion_id)}
@@ -190,7 +191,7 @@
                       use:autofocus
                       on:keydown={(e) => draftKeydown(e, c)}
                     />
-                    <button type="button" class="apply" on:click={() => applyDraft(c)}>Apply</button>
+                    <button type="button" class="apply" on:click={() => applyDraft(c)}>{$_("common.apply")}</button>
                   </div>
                 </ChipPopover>
               </span>
@@ -198,7 +199,7 @@
                 <button
                   type="button"
                   class="remove"
-                  aria-label="Remove {c.display}"
+                  aria-label={$_("audit.removeCriterion", { values: { label: c.display } })}
                   on:click={() => removeCriterion(c)}
                 ><Icon name="close" size={10} /></button>
               {/if}
@@ -210,9 +211,9 @@
     </section>
 
     <section class="section">
-      <h4 class="section-title">Databases</h4>
+      <h4 class="section-title">{$_("audit.databases")}</h4>
       {#if !mapping}
-        <p class="hint">No database is paired with this audit yet.</p>
+        <p class="hint">{$_("audit.noDatabasePaired")}</p>
       {:else}
         <div class="rows">
           {#each databaseChips as db (db.id)}
@@ -226,9 +227,9 @@
     </section>
 
     <section class="section">
-      <h4 class="section-title">Template</h4>
+      <h4 class="section-title">{$_("audit.template")}</h4>
       {#if !mapping}
-        <p class="hint">Pair a database with this audit to see how each field is filled.</p>
+        <p class="hint">{$_("audit.pairDatabaseHint")}</p>
       {/if}
       <div class="rows">
         {#each fieldChips as f (f.key)}

@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from "svelte";
+  import { _ } from "svelte-i18n";
   import { fly } from "svelte/transition";
   import Chip from "./Chip.svelte";
   import ChipPopover from "./ChipPopover.svelte";
@@ -59,7 +60,7 @@
   // Derive a crisp summary line from a chosen template, e.g.
   // "Cord pH (local)" → "Cord pH audit", "NNAP (national)" → "NNAP audit".
   function summaryFor(template) {
-    return `${baseName(template)} audit`;
+    return $_("spec.auditSuffix", { values: { name: baseName(template) } });
   }
 
   function selectTemplate(template) {
@@ -94,10 +95,10 @@
 </script>
 
 <section class="output-spec">
-  <h3 class="title" in:fly={lineIn(0)}>Output specifications</h3>
+  <h3 class="title" in:fly={lineIn(0)}>{$_("spec.outputSpecifications")}</h3>
 
   <div class="template-row" in:fly={lineIn(1)}>
-    <span class="label">Template</span>
+    <span class="label">{$_("spec.template")}</span>
     <span
       class="chip-wrap"
       bind:this={chipWrapEl}
@@ -134,7 +135,7 @@
         <div class="preview" role="tooltip" style={previewStyle}>
           <p class="preview-desc">{currentTemplate.description}</p>
           <p class="preview-cols">
-            <span class="cols-label">Columns:</span>
+            <span class="cols-label">{$_("spec.columnsLabel")}</span>
             {currentTemplate.columns.join(", ")}
           </p>
         </div>
@@ -144,13 +145,13 @@
 
   {#each refinements as r, i (r.id)}
     <div class="refinement-row" in:fly={lineIn(2 + i)}>
-      <span class="label">Refinement</span>
+      <span class="label">{$_("spec.refinement")}</span>
       <span class="chip-slot removable">
         <span class="static-chip">{r.value}</span>
         <button
           type="button"
           class="remove"
-          aria-label="Remove {r.value}"
+          aria-label={$_("common.remove", { values: { label: r.value } })}
           on:click={() => removeRefinement(r.id)}
         ><Icon name="close" size={10} /></button>
       </span>

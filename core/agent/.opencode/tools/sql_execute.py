@@ -9,10 +9,18 @@ rest:
   only ever touches its own run; off-code / state legality are enforced by the
   store's own DB triggers (a rejection is handed straight back).
 * **any other name** (a clinical database) → opened read-only; only `SELECT` is
-  allowed; ``<anchor> IN (cohort)`` is injected onto every cohort-bearing table
-  so the agent can never read outside the audited cohort.
+  allowed. The named database is ``main`` and EVERY other bound database is
+  ATTACHed read-only (aliased by slug) on the same connection, so one statement
+  can join across databases. A cohort predicate is injected onto every top-level
+  table: a table that carries the anchor is bounded by ``<anchor> IN (cohort)``;
+  a foreign-database table is bounded — via the precomputed map (``identity_links``
+  + safe ``foreign_keys`` paths: to-one both ways, and to-many parent→child
+  descent) — to the same cohort, translated into that database's bridge key. A
+  table the map cannot bound makes the query rejected (fail-safe).
+  The agent's SUBMITTED SQL may never contain ATTACH/PRAGMA/DDL/multiple
+  statements — the tool performs the ATTACH itself at setup, never from agent SQL.
 
-The run context (run id, cohort, anchor, database paths) is read from the run
+The run context (run id, cohort, anchor, database map) is read from the run
 worktree (``context.json`` in the working directory), never from the agent.
 """
 
@@ -32,12 +40,14 @@ from _run_sql import (
     is_select,
     load_context,
     parse,
+    reject_multiple_statements,
     reject_nested_queries,
     render,
+    scope_source_to_cell,
     serialize_rows,
     top_level_tables,
 )
-from _sql_runtime import install_progress_guard, readonly_connection
+from _sql_runtime import attached_readonly_connection, install_progress_guard
 
 CELLS = "cells"
 logger = logging.getLogger(__name__)
@@ -97,10 +107,11 @@ def _run_cells(ctx: dict, sql: str) -> dict:
                 f"To record a value, write: UPDATE cells SET value=..., state='filled', "
                 f"confidence=..., resolved_by='agent', sources='[{{...}}]' WHERE ref='<cell ref>'."
             )
-        scoped = inject_run(tree, run_id)
-        if not scoped.find(exp.Returning):
-            scoped = scoped.copy()
-            scoped.set("returning", exp.Returning(expressions=[exp.column("ref")]))
+        scoped = inject_run(tree, run_id).copy()
+        # Always RETURN the columns we post-process on: ref (what was written),
+        # plus kind/state/member (interpret-batch guard + per-cell source scoping).
+        scoped.set("returning", exp.Returning(expressions=[
+            exp.column(c) for c in ("ref", "kind", "state", "member")]))
         conn = sqlite3.connect(state_db, timeout=5)
         try:
             # Connection-scoped guard: no write may touch another run, even if the
@@ -111,7 +122,10 @@ def _run_cells(ctx: dict, sql: str) -> dict:
                 f"WHEN NEW.run_id <> '{safe}' OR OLD.run_id <> '{safe}' "
                 f"BEGIN SELECT RAISE(ABORT, 'cross-run write denied'); END"
             )
-            refs = [r[0] for r in conn.execute(render(scoped)).fetchall()]
+            written = conn.execute(render(scoped)).fetchall()  # [(ref, kind, state, member)]
+            refs = [r[0] for r in written]
+            _reject_batched_interpret_fill(written)  # raises before commit → rolls back
+            _scope_cell_sources(conn, ctx, run_id, written)
             _stamp_attempts(conn, run_id, refs, sql)
             conn.commit()
             return {"ok": True, "updated": refs, "updatedCount": len(refs),
@@ -139,9 +153,72 @@ def _stamp_attempts(conn: sqlite3.Connection, run_id: str, refs: list[str], sql:
                      (json.dumps(attempts), run_id, ref))
 
 
+def _reject_batched_interpret_fill(written: list[tuple]) -> None:
+    """An interpret (free-text) cell's explanation and note source are unique to
+    that cell, but a column-wide UPDATE sets `explanation`/`sources` as one shared
+    literal across every row it fills. So an interpret cell may only be FILLED by a
+    single-cell write — refuse a batch that fills an interpret cell alongside any
+    other. (Batched blocks are fine; only fills carry an explanation/source.)"""
+    filled = [(ref, kind) for ref, kind, state, _ in written
+              if (state or "").lower() == "filled"]
+    interpret = [ref for ref, kind in filled if (kind or "").lower() == "interpret"]
+    if interpret and len(filled) > 1:
+        raise ToolError(
+            f"interpret (free-text) cells must be filled one at a time, so each carries "
+            f"its own explanation and its own note source. This UPDATE fills {len(filled)} "
+            f"cells including interpret cell(s) {sorted(interpret)}. Re-issue one UPDATE per "
+            f"interpret cell, each with WHERE ref='<that cell>'."
+        )
+
+
+def _scope_cell_sources(conn: sqlite3.Connection, ctx: dict, run_id: str,
+                        written: list[tuple]) -> None:
+    """Narrow each just-filled cell's stored source(s) to that cell only: the agent
+    may read/write a broad column-wide query, but the persisted source must show
+    only this member's row (and, for a note, the single cited row). Synthesize, not
+    override — `scope_source_to_cell` leaves a query the agent already scoped."""
+    anchor = ctx.get("anchor") or ""
+    databases = ctx.get("databases") or {}
+    if not anchor:
+        return
+    for ref, _kind, _state, member in written:
+        if member is None:
+            continue
+        row = conn.execute("SELECT sources FROM cells WHERE run_id = ? AND ref = ?",
+                           (run_id, ref)).fetchone()
+        if not row or not row[0]:
+            continue
+        try:
+            sources = json.loads(row[0])
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(sources, list):
+            continue
+        changed = False
+        for s in sources:
+            if not isinstance(s, dict) or not isinstance(s.get("query"), str) or not s["query"]:
+                continue
+            cohort_tables = set((databases.get(s.get("database")) or {}).get("cohort_tables") or [])
+            new_q = scope_source_to_cell(
+                s["query"], anchor=anchor, member=member, cohort_tables=cohort_tables,
+                row_key=s.get("row_key"), row_id=s.get("row_id"))
+            if new_q != s["query"]:
+                s["query"] = new_q
+                changed = True
+        if changed:
+            conn.execute("UPDATE cells SET sources = ? WHERE run_id = ? AND ref = ?",
+                         (json.dumps(sources), run_id, ref))
+
+
 def _run_hospital(ctx: dict, name: str, sql: str) -> dict:
-    """Read a clinical database. SELECT only; cohort injected onto every
-    cohort-bearing table."""
+    """Read the clinical databases. SELECT only; cohort injected onto every
+    top-level table; named DB is ``main`` with the rest ATTACHed by slug."""
+    # The agent's SUBMITTED SQL is a single read-only SELECT — never an ATTACH,
+    # PRAGMA, DDL, or a second statement. The tool performs the ATTACH itself at
+    # setup (below); it must never come from the agent. Reject multiple statements
+    # FIRST so a trailing statement gets the precise message (parse() keeps only
+    # the first), then enforce SELECT-only and no nested query blocks.
+    reject_multiple_statements(sql)
     tree = parse(sql)
     if not is_select(tree):
         raise ToolError(
@@ -163,9 +240,14 @@ def _run_hospital(ctx: dict, name: str, sql: str) -> dict:
         tree,
         anchor=require_string(ctx, "anchor"),
         cohort=list(ctx.get("cohort") or []),
-        cohort_tables=set(entry.get("cohort_tables") or []),
+        databases=databases,
+        target_db=name,
     )
-    with readonly_connection(_hospital_db(name)) as conn:
+    # ONE read-only connection: the named DB is `main`, every OTHER bound DB is
+    # ATTACHed read-only by slug, so the injected cohort-translation subqueries
+    # (and any cross-DB join the agent writes) resolve on a single statement.
+    attach = {slug: _hospital_db(slug) for slug in databases if slug != name}
+    with attached_readonly_connection(_hospital_db(name), attach) as conn:
         install_progress_guard(conn)
         cur = conn.execute(render(scoped))
         cols, rows = serialize_rows(cur)

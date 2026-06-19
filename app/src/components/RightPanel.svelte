@@ -30,6 +30,7 @@
     shouldShowRefreshAction,
     summaryRows,
   } from "../lib/refreshActivity.js";
+  import { _ } from "svelte-i18n";
 
   $: panelMode = $resultViewUiState.rightPanelMode;
   $: currentAudit = $audits.find((a) => a.id === $currentAuditId) || null;
@@ -81,22 +82,22 @@
     const state = String(meta.state || "").toLowerCase();
     const reviewState = String(meta.review_state ?? meta.reviewState ?? "").toLowerCase();
     const confidence = String(meta.confidence || "").toLowerCase();
-    let label = "Filled";
+    let label = $_("rightPanel.statusFilled");
     let tone = "settled";
     if (state === "blocked") {
-      label = "Blocked";
+      label = $_("rightPanel.statusBlocked");
       tone = "blocked";
     } else if (state === "not_applicable") {
-      label = "Not applicable";
+      label = $_("rightPanel.statusNotApplicable");
       tone = "muted";
     } else if (state === "pending") {
-      label = "Pending";
+      label = $_("rightPanel.statusPending");
       tone = "muted";
     } else if (reviewState === "reviewed") {
-      label = "Reviewed";
+      label = $_("rightPanel.statusReviewed");
       tone = "settled";
     } else if (reviewState === "not_reviewed") {
-      label = "Filled · needs review";
+      label = $_("rightPanel.statusFilledNeedsReview");
       tone = "review";
     }
     return {
@@ -109,7 +110,7 @@
   }
 
   function labelFromField(field) {
-    if (!field) return "Criteria";
+    if (!field) return $_("rightPanel.criteriaFallback");
     const spaced = String(field).replace(/[_-]+/g, " ").replace(/([A-Z])/g, " $1");
     return spaced.charAt(0).toUpperCase() + spaced.slice(1).trim();
   }
@@ -142,7 +143,7 @@
     refreshPending = true;
     try {
       await startRefreshFromPanel();
-      refreshMessage = "Update check started.";
+      refreshMessage = $_("rightPanel.updateCheckStarted");
     } catch (err) {
       refreshError = err?.message || String(err);
       console.error("check-for-updates failed", err);
@@ -153,21 +154,24 @@
 </script>
 
 <div class="right-panel" style="width: {rightPanelWidth}px">
-  <button class="close-btn" on:click={closePanel} aria-label="Close panel">
+  <button class="close-btn" on:click={closePanel} aria-label={$_("rightPanel.closePanel")}>
     <Icon name="close" size={18} />
   </button>
 
   {#if panelMode === RIGHT_PANEL_MODES.CELL_EVIDENCE}
     <div class="panel-body">
       {#if !cellStatus && !$activeCommand}
-        <div class="status">Select a cell to inspect its evidence.</div>
+        <div class="status">{$_("rightPanel.selectCell")}</div>
       {/if}
 
       {#if cellStatus}
         <section class="block">
-          <div class="block-label">Status</div>
+          <div class="block-label">{$_("rightPanel.status")}</div>
           <div class="cell-status cell-status--{cellStatus.tone}">
-            {cellStatus.label}{#if cellStatus.confidence} · {cellStatus.confidence} confidence{/if}
+            <span>{cellStatus.label}</span>
+            {#if cellStatus.confidence}
+              <span class="cell-status-confidence">{$_("confidence.suffix", { values: { level: $_("confidence." + cellStatus.confidence) } })}</span>
+            {/if}
           </div>
           {#if cellStatus.reasonCode || cellStatus.reasonDetail}
             <div class="cell-reason">
@@ -184,7 +188,7 @@
 
       {#if cellExplanation}
         <section class="block">
-          <div class="block-label">Explanation</div>
+          <div class="block-label">{$_("rightPanel.explanation")}</div>
           <div class="explanation">
             <p class="explanation-text">{cellExplanation}</p>
           </div>
@@ -193,7 +197,7 @@
 
       {#if $activeCommand?.sql}
         <section class="block">
-          <div class="block-label">Query</div>
+          <div class="block-label">{$_("rightPanel.query")}</div>
           <SqlDisplay sql={$activeCommand.sql} />
         </section>
       {/if}
@@ -201,18 +205,18 @@
       {#if $activeCommand?.sql}
         <section class="block">
           {#if $activeCommand.loading}
-            <div class="status">Running query…</div>
+            <div class="status">{$_("rightPanel.runningQuery")}</div>
           {:else if $activeCommand.error}
             <div class="error">{$activeCommand.error}</div>
           {:else if $activeCommand.result}
             {#if hasEvidence}
               <div class="block-label">
-                Source note{$activeCommand.result.rowCount !== 1 ? "s" : ""}
+                {$activeCommand.result.rowCount !== 1 ? $_("rightPanel.sourceNotes") : $_("rightPanel.sourceNote")}
               </div>
               <NoteEvidenceView result={$activeCommand.result} quotes={$activeCommand.evidence} />
             {:else}
               <div class="block-label">
-                Result · {$activeCommand.result.rowCount} row{$activeCommand.result.rowCount !== 1 ? "s" : ""} · {$activeCommand.result.durationMs}ms
+                {$_("rightPanel.result")} · {$_("rightPanel.resultMeta", { values: { rows: $activeCommand.result.rowCount, ms: $activeCommand.result.durationMs } })}
               </div>
               <SqlResultViewer result={$activeCommand.result} />
             {/if}
@@ -223,7 +227,7 @@
   {:else if panelMode === RIGHT_PANEL_MODES.AGENT_ACTIVITY}
     <div class="panel-body">
       <section class="block">
-        <div class="block-label">Agent activity</div>
+        <div class="block-label">{$_("rightPanel.agentActivity")}</div>
 
         <!-- The whole live stream lives in ONE collapsible gray box. Keyed on the
              audit so its fold/scroll state is per-audit, not carried across a
@@ -246,29 +250,29 @@
             class="review-entry"
             bind:this={summaryEl}
             aria-live="polite"
-            aria-label="Review summary"
+            aria-label={$_("rightPanel.reviewSummary")}
           >
-            <div class="review-entry-head">Review summary</div>
+            <div class="review-entry-head">{$_("rightPanel.reviewSummary")}</div>
             <div class="review-totals">
-              <span class="total">Cells <strong>{summaryTotals?.cells ?? 0}</strong></span>
-              <span class="total">Filled <strong>{summaryTotals?.filled ?? 0}</strong></span>
-              <span class="total is-needs-review">Needs review <strong>{summaryTotals?.needs_verification ?? 0}</strong></span>
-              <span class="total is-needs-review">Low confidence <strong>{summaryTotals?.low_confidence ?? 0}</strong></span>
-              <span class="total is-blocked">Blocked <strong>{summaryTotals?.blocked ?? 0}</strong></span>
+              <span class="total">{$_("rightPanel.cells")} <strong>{summaryTotals?.cells ?? 0}</strong></span>
+              <span class="total">{$_("rightPanel.filled")} <strong>{summaryTotals?.filled ?? 0}</strong></span>
+              <span class="total is-needs-review">{$_("rightPanel.needsReview")} <strong>{summaryTotals?.needs_verification ?? 0}</strong></span>
+              <span class="total is-needs-review">{$_("rightPanel.lowConfidence")} <strong>{summaryTotals?.low_confidence ?? 0}</strong></span>
+              <span class="total is-blocked">{$_("rightPanel.blocked")} <strong>{summaryTotals?.blocked ?? 0}</strong></span>
             </div>
             {#if blockingReasons.length}
-              <div class="review-detail-title">Blocked — why / who to chase</div>
+              <div class="review-detail-title">{$_("rightPanel.blockedWhyWho")}</div>
               <div class="reason-list">
                 {#each blockingReasons as [code, count]}
                   <span class="reason-pill">{code}: {count}</span>
                 {/each}
               </div>
             {/if}
-            <div class="review-detail-title">Verification queue</div>
+            <div class="review-detail-title">{$_("rightPanel.verificationQueue")}</div>
             <div class="queue-row">
-              <span>Pending: {summaryVerification?.pending ?? 0}</span>
-              <span>Reviewed: {summaryVerification?.reviewed ?? 0}</span>
-              <span>Corrected: {summaryVerification?.corrected ?? 0}</span>
+              <span>{$_("rightPanel.pending")} {summaryVerification?.pending ?? 0}</span>
+              <span>{$_("rightPanel.reviewed")} {summaryVerification?.reviewed ?? 0}</span>
+              <span>{$_("rightPanel.corrected")} {summaryVerification?.corrected ?? 0}</span>
             </div>
           </div>
         {/if}
@@ -277,7 +281,7 @@
           <!-- Downstream-update counts from a refresh run. Shown ONLY once the
                counts exist — never as a from-the-start placeholder. -->
           <div class="summary-block">
-            <div class="summary-label">Downstream updates</div>
+            <div class="summary-label">{$_("rightPanel.downstreamUpdates")}</div>
             {#each latestSummaryRows as row (row.key)}
               <div class="summary-row">
                 <span>{row.label}</span>
@@ -298,10 +302,10 @@
             class="refresh-action"
             on:click={onCheckForUpdates}
             disabled={refreshPending || currentAudit?.refreshInFlight}
-            aria-label="Check for updates"
+            aria-label={$_("rightPanel.checkForUpdates")}
           >
             <Icon name="loop" size={14} />
-            <span>Check for updates</span>
+            <span>{$_("rightPanel.checkForUpdates")}</span>
           </button>
         {/if}
       </section>
@@ -309,11 +313,11 @@
   {:else if panelMode === RIGHT_PANEL_MODES.INCLUSION_CRITERIA}
     <div class="panel-body">
       <section class="block">
-        <div class="block-label">Inclusion criteria</div>
+        <div class="block-label">{$_("results.inclusionCriteria")}</div>
         {#if criteriaCohort.length}
           <InputSpec cohort={criteriaCohort} showTitle={false} readOnly />
         {:else}
-          <div class="status">No inclusion criteria available for this run.</div>
+          <div class="status">{$_("rightPanel.noInclusionCriteria")}</div>
         {/if}
       </section>
     </div>
@@ -522,6 +526,7 @@
   .cell-status {
     display: inline-flex;
     align-items: center;
+    gap: var(--space-1);
     align-self: flex-start;
     border-radius: var(--radius-pill);
     padding: 2px 10px;
@@ -530,6 +535,9 @@
     border: 1px solid var(--color-border);
     background: var(--color-surface);
     color: var(--color-text-secondary);
+  }
+  .cell-status-confidence {
+    white-space: nowrap;
   }
   .cell-status--blocked {
     border-color: var(--color-danger);

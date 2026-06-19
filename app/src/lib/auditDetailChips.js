@@ -9,6 +9,8 @@
 // - Criteria chips: mechanical display regeneration + predicate-value parsing
 //   for the editable `fixed_criteria` chips.
 
+import { monthNames } from "../i18n/localeTag.js";
+
 const CODE_PREVIEW_LIMIT = 4;
 
 function isCodeMap(code) {
@@ -97,7 +99,7 @@ export function buildDatabaseChips(mapping, databaseRows) {
   });
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS = monthNames("short");
 
 function formatValue(v, type) {
   if (type === "date") {

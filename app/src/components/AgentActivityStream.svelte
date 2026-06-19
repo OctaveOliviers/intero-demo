@@ -10,6 +10,7 @@
   import { onDestroy, tick } from "svelte";
   import snarkdown from "snarkdown";
   import DOMPurify from "dompurify";
+  import { _ } from "svelte-i18n";
 
   export let events = [];
   export let runStatus = "idle";
@@ -59,16 +60,16 @@
   // --- The folded "now" line --------------------------------------------------
   $: latest = events.length ? events[events.length - 1] : null;
   $: nowLine = stopping
-    ? "Finalizing…"
+    ? $_("activity.finalizing")
     : running
-      ? latest?.label || firstWords(latest?.headline) || "Working…"
+      ? latest?.label || firstWords(latest?.headline) || $_("activity.working")
       : runStatus === "error"
-        ? "Run failed"
+        ? $_("activity.runFailed")
         : runStatus === "stopped"
-          ? "Stopped"
+          ? $_("activity.stopped")
           : events.length
-            ? "Completed"
-            : "No activity yet";
+            ? $_("activity.completed")
+            : $_("activity.noActivityYet");
 
   function firstWords(headline) {
     if (!headline) return "";
@@ -147,8 +148,8 @@
       class="stop-btn"
       on:click|stopPropagation={onStop}
       disabled={!running || stopping}
-      title="Stop the run and write its summary"
-      aria-label="Stop the run and write its summary"
+      title={$_("activity.stopRun")}
+      aria-label={$_("activity.stopRun")}
     >
       <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">
         <rect x="2" y="1.5" width="2.6" height="9" rx="0.6" />
@@ -161,7 +162,7 @@
       class="header-main"
       on:click={toggle}
       aria-expanded={!collapsed}
-      aria-label={collapsed ? "Expand agent activity" : "Collapse agent activity"}
+      aria-label={collapsed ? $_("activity.expand") : $_("activity.collapse")}
     >
       <span class="timer" class:is-live={running}>{elapsedLabel}</span>
       <span class="now-line">{nowLine}</span>
@@ -189,27 +190,27 @@
               <span class="dot" aria-hidden="true"></span>
               <div class="log-body">
                 <div class="log-head md">
-                  {@html md(preview(event.headline || event.label || event.name || "Activity", expanded[i]))}
+                  {@html md(preview(event.headline || event.label || event.name || $_("activity.fallback"), expanded[i]))}
                 </div>
                 {#if event.detail}
                   <div class="log-detail md">{@html md(preview(event.detail, expanded[i]))}</div>
                 {/if}
                 {#if isLong(event)}
                   <button type="button" class="more-toggle" on:click|stopPropagation={() => toggleExpand(i)}>
-                    {expanded[i] ? "Show less" : "Show more"}
+                    {expanded[i] ? $_("activity.showLess") : $_("activity.showMore")}
                   </button>
                 {/if}
               </div>
             </div>
           {/each}
         {:else}
-          <div class="log-empty">No activity yet.</div>
+          <div class="log-empty">{$_("activity.noActivityLog")}</div>
         {/if}
       </div>
 
       {#if !pinnedToBottom}
         <button type="button" class="jump-latest" on:click={jumpToLatest}>
-          Jump to latest ↓
+          {$_("activity.jumpToLatest")}
         </button>
       {/if}
     </div>

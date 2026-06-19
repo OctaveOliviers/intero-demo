@@ -23,8 +23,14 @@ sys.path.insert(0, str(REPO_ROOT))
 
 import asyncio  # noqa: E402
 
+import types  # noqa: E402
+
 from core.running.orchestrator import RunStore, orchestrate_run  # noqa: E402
-from core.running.try_agent import make_tier_agent, provision_worktree  # noqa: E402
+from core.running.try_agent import (  # noqa: E402
+    make_tier_agent,
+    provision_worktree,
+    write_run_context,
+)
 from core.store import Cell, Run, Store  # noqa: E402
 
 TOOLS = REPO_ROOT / "core" / "agent" / ".opencode" / "tools"
@@ -277,6 +283,61 @@ class OrchestratorIntegratesTierAgentTest(unittest.TestCase):
         self.assertEqual(cell.state, "filled")
         self.assertEqual(cell.resolved_by, "agent")
         self.assertTrue((self.run_dir / "context.json").is_file())
+
+
+class WriteRunContextNavMapTest(unittest.TestCase):
+    """Hermetic contract test for the NEW emission: write_run_context must copy
+    each bound database's identity_links/foreign_keys into context.json FROM the
+    given databases_dir (not the live repo). Reads a temp model.json, so a
+    regression that emitted []/garbage for the nav map would fail here — the gap
+    the anchor-only round-trip test could not catch."""
+
+    def test_write_run_context_emits_navigation_map_from_databases_dir(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            databases_dir = root / "databases"
+            # A FOREIGN database's canonical model with a real nav map.
+            links = [{"column": "patients.nhs_number",
+                      "target": "npda-clinical -> clinic_visits.patient_ref"}]
+            fks = [{"column": "registrations.patient_id",
+                    "target": "patients.patient_id", "cardinality": "to-one"}]
+            (databases_dir / "npda-demographics").mkdir(parents=True)
+            (databases_dir / "npda-demographics" / "model.json").write_text(
+                json.dumps({"identity_links": links, "foreign_keys": fks}), "utf-8")
+            (databases_dir / "npda-clinical").mkdir(parents=True)
+            (databases_dir / "npda-clinical" / "model.json").write_text(
+                json.dumps({"identity_links": [], "foreign_keys": []}), "utf-8")
+
+            run_store = types.SimpleNamespace(
+                run_id="r1", anchor="visit_id", cohort=["V1", "V2"],
+                database_paths={"npda-clinical": root / "clinical.sqlite",
+                                "npda-demographics": root / "demographics.sqlite"},
+                cohort_tables={"npda-clinical": ["clinic_visits"], "npda-demographics": []},
+            )
+            ctx = json.loads(write_run_context(
+                run_store, root / "run", databases_dir=databases_dir).read_text())
+
+            demo = ctx["databases"]["npda-demographics"]
+            self.assertEqual(demo["identity_links"], links)
+            self.assertEqual(demo["foreign_keys"], fks)
+            self.assertEqual(demo["cohort_tables"], [])
+            self.assertEqual(ctx["databases"]["npda-clinical"]["cohort_tables"],
+                             ["clinic_visits"])
+
+    def test_missing_model_degrades_to_empty_nav_map(self):
+        # The documented fail-safe: an unreadable model yields empty links/keys
+        # (the slug then bounds only anchor-bearing tables), never a crash.
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            run_store = types.SimpleNamespace(
+                run_id="r1", anchor="visit_id", cohort=["V1"],
+                database_paths={"npda-demographics": root / "demographics.sqlite"},
+                cohort_tables={"npda-demographics": []},
+            )
+            ctx = json.loads(write_run_context(
+                run_store, root / "run", databases_dir=root / "nope").read_text())
+            self.assertEqual(ctx["databases"]["npda-demographics"]["identity_links"], [])
+            self.assertEqual(ctx["databases"]["npda-demographics"]["foreign_keys"], [])
 
 
 if __name__ == "__main__":

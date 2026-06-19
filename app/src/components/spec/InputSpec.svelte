@@ -12,6 +12,7 @@
   import Icon from "../Icon.svelte";
   import { databases, refreshDatabases } from "../../stores/databases.js";
   import { onMount } from "svelte";
+  import { _ } from "svelte-i18n";
 
   // The input specification: one editable row per cohort chip (a plain-text
   // label beside a value-only pill), a "+" add-filter affordance, and a
@@ -89,7 +90,7 @@
       id: crypto.randomUUID(),
       kind: "database",
       field: "database",
-      label: "Database",
+      label: $_("spec.database"),
       value: db.name,
       raw: db.id,
       added: true,
@@ -171,6 +172,17 @@
     node.focus();
   }
 
+  // Chip row labels are localized by their stable `field` key (the English
+  // label set in spec.js is the fallback for any field without a catalog key).
+  const CHIP_LABEL_FIELDS = new Set([
+    "condition", "specialty", "ward", "admissionMethod", "age", "gestation",
+    "dateOfBirth", "appointmentDate", "birthDate", "dateFrom", "dateTo",
+    "codes", "custom", "sex", "database",
+  ]);
+  function chipLabel(r) {
+    return CHIP_LABEL_FIELDS.has(r.field) ? $_("chip." + r.field) : (r.label || "");
+  }
+
   function draftKeydown(e, c) {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -181,16 +193,16 @@
 
 <section class="input-spec">
   {#if showTitle}
-    <h3 class="title">Inclusion criteria</h3>
+    <h3 class="title">{$_("spec.inclusionCriteria")}</h3>
   {/if}
 
   <div class="rows">
     {#each rows as r, i (r.field)}
       <div class="row" in:fly={rowIn(i)}>
-        <span class="label">{r.label}</span>
+        <span class="label">{chipLabel(r)}</span>
         <div class="chips">
           {#each r.chips as c (c.id)}
-            {#if c.connector}<span class="connector">{c.connector}</span>{/if}
+            {#if c.connector}<span class="connector">{c.connector === "to" ? $_("chip.to") : c.connector}</span>{/if}
             <span class="chip-slot" class:removable={MULTI_FIELDS.has(r.field)}>
             {#if readOnly}
               <Chip value={c.value} editable={false} />
@@ -207,7 +219,7 @@
                     open={openId === c.id}
                     searchable
                     bind:query
-                    placeholder="Search…"
+                    placeholder={$_("spec.search")}
                     on:close={() => (openId = null)}
                   >
                     <ul class="list">
@@ -221,7 +233,7 @@
                           </button>
                         </li>
                       {:else}
-                        <li class="empty">No matches</li>
+                        <li class="empty">{$_("spec.noMatches")}</li>
                       {/each}
                     </ul>
                   </ChipPopover>
@@ -235,7 +247,7 @@
                         use:autofocus
                         on:keydown={(e) => draftKeydown(e, c)}
                       />
-                      <button type="button" class="apply" on:click={() => applyDraft(c)}>Apply</button>
+                      <button type="button" class="apply" on:click={() => applyDraft(c)}>{$_("common.apply")}</button>
                     </div>
                   </ChipPopover>
                 {/if}
@@ -245,7 +257,7 @@
               <button
                 type="button"
                 class="remove"
-                aria-label="Remove {c.value}"
+                aria-label={$_("common.remove", { values: { label: c.value } })}
                 on:click={() => removeChip(c.id)}
               ><Icon name="close" size={10} /></button>
             {/if}
@@ -258,14 +270,14 @@
                 type="button"
                 class="plus-chip"
                 class:open={addOpenField === r.field}
-                aria-label="Add database"
+                aria-label={$_("spec.addDatabase")}
                 on:click={() => (addOpenField = addOpenField === r.field ? null : r.field)}
               >+</button>
               <ChipPopover
                 open={addOpenField === r.field}
                 searchable
                 bind:query={addQuery}
-                placeholder="Search databases…"
+                placeholder={$_("spec.searchDatabases")}
                 on:close={() => (addOpenField = null)}
               >
                 <ul class="list">
@@ -276,7 +288,7 @@
                       </button>
                     </li>
                   {:else}
-                    <li class="empty">No databases found</li>
+                    <li class="empty">{$_("spec.noDatabasesFound")}</li>
                   {/each}
                 </ul>
               </ChipPopover>

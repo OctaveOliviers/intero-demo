@@ -5,6 +5,7 @@
   import {
     RIGHT_PANEL_MODES,
     openCellEvidence,
+    patchSelectedCellMeta,
     resultViewUiState,
   } from "../stores/resultViewUi.js";
   import {
@@ -167,7 +168,15 @@
 
   // The v5 worksheet object lives on the rendered .jss_container element.
   function getWs() {
-    return container?.querySelector(".jss_container")?.jssWorksheet || null;
+    const fromDom = container?.querySelector(".jss_container")?.jssWorksheet;
+    if (fromDom && typeof fromDom.setValueFromCoords === "function") return fromDom;
+    // During mount/update bursts, the DOM hook can briefly lag behind the
+    // instance object. Fall back to the in-memory worksheet handle.
+    if (Array.isArray(instance) && typeof instance[0]?.setValueFromCoords === "function") {
+      return instance[0];
+    }
+    if (instance && typeof instance?.setValueFromCoords === "function") return instance;
+    return null;
   }
 
   // Build initial mount-time style map (A1 -> css) from cell metadata:
@@ -207,12 +216,14 @@
   }
 
   function markCellReviewed(cellRef) {
+    let didReview = false;
     updateCurrentAuditWorkbook((wb) => {
       const cellMetadata = getCellMetadataMap(wb);
       if (!cellMetadata[cellRef]) return wb;
       const currentMeta = normalizeCellMeta(cellMetadata[cellRef]);
       if (!currentMeta) return wb;
       if (!isAcknowledgeableOnDwell(currentMeta)) return wb;
+      didReview = true;
       return {
         ...wb,
         cellMetadata: {
@@ -223,6 +234,7 @@
         updateTick: (wb.updateTick || 0) + 1,
       };
     });
+    if (didReview) patchSelectedCellMeta(cellRef, { review_state: "reviewed" });
   }
 
   function scheduleAutoReview(cellRef, meta) {
@@ -359,26 +371,33 @@
   function applyUpdates(wb, sheetIndex) {
     const sheet = wb.sheets[sheetIndex];
     const ws = getWs();
-    if (!sheet || !ws) return;
+    if (!sheet || !ws) return false;
 
     const prefix = sheet.name + "!";
     const styleMap = {};
-    for (const fullRef of wb.recentlyUpdated || []) {
-      if (typeof fullRef !== "string") continue;
-      if (!fullRef.startsWith(prefix)) continue; // batch landed in another sheet
-      const a1 = fullRef.slice(prefix.length);
-      const rc = refToRC(a1);
-      if (!rc || rc.row < 0 || rc.col < 0) continue;
-      const displayRow = rc.row - HEADER_ROWS;
-      if (displayRow < 0) continue; // hidden header row
-      const value = sheet.data[rc.row] ? sheet.data[rc.row][rc.col] : "";
-      ws.setValueFromCoords(rc.col, displayRow, value ?? "", true);
-      const displayRef = colToLetters(rc.col) + (displayRow + 1);
-      const meta = getCellMetadataMap(wb)[fullRef];
-      styleMap[displayRef] = styleForMeta(meta);
-      flashCell(ws, rc.col, displayRow, backgroundForMeta(meta));
+    try {
+      for (const fullRef of wb.recentlyUpdated || []) {
+        if (typeof fullRef !== "string") continue;
+        if (!fullRef.startsWith(prefix)) continue; // batch landed in another sheet
+        const a1 = fullRef.slice(prefix.length);
+        const rc = refToRC(a1);
+        if (!rc || rc.row < 0 || rc.col < 0) continue;
+        const displayRow = rc.row - HEADER_ROWS;
+        if (displayRow < 0) continue; // hidden header row
+        const value = sheet.data[rc.row] ? sheet.data[rc.row][rc.col] : "";
+        ws.setValueFromCoords(rc.col, displayRow, value ?? "", true);
+        const displayRef = colToLetters(rc.col) + (displayRow + 1);
+        const meta = getCellMetadataMap(wb)[fullRef];
+        styleMap[displayRef] = styleForMeta(meta);
+        flashCell(ws, rc.col, displayRow, backgroundForMeta(meta));
+      }
+      if (Object.keys(styleMap).length) ws.setStyle(styleMap);
+      return true;
+    } catch (_) {
+      // A transient worksheet readiness error should trigger full catch-up
+      // instead of consuming the tick and dropping this batch visually.
+      return false;
     }
-    if (Object.keys(styleMap).length) ws.setStyle(styleMap);
   }
 
   // Reactive sync: mount on a new workbook/sheet, otherwise apply each batch in
@@ -397,7 +416,13 @@
       return;
     }
     if ((wb.updateTick ?? 0) !== lastTick) {
-      applyUpdates(wb, idx);
+      const applied = applyUpdates(wb, idx);
+      if (!applied) {
+        // Recovery path for missed batches: remount from the current workbook
+        // snapshot so no prior writes are dropped during rapid init bursts.
+        mountSheet(wb, idx);
+        return;
+      }
       lastTick = wb.updateTick ?? 0;
     }
   }

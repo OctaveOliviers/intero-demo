@@ -1,14 +1,19 @@
 <script>
   import { createEventDispatcher } from "svelte";
+  import { _ } from "svelte-i18n";
   import Icon from "./Icon.svelte";
+  import { LOCALES, ACTIVE_LOCALE, setLocale } from "../i18n/index.js";
 
   const dispatch = createEventDispatcher();
 
-  let compactSidebar = false;
-  let confirmDeletes = true;
-
   function close() {
     dispatch("close");
+  }
+
+  function choose(code) {
+    // setLocale persists the choice and reloads so both the UI and the demo
+    // data come back in the new language; a no-op when already active.
+    setLocale(code);
   }
 
   function onBackdrop(e) {
@@ -32,28 +37,32 @@
 >
   <div class="modal">
     <header class="modal-header">
-      <h2>Settings</h2>
-      <button class="icon-btn" on:click={close} title="Close" aria-label="Close">
+      <h2>{$_("settings.title")}</h2>
+      <button class="icon-btn" on:click={close} title={$_("common.close")} aria-label={$_("common.close")}>
         <Icon name="close" />
       </button>
     </header>
 
     <section class="content">
       <div class="group">
-        <h3>Workspace</h3>
-        <label class="row">
-          <span>Compact sidebar</span>
-          <input type="checkbox" bind:checked={compactSidebar} />
-        </label>
-        <p class="hint">UI preferences only. Library management now lives in the left panel.</p>
-      </div>
-
-      <div class="group">
-        <h3>Safety</h3>
-        <label class="row">
-          <span>Confirm destructive actions</span>
-          <input type="checkbox" bind:checked={confirmDeletes} />
-        </label>
+        <h3>{$_("settings.language")}</h3>
+        <div class="lang-list" role="radiogroup" aria-label={$_("settings.language")}>
+          {#each LOCALES as l (l.code)}
+            <button
+              class="lang-row"
+              class:selected={l.code === ACTIVE_LOCALE}
+              role="radio"
+              aria-checked={l.code === ACTIVE_LOCALE}
+              on:click={() => choose(l.code)}
+            >
+              <span class="lang-name">{l.label}</span>
+              {#if l.code === ACTIVE_LOCALE}
+                <span class="check" aria-hidden="true"><Icon name="check" size={16} /></span>
+              {/if}
+            </button>
+          {/each}
+        </div>
+        <p class="hint">{$_("settings.languageHint")}</p>
       </div>
     </section>
   </div>
@@ -72,7 +81,7 @@
 
   .modal {
     background: var(--color-surface);
-    width: min(560px, 92vw);
+    width: min(460px, 92vw);
     max-height: 84vh;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
@@ -137,13 +146,45 @@
     color: var(--color-text);
   }
 
-  .row {
+  .lang-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .lang-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: var(--radius-md);
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
     font-size: var(--text-sm);
     color: var(--color-text);
-    gap: var(--space-3);
+    transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  }
+
+  .lang-row:hover {
+    background: var(--color-hover);
+  }
+
+  .lang-row.selected {
+    background: var(--color-accent-weak);
+    border-color: var(--color-accent-border);
+  }
+
+  .lang-name {
+    font-weight: var(--weight-medium);
+  }
+
+  .check {
+    display: inline-flex;
+    color: var(--color-accent);
   }
 
   .hint {

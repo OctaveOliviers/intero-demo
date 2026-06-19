@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from "svelte";
+  import { _ } from "svelte-i18n";
 
   const dispatch = createEventDispatcher();
 
@@ -57,7 +58,7 @@
     {#if fileName}
       <span>📎 {fileName}</span>
     {:else}
-      <span>📎 Drop Excel file here</span>
+      <span>{$_("fileUpload.dropExcel")}</span>
     {/if}
   </label>
 </div>

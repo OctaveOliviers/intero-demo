@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from "svelte";
+  import { monthNames, weekdayNames } from "../../i18n/localeTag.js";
 
   // Minimal month grid. No external date library — plain JS Date.
   // `value` is an ISO date (YYYY-MM-DD); dispatches 'select' with an ISO string.
@@ -7,11 +8,8 @@
 
   const dispatch = createEventDispatcher();
 
-  const MONTHS = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-  ];
-  const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+  const MONTHS = monthNames("long");
+  const WEEKDAYS = weekdayNames("short", 2);
 
   // Parse an ISO date into a LOCAL Date (avoids the UTC-midnight off-by-one
   // that `new Date('2026-01-03')` causes in negative timezones).

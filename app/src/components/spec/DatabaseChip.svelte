@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher, onMount } from "svelte";
+  import { _ } from "svelte-i18n";
   import Chip from "./Chip.svelte";
   import ChipPopover from "./ChipPopover.svelte";
   import { databases, refreshDatabases } from "../../stores/databases.js";
@@ -38,7 +39,7 @@
     {open}
     searchable
     bind:query
-    placeholder="Search databases…"
+    placeholder={$_("spec.searchDatabases")}
     on:close={() => (open = false)}
   >
     <ul class="list">
@@ -52,7 +53,7 @@
           </button>
         </li>
       {:else}
-        <li class="empty">No databases found</li>
+        <li class="empty">{$_("spec.noDatabasesFound")}</li>
       {/each}
     </ul>
   </ChipPopover>

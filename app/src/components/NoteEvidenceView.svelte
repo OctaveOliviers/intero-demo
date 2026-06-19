@@ -1,4 +1,5 @@
 <script>
+  import { _ } from "svelte-i18n";
   import { tick } from "svelte";
 
   // result: { columns: string[], rows: any[][] } from /api/sql
@@ -84,7 +85,7 @@
       {#if note.hasBody}
         <div class="note-body">{#each note.segments as seg}{#if seg.mark}<mark>{seg.text}</mark>{:else}{seg.text}{/if}{/each}</div>
       {:else}
-        <div class="note-empty">No note text returned for this row.</div>
+        <div class="note-empty">{$_("noteEvidence.empty")}</div>
       {/if}
     </div>
   {/each}

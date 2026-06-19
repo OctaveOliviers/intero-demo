@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { _ } from "svelte-i18n";
   import Icon from "./Icon.svelte";
   import AuditDetail from "./AuditDetail.svelte";
   import DatabaseDetail from "./DatabaseDetail.svelte";
@@ -118,7 +119,7 @@
     if (!file) return;
     const ext = "." + file.name.split(".").pop().toLowerCase();
     if (![".xlsx", ".xlsm"].includes(ext)) {
-      auditError = "Only .xlsx and .xlsm files are supported.";
+      auditError = $_("library.errXlsxOnly");
       return;
     }
     auditError = "";
@@ -154,12 +155,12 @@
       _clone: true,
     };
     clones = [...clones, clone];
-    addToast({ kind: "success", message: `Cloned “${a.name}” into Local audits.` });
+    addToast({ kind: "success", message: $_("library.cloned", { values: { name: a.name } }) });
   }
 
   async function handleRenameAudit(a) {
     auditMenuOpenId = null;
-    const next = prompt("Rename audit", a.name);
+    const next = prompt($_("template.renamePrompt"), a.name);
     if (next == null) return;
     const name = next.trim();
     if (!name || name === a.name) return;
@@ -177,7 +178,7 @@
 
   async function handleDeleteAudit(a) {
     auditMenuOpenId = null;
-    if (!confirm(`Delete "${a.name}"? This cannot be undone.`)) return;
+    if (!confirm($_("template.deleteConfirm", { values: { name: a.name } }))) return;
     if (a._clone) {
       clones = clones.filter((c) => c.id !== a.id);
       return;
@@ -206,7 +207,7 @@
     if (!file) return;
     const ext = "." + file.name.split(".").pop().toLowerCase();
     if (![".sqlite", ".sqlite3", ".db"].includes(ext)) {
-      dbError = "Only .sqlite, .sqlite3, and .db files are supported.";
+      dbError = $_("library.errDbOnly");
       return;
     }
     dbError = "";
@@ -230,7 +231,7 @@
 
   async function handleRenameDb(d) {
     dbMenuOpenId = null;
-    const next = prompt("Rename database", d.name);
+    const next = prompt($_("library.renameDbPrompt"), d.name);
     if (next == null) return;
     const name = next.trim();
     if (!name || name === d.name) return;
@@ -243,7 +244,7 @@
 
   async function handleDeleteDb(d) {
     dbMenuOpenId = null;
-    if (!confirm(`Remove "${d.name}" from the catalog? The SQLite file on disk will not be deleted.`)) return;
+    if (!confirm($_("library.removeDbConfirm", { values: { name: d.name } }))) return;
     try {
       await deleteDatabase(d.id);
       if (selectedDatabaseId === d.id) backToLibraryList();
@@ -293,17 +294,17 @@
           }}
         />
       {:else}
-        <h2 class="page-title">Templates</h2>
+        <h2 class="page-title">{$_("library.templatesTitle")}</h2>
         {#if auditError}<div class="error">{auditError}</div>{/if}
         {#if $templatesLoading && auditItems.length === 0}
-          <div class="empty">Loading templates…</div>
+          <div class="empty">{$_("library.loadingTemplates")}</div>
         {:else if auditItems.length === 0}
-          <div class="empty">No templates found. Add an audit template to get started.</div>
+          <div class="empty">{$_("library.noTemplates")}</div>
         {/if}
 
         {#each auditGroups as group (group.level)}
           <div class="group">
-            <h3 class="group-title">{group.level}</h3>
+            <h3 class="group-title">{$_("level." + group.level.toLowerCase())}</h3>
             <div class="grid">
               {#each group.items as a (a.id)}
                 {@const chip = chipOf("audit", a.id, $indexingMap, $flashing)}
@@ -318,11 +319,11 @@
                     <div class="card-body">
                       <h3>
                         <span class="card-name">{a.name}</span>
-                        {#if a.readOnly}<span class="badge readonly">Read-only</span>{/if}
-                        {#if chip === "indexing"}<span class="badge indexing">Indexing</span>{/if}
-                        {#if chip === "ready"}<span class="badge ready">Ready</span>{/if}
+                        {#if a.readOnly}<span class="badge readonly">{$_("common.readOnly")}</span>{/if}
+                        {#if chip === "indexing"}<span class="badge indexing">{$_("common.indexing")}</span>{/if}
+                        {#if chip === "ready"}<span class="badge ready">{$_("common.ready")}</span>{/if}
                         {#if chip === "error"}
-                          <span class="badge error" title={errorOf("audit", a.id, $indexingMap)}>Error</span>
+                          <span class="badge error" title={errorOf("audit", a.id, $indexingMap)}>{$_("common.error")}</span>
                         {/if}
                       </h3>
                       {#if a.description}<p>{a.description}</p>{/if}
@@ -336,7 +337,7 @@
                     class="menu-btn"
                     class:open={auditMenuOpenId === a.id}
                     on:click={(e) => toggleMenu("audit", a.id, e)}
-                    aria-label="Options"
+                    aria-label={$_("common.options")}
                   >
                     <Icon name="more" />
                   </button>
@@ -344,19 +345,19 @@
                     <div class="menu">
                       {#if chip === "error"}
                         <button class="menu-item" on:click={() => handleReindexAudit(a)}>
-                          <span class="menu-icon-spacer"></span>Try indexing again
+                          <span class="menu-icon-spacer"></span>{$_("common.tryIndexingAgain")}
                         </button>
                       {/if}
                       {#if a.readOnly}
                         <button class="menu-item" on:click={() => handleCloneAudit(a)}>
-                          <span class="menu-icon-spacer"></span>Clone to local
+                          <span class="menu-icon-spacer"></span>{$_("common.cloneToLocal")}
                         </button>
                       {:else}
                         <button class="menu-item" on:click={() => handleRenameAudit(a)}>
-                          <Icon name="rename" size={16} />Rename
+                          <Icon name="rename" size={16} />{$_("common.rename")}
                         </button>
                         <button class="menu-item danger" on:click={() => handleDeleteAudit(a)}>
-                          <Icon name="trash" size={16} />Delete
+                          <Icon name="trash" size={16} />{$_("common.delete")}
                         </button>
                       {/if}
                     </div>
@@ -394,12 +395,12 @@
       {#if selectedDatabase}
         <DatabaseDetail database={selectedDatabase} on:back={backToLibraryList} />
       {:else}
-        <h2 class="page-title">Databases</h2>
+        <h2 class="page-title">{$_("library.databasesTitle")}</h2>
         {#if dbError}<div class="error">{dbError}</div>{/if}
         {#if $databasesLoading && dbItems.length === 0}
-          <div class="empty">Loading databases…</div>
+          <div class="empty">{$_("library.loadingDatabases")}</div>
         {:else if dbItems.length === 0}
-          <div class="empty">No databases found. Add a database to get started.</div>
+          <div class="empty">{$_("library.noDatabases")}</div>
         {/if}
         <div class="grid">
           {#each dbItems as d (d.id)}
@@ -415,11 +416,11 @@
                 <div class="card-body">
                   <h3>
                     <span class="card-name">{d.name}</span>
-                    {#if d.readOnly}<span class="badge readonly">Read-only</span>{/if}
-                    {#if chip === "indexing"}<span class="badge indexing">Indexing</span>{/if}
-                    {#if chip === "ready"}<span class="badge ready">Ready</span>{/if}
+                    {#if d.readOnly}<span class="badge readonly">{$_("common.readOnly")}</span>{/if}
+                    {#if chip === "indexing"}<span class="badge indexing">{$_("common.indexing")}</span>{/if}
+                    {#if chip === "ready"}<span class="badge ready">{$_("common.ready")}</span>{/if}
                     {#if chip === "error"}
-                      <span class="badge error" title={errorOf("database", d.id, $indexingMap)}>Error</span>
+                      <span class="badge error" title={errorOf("database", d.id, $indexingMap)}>{$_("common.error")}</span>
                     {/if}
                   </h3>
                   <p>{d.description || d.path}</p>
@@ -429,7 +430,7 @@
                 class="menu-btn"
                 class:open={dbMenuOpenId === d.id}
                 on:click={(e) => toggleMenu("db", d.id, e)}
-                aria-label="Options"
+                aria-label={$_("common.options")}
               >
                 <Icon name="more" />
               </button>
@@ -437,14 +438,14 @@
                 <div class="menu">
                   {#if chip === "error"}
                     <button class="menu-item" on:click={() => handleReindexDb(d)}>
-                      <span class="menu-icon-spacer"></span>Try indexing again
+                      <span class="menu-icon-spacer"></span>{$_("common.tryIndexingAgain")}
                     </button>
                   {/if}
                   <button class="menu-item" on:click={() => handleRenameDb(d)}>
-                    <Icon name="rename" size={16} />Rename
+                    <Icon name="rename" size={16} />{$_("common.rename")}
                   </button>
                   <button class="menu-item danger" on:click={() => handleDeleteDb(d)}>
-                    <Icon name="trash" size={16} />Delete
+                    <Icon name="trash" size={16} />{$_("common.delete")}
                   </button>
                 </div>
               {/if}

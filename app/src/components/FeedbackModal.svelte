@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from "svelte";
+  import { _ } from "svelte-i18n";
   import Icon from "./Icon.svelte";
   import { submitFeedback } from "../lib/api.js";
   import { addToast } from "../stores/toasts.js";
@@ -17,7 +18,7 @@
 
   async function handleSubmit() {
     if (submitting) return;
-    if (!message.trim()) { error = "Please describe what you'd like to share."; return; }
+    if (!message.trim()) { error = $_("feedback.errEmpty"); return; }
     submitting = true;
     error = "";
     try {
@@ -25,10 +26,10 @@
         title: title.trim() || message.trim().slice(0, 60),
         body: message.trim(),
       });
-      addToast({ kind: "success", message: "Thanks — your feedback was sent." });
+      addToast({ kind: "success", message: $_("feedback.sent") });
       close();
     } catch (e) {
-      error = e.message || "Could not send feedback. Please try again.";
+      error = e.message || $_("feedback.failed");
     } finally {
       submitting = false;
     }
@@ -40,35 +41,34 @@
 <div class="backdrop" on:click={onBackdrop} on:keydown={() => {}} role="dialog" aria-modal="true" tabindex="-1">
   <div class="modal">
     <header class="modal-header">
-      <h2>Send feedback</h2>
-      <button class="icon-btn" on:click={close} title="Close" aria-label="Close">
+      <h2>{$_("feedback.title")}</h2>
+      <button class="icon-btn" on:click={close} title={$_("common.close")} aria-label={$_("common.close")}>
         <Icon name="close" />
       </button>
     </header>
 
     <form class="modal-body" on:submit|preventDefault={handleSubmit}>
       <p class="intro">
-        Spotted something broken, slow, or worth changing? Let us know and it
-        goes straight to our issue tracker.
+        {$_("feedback.intro")}
       </p>
 
       <label class="field">
-        <span class="field-label">Title <span class="optional">(optional)</span></span>
+        <span class="field-label">{$_("feedback.titleLabel")} <span class="optional">{$_("common.optional")}</span></span>
         <input
           class="input"
           type="text"
-          placeholder="Short summary"
+          placeholder={$_("feedback.titlePlaceholder")}
           bind:value={title}
           disabled={submitting}
         />
       </label>
 
       <label class="field">
-        <span class="field-label">Details</span>
+        <span class="field-label">{$_("feedback.detailsLabel")}</span>
         <textarea
           class="input textarea"
           rows="6"
-          placeholder="What happened? What did you expect?"
+          placeholder={$_("feedback.detailsPlaceholder")}
           bind:value={message}
           disabled={submitting}
         ></textarea>
@@ -77,9 +77,9 @@
       {#if error}<div class="error">{error}</div>{/if}
 
       <div class="actions">
-        <button type="button" class="btn ghost" on:click={close} disabled={submitting}>Cancel</button>
+        <button type="button" class="btn ghost" on:click={close} disabled={submitting}>{$_("common.cancel")}</button>
         <button type="submit" class="btn primary" disabled={submitting}>
-          {submitting ? "Sending…" : "Submit"}
+          {submitting ? $_("feedback.sending") : $_("feedback.submit")}
         </button>
       </div>
     </form>

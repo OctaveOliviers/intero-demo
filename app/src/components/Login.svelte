@@ -12,6 +12,7 @@
 -->
 <script>
   import { createEventDispatcher } from "svelte";
+  import { _ } from "svelte-i18n";
   import { authLogin } from "../lib/api.js";
 
   const dispatch = createEventDispatcher();
@@ -24,7 +25,7 @@
   async function handleSubmit() {
     if (submitting) return;
     if (!username.trim() || !password) {
-      error = "Enter your username and password.";
+      error = $_("login.errMissing");
       return;
     }
     submitting = true;
@@ -34,7 +35,7 @@
       password = "";
       dispatch("authenticated", user);
     } catch (e) {
-      error = e.message || "Could not log in. Please try again.";
+      error = e.message || $_("login.errFailed");
     } finally {
       submitting = false;
     }
@@ -44,10 +45,10 @@
 <div class="login-screen">
   <form class="login-card" on:submit|preventDefault={handleSubmit}>
     <h1 class="brand">Intero</h1>
-    <p class="intro">Sign in to access your audits.</p>
+    <p class="intro">{$_("login.subtitle")}</p>
 
     <label class="field">
-      <span class="field-label">Username</span>
+      <span class="field-label">{$_("login.username")}</span>
       <input
         class="input"
         type="text"
@@ -58,7 +59,7 @@
     </label>
 
     <label class="field">
-      <span class="field-label">Password</span>
+      <span class="field-label">{$_("login.password")}</span>
       <input
         class="input"
         type="password"
@@ -71,7 +72,7 @@
     {#if error}<div class="error">{error}</div>{/if}
 
     <button type="submit" class="btn primary" disabled={submitting}>
-      {submitting ? "Signing in…" : "Sign in"}
+      {submitting ? $_("login.signingIn") : $_("login.signIn")}
     </button>
   </form>
 </div>

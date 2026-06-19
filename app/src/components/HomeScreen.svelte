@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { _ } from "svelte-i18n";
   import { parseRequest } from "../lib/spec.js";
   import { runFromSpec } from "../lib/runFromSpec.js";
   import {
@@ -50,11 +51,11 @@
 
   function toBackendTemplateGroup(audits) {
     return [{
-      category: "Available audits",
+      category: $_("home.availableAudits"),
       templates: (audits || []).map((a) => ({
         id: a.id,
         name: a.name,
-        category: "Available audits",
+        category: $_("home.availableAudits"),
         fileName: `${a.id}.xlsx`,
         description: a.description || "",
         columns: [],
@@ -194,7 +195,7 @@
     if (!templateSourceReady) {
       phase = "error";
       spec = null;
-      errorMessage = "Templates are still loading. Try again in a moment.";
+      errorMessage = $_("home.templatesLoading");
       return;
     }
     phase = "parsing"; // fold out + scanning eye right away
@@ -221,7 +222,7 @@
     } catch (e) {
       if (seq !== parseSeq) return;
       pendingRun = false;
-      errorMessage = e?.message || "Something went wrong reading your request.";
+      errorMessage = e?.message || $_("home.parseError");
       phase = "error";
     }
   }
@@ -330,7 +331,7 @@
 </script>
 
 <div class="home">
-  <h1 class="heading">What would you like to know?</h1>
+  <h1 class="heading">{$_("home.heading")}</h1>
 
   <!-- ABOVE the line: the user request. Bottom-anchored to the divider, so it
        grows UPWARD (capped, then scrolls) and the line never moves. -->
@@ -340,7 +341,7 @@
         <div class="file-chip">
           <span class="file-icon" aria-hidden="true">📎</span>
           <span class="file-name">{selectedFile.name}</span>
-          <button class="file-remove" type="button" on:click={clearFile} aria-label="Remove file"
+          <button class="file-remove" type="button" on:click={clearFile} aria-label={$_("home.removeFile")}
             >×</button
           >
         </div>
@@ -353,10 +354,10 @@
             class="add-btn"
             type="button"
             on:click={toggleMenu}
-            title="Add a template"
+            title={$_("home.addTemplate")}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            aria-label="Add a template"><span class="plus">+</span></button
+            aria-label={$_("home.addTemplate")}><span class="plus">+</span></button
           >
           {#if menuOpen}
             <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
@@ -364,7 +365,7 @@
             <div class="add-menu" role="menu">
               {#if menuView === "root"}
                 <button class="menu-item" type="button" role="menuitem" on:click={chooseUpload}>
-                  Upload a new template
+                  {$_("home.uploadNewTemplate")}
                 </button>
                 <button
                   class="menu-item"
@@ -372,11 +373,11 @@
                   role="menuitem"
                   on:click={() => (menuView = "templates")}
                 >
-                  Select an existing template
+                  {$_("home.selectExistingTemplate")}
                 </button>
               {:else}
                 <button class="menu-back" type="button" on:click={() => (menuView = "root")}>
-                  ← Templates
+                  {$_("home.backToTemplates")}
                 </button>
                 {#each templateGroups as group}
                   <div class="menu-group">{group.category}</div>
@@ -401,7 +402,7 @@
           bind:value={requestText}
           on:input={onInput}
           on:keydown={onKeydown}
-          placeholder="Ask anything"
+          placeholder={$_("home.askAnything")}
           rows="1"
           autofocus
           disabled={!templateSourceReady}
@@ -414,7 +415,7 @@
           type="button"
           on:click={requestRun}
           disabled={!templateSourceReady || (!requestText.trim() && !(phase === "ready" && spec))}
-          aria-label="Run audit">→</button
+          aria-label={$_("home.runAudit")}>→</button
         >
       </div>
     </form>
@@ -436,13 +437,13 @@
                 class="stop-btn"
                 type="button"
                 on:click={stopParsing}
-                title="Stop"
-                aria-label="Stop reading"
+                title={$_("home.stop")}
+                aria-label={$_("home.stopReading")}
               >
                 <Icon name="stop" size={16} />
               </button>
             </span>
-            <span class="status">Reading your request…</span>
+            <span class="status">{$_("home.readingRequest")}</span>
           </div>
         {:else if phase === "error"}
           <div class="error" role="alert">{errorMessage}</div>
@@ -450,7 +451,7 @@
           {#if indexing}
             <div class="indexing-badge" aria-live="polite">
               <span class="eye-sm" aria-hidden="true"><ScanningEye size={12} /></span>
-              <span>Indexing template…</span>
+              <span>{$_("home.indexingTemplate")}</span>
             </div>
           {/if}
           <div class="sections">

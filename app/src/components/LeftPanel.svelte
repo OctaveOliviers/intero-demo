@@ -18,6 +18,7 @@
   import Icon from "./Icon.svelte";
   import SettingsModal from "./SettingsModal.svelte";
   import FeedbackModal from "./FeedbackModal.svelte";
+  import { _ } from "svelte-i18n";
 
   let showSettings = false;
   let showFeedback = false;
@@ -164,14 +165,14 @@
 
   async function handleDelete(id) {
     menuOpenId = null;
-    if (!confirm("Delete this analysis? This permanently removes its run and all its data.")) {
+    if (!confirm($_("leftPanel.deleteConfirm"))) {
       return;
     }
     try {
       await deleteAudit(id);
     } catch (err) {
       // Backend delete failed — keep the row so the UI never lies about what's stored.
-      addToast({ kind: "error", message: "Could not delete the analysis. Please try again." });
+      addToast({ kind: "error", message: $_("leftPanel.deleteFailed") });
       console.warn("Delete analysis failed:", err);
     }
   }
@@ -219,8 +220,8 @@
       <button
         class="icon-btn"
         on:click={toggleCollapsed}
-        title="Collapse sidebar"
-        aria-label="Collapse sidebar"
+        title={$_("leftPanel.collapseSidebar")}
+        aria-label={$_("leftPanel.collapseSidebar")}
       >
         <Icon name="sidebar" />
       </button>
@@ -229,7 +230,7 @@
     <nav class="menu">
       <button class="menu-row" on:click={handleNew}>
         <Icon name="new" size={18} />
-        <span>New audit</span>
+        <span>{$_("leftPanel.newAudit")}</span>
       </button>
       {#if searchOpen}
         <div class="menu-row search-row">
@@ -246,7 +247,7 @@
       {:else}
         <button class="menu-row" on:click={toggleSearch}>
           <Icon name="search" size={18} />
-          <span>Search audits</span>
+          <span>{$_("leftPanel.searchAudits")}</span>
         </button>
       {/if}
       <button
@@ -255,7 +256,7 @@
         on:click={handleTemplates}
       >
         <Icon name="table" size={18} />
-        <span>Templates</span>
+        <span>{$_("leftPanel.templates")}</span>
       </button>
       <button
         class="menu-row"
@@ -263,14 +264,14 @@
         on:click={handleDatabases}
       >
         <Icon name="database" size={18} />
-        <span>Databases</span>
+        <span>{$_("leftPanel.databases")}</span>
       </button>
     </nav>
 
     <div class="list">
       {#if filtered.length === 0}
         <div class="empty">
-          {query.trim() ? "No matches" : "No audits yet"}
+          {query.trim() ? $_("leftPanel.noMatches") : $_("leftPanel.noAudits")}
         </div>
       {:else}
         {#each filtered as audit (audit.id)}
@@ -295,7 +296,7 @@
               >
                 <span class="title">{audit.title}</span>
                 {#if audit.status === "running"}
-                  <span class="dot running" title="Running" aria-hidden="true" />
+                  <span class="dot running" title={$_("common.running")} aria-hidden="true" />
                 {/if}
               </button>
               <button
@@ -303,8 +304,8 @@
                 class="more-btn"
                 class:open={menuOpenId === audit.id}
                 on:click={(e) => toggleMenu(e, audit.id)}
-                title="More"
-                aria-label="More options"
+                title={$_("common.more")}
+                aria-label={$_("common.moreOptions")}
               >
                 <Icon name="more" size={18} />
               </button>
@@ -316,14 +317,14 @@
                     on:click={() => startRename(audit.id, audit.title)}
                   >
                     <Icon name="rename" size={16} />
-                    <span>Rename</span>
+                    <span>{$_("common.rename")}</span>
                   </button>
                   <button
                     class="pop-item danger"
                     on:click={() => handleDelete(audit.id)}
                   >
                     <Icon name="trash" size={16} />
-                    <span>Delete</span>
+                    <span>{$_("common.delete")}</span>
                   </button>
                 </div>
               {/if}
@@ -336,17 +337,15 @@
     <div class="footer">
       <button class="menu-row" on:click={() => (showFeedback = true)}>
         <Icon name="feedback" size={18} />
-        <span>Feedback</span>
+        <span>{$_("leftPanel.feedback")}</span>
       </button>
-      <!--
       <button class="menu-row" on:click={() => (showSettings = true)}>
         <Icon name="settings" size={18} />
-        <span>Settings</span>
+        <span>{$_("leftPanel.settings")}</span>
       </button>
-      -->
       <button class="menu-row" on:click={handleLogout} disabled={logoutBusy}>
         <Icon name="logout" size={18} />
-        <span>{logoutBusy ? "Signing out…" : "Sign out"}</span>
+        <span>{logoutBusy ? $_("leftPanel.signingOut") : $_("leftPanel.signOut")}</span>
       </button>
     </div>
 
@@ -365,20 +364,20 @@
       <button
         class="icon-btn rail-logo"
         on:click={toggleCollapsed}
-        title="Expand sidebar"
-        aria-label="Expand sidebar"
+        title={$_("leftPanel.expandSidebar")}
+        aria-label={$_("leftPanel.expandSidebar")}
       >
         <span class="logo-default"><Icon name="logo" /></span>
         <span class="logo-hover"><Icon name="sidebar" /></span>
       </button>
-      <button class="icon-btn" on:click={handleNew} title="New audit" aria-label="New audit">
+      <button class="icon-btn" on:click={handleNew} title={$_("leftPanel.newAudit")} aria-label={$_("leftPanel.newAudit")}>
         <Icon name="new" />
       </button>
       <button
         class="icon-btn"
         on:click={() => { collapsed = false; toggleSearch(); }}
-        title="Search audits"
-        aria-label="Search audits"
+        title={$_("leftPanel.searchAudits")}
+        aria-label={$_("leftPanel.searchAudits")}
       >
         <Icon name="search" />
       </button>
@@ -386,8 +385,8 @@
         class="icon-btn"
         class:rail-active={$currentView === "library" && $libraryPage.section === "templates"}
         on:click={handleTemplates}
-        title="Templates"
-        aria-label="Templates"
+        title={$_("leftPanel.templates")}
+        aria-label={$_("leftPanel.templates")}
       >
         <Icon name="table" />
       </button>
@@ -395,8 +394,8 @@
         class="icon-btn"
         class:rail-active={$currentView === "library" && $libraryPage.section === "databases"}
         on:click={handleDatabases}
-        title="Databases"
-        aria-label="Databases"
+        title={$_("leftPanel.databases")}
+        aria-label={$_("leftPanel.databases")}
       >
         <Icon name="database" />
       </button>
@@ -404,26 +403,24 @@
       <button
         class="icon-btn rail-feedback"
         on:click={() => (showFeedback = true)}
-        title="Feedback"
-        aria-label="Feedback"
+        title={$_("leftPanel.feedback")}
+        aria-label={$_("leftPanel.feedback")}
       >
         <Icon name="feedback" />
       </button>
-      <!--
       <button
         class="icon-btn rail-settings"
         on:click={() => (showSettings = true)}
-        title="Settings"
-        aria-label="Settings"
+        title={$_("leftPanel.settings")}
+        aria-label={$_("leftPanel.settings")}
       >
         <Icon name="settings" />
       </button>
-      -->
       <button
         class="icon-btn"
         on:click={handleLogout}
-        title={logoutBusy ? "Signing out…" : "Sign out"}
-        aria-label="Sign out"
+        title={logoutBusy ? $_("leftPanel.signingOut") : $_("leftPanel.signOut")}
+        aria-label={$_("leftPanel.signOut")}
         disabled={logoutBusy}
       >
         <Icon name="logout" />
@@ -432,11 +429,9 @@
   {/if}
 </aside>
 
-<!--
 {#if showSettings}
   <SettingsModal on:close={() => (showSettings = false)} />
 {/if}
--->
 
 {#if showFeedback}
   <FeedbackModal on:close={() => (showFeedback = false)} />

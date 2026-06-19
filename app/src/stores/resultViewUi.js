@@ -104,6 +104,24 @@ export function openCellEvidence(cellRef, cellMeta) {
   }));
 }
 
+// Keep the right-panel status in sync when the selected cell's metadata changes
+// in-place (for example, dwell auto-review flips review_state to reviewed).
+export function patchSelectedCellMeta(cellRef, patch) {
+  if (!cellRef || !patch || typeof patch !== "object") return;
+  resultViewUiState.update((state) => {
+    if (!state.rightPanelOpen) return state;
+    if (state.rightPanelMode !== RIGHT_PANEL_MODES.CELL_EVIDENCE) return state;
+    if (state.selectedCellRef !== cellRef || !state.selectedCellMeta) return state;
+    return {
+      ...state,
+      selectedCellMeta: {
+        ...state.selectedCellMeta,
+        ...patch,
+      },
+    };
+  });
+}
+
 export function setActivityVisualState(state) {
   if (!guardEnum("activityVisualState", state, isActivityVisualState)) return;
   resultViewUiState.update((current) => ({

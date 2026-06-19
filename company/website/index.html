@@ -3,18 +3,229 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Melodic Health</title>
+    <title>Melodic Health — Clinical data, unlocked on-premise</title>
+    <meta
+      name="description"
+      content="Melodic's on-premise AI agents extract and structure clinical data from your existing systems and automate the manual admin that keeps staff from patients. Nothing leaves your network."
+    />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="bg-layer bg-a"></div>
-    <div class="bg-layer bg-b"></div>
-    <div class="bg-layer bg-c"></div>
-    <main class="hero">
-      <h1>Melodic Health</h1>
-      <p class="tagline">
-        Collaboration fuels healthcare progress
-      </p>
+    <!-- ── Nav ─────────────────────────────────────────────── -->
+    <header class="nav">
+      <div class="nav__inner">
+        <a class="brand" href="#top" aria-label="Melodic Health home">
+          <span class="brand__name">Melodic Health</span>
+        </a>
+        <nav class="nav__links" aria-label="Primary">
+          <a href="#how">How it works</a>
+          <a href="#usecases">Use cases</a>
+          <a href="#security">Security</a>
+          <a href="./about.html">About</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+        <a class="btn btn--primary nav__cta" href="#demo">Book a Demo</a>
+        <button class="nav__toggle" aria-label="Toggle menu" aria-expanded="false">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main id="top">
+      <!-- ── Hero ──────────────────────────────────────────── -->
+      <section class="hero">
+        <div class="blob blob--1" aria-hidden="true"></div>
+        <div class="blob blob--2" aria-hidden="true"></div>
+        <div class="container hero__inner">
+          <div class="hero__copy">
+            <h1 class="hero__title">Give clinicians <span class="hl">their time back</span>.</h1>
+            <p class="hero__sub">
+              Clinical data is locked in legacy systems, and staff burn hours making it usable.
+              Melodic's on-premise AI agents extract it, structure it, and automate the manual
+              admin, so your team gets back to patients.
+            </p>
+            <div class="hero__cta">
+              <a class="btn btn--accent" href="#demo">Book a Demo</a>
+              <a class="btn btn--ghost" href="#how">See how it works</a>
+            </div>
+          </div>
+
+          <!-- Product preview mockup -->
+          <div class="mock" aria-hidden="true">
+            <div class="mock__bar">
+              <span class="mock__dot"></span><span class="mock__dot"></span><span class="mock__dot"></span>
+              <span class="mock__tab">Cord-pH audit · 124 patients</span>
+            </div>
+            <div class="mock__body">
+              <div class="mock__grid">
+                <div class="mock__row mock__row--head"><span>Patient</span><span>pH</span><span>Outcome</span></div>
+                <div class="mock__row"><span>P-0182</span><span>7.21</span><span class="ok">Normal</span></div>
+                <div class="mock__row mock__row--sel"><span>P-0183</span><span>7.04</span><span class="flag">Review</span></div>
+                <div class="mock__row"><span>P-0184</span><span>7.30</span><span class="ok">Normal</span></div>
+                <div class="mock__row"><span>P-0185</span><span>7.18</span><span class="ok">Normal</span></div>
+              </div>
+              <div class="mock__panel">
+                <p class="mock__panel-title">Evidence · P-0183 · pH</p>
+                <p class="mock__panel-label">Source</p>
+                <p class="mock__panel-val">Blood gas result · 02:14</p>
+                <div class="mock__note">
+                  “…umbilical arterial sample, <mark>pH 7.04</mark>, base excess −8.2…”
+                </div>
+                <p class="mock__conf">Confidence: needs a clinician's eyes</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Proof strip ──────────────────────────────────── -->
+      <section class="proof">
+        <div class="container proof__grid">
+          <div class="proof__item">
+            <svg viewBox="0 0 24 24" class="ico"><path d="M3 7l9-4 9 4-9 4-9-4Zm0 5l9 4 9-4M3 17l9 4 9-4"/></svg>
+            <div><strong>Works inside your systems</strong><span>No rip-and-replace integration</span></div>
+          </div>
+          <div class="proof__item">
+            <svg viewBox="0 0 24 24" class="ico"><path d="M12 3 4 6v6c0 4 3.4 7.4 8 9 4.6-1.6 8-5 8-9V6l-8-3Z"/></svg>
+            <div><strong>Data never leaves</strong><span>Fully on-premise, inside your network</span></div>
+          </div>
+          <div class="proof__item">
+            <svg viewBox="0 0 24 24" class="ico"><path d="M16 11a4 4 0 1 0-8 0M4 20a8 8 0 0 1 16 0"/></svg>
+            <div><strong>Human in the loop</strong><span>Your team approves every output</span></div>
+          </div>
+          <div class="proof__item">
+            <svg viewBox="0 0 24 24" class="ico"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v4h-4"/></svg>
+            <div><strong>Learns from your team</strong><span>Improves with every correction</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Problem ──────────────────────────────────────── -->
+      <section id="problem" class="section section--tint">
+        <div class="container">
+          <h2 class="section__title">The data is there. Getting to it isn't.</h2>
+          <p class="section__lead">
+            Clinical data sits unstructured across incompatible legacy systems. Making it usable
+            falls on staff, by hand, pulling them off patient care and inflating cost. That
+            bottleneck is what Melodic clears.
+          </p>
+        </div>
+      </section>
+
+      <!-- ── How it works ─────────────────────────────────── -->
+      <section id="how" class="section">
+        <div class="container">
+          <p class="eyebrow">How it works</p>
+          <h2 class="section__title">Agents that work like staff</h2>
+          <div class="steps">
+            <article class="step">
+              <span class="step__n">1</span>
+              <h3>Deploy</h3>
+              <p>Agents run inside your network and navigate the systems you already use. No
+                lengthy integration, no infrastructure changes.</p>
+            </article>
+            <article class="step">
+              <span class="step__n">2</span>
+              <h3>Extract &amp; structure</h3>
+              <p>They read your records, structured fields and free-text notes alike, and turn
+                what's locked inside into clean, usable data.</p>
+            </article>
+            <article class="step">
+              <span class="step__n">3</span>
+              <h3>Automate, with oversight</h3>
+              <p>They run the manual workflow end to end. Your team reviews and signs off, and
+                the agents learn from every correction.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Use cases ────────────────────────────────────── -->
+      <section id="usecases" class="section section--tint">
+        <div class="container">
+          <h2 class="section__title">Start with audits. Go further.</h2>
+          <p class="section__lead">
+            Melodic takes on the mandatory, labour-intensive workflows that eat clinical time.
+            Audits are where most teams start.
+          </p>
+          <div class="cards cards--4">
+            <article class="card card--soft"><h3>Clinical audits</h3><p>Whole audits populated from your records, every value traced to its source.</p></article>
+            <article class="card card--soft"><h3>Mandatory reporting</h3><p>National registries and returns, compiled straight from source data.</p></article>
+            <article class="card card--soft"><h3>Data extraction &amp; cleaning</h3><p>Unstructured notes and legacy records turned into structured, usable data.</p></article>
+            <article class="card card--soft"><h3>Ad-hoc requests</h3><p>One-off data questions answered without a data-warehouse round-trip.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Security ─────────────────────────────────────── -->
+      <section id="security" class="section">
+        <div class="container">
+          <p class="eyebrow">Security</p>
+          <h2 class="section__title">Built to clear procurement</h2>
+          <p class="section__lead">
+            The reason automation rarely reaches the ward is data security. Melodic is designed
+            around it.
+          </p>
+          <div class="cards cards--2">
+            <article class="card"><h3>On-premise</h3><p>Runs inside your environment. Patient data never leaves the hospital.</p></article>
+            <article class="card"><h3>Read-only</h3><p>Reads from a copy of your data. It never writes back to clinical systems.</p></article>
+            <article class="card"><h3>Human in the loop</h3><p>Staff approve every output before it counts. Nothing ships unchecked.</p></article>
+            <article class="card"><h3>Fully auditable</h3><p>Every action and value traces to its source, attributed to a named user.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── FAQ ──────────────────────────────────────────── -->
+      <section id="faq" class="section section--tint">
+        <div class="container">
+          <h2 class="section__title">Questions, answered</h2>
+          <div class="faq">
+            <details><summary>What is Melodic?</summary><p>On-premise AI agents that extract and structure clinical data from your existing systems and automate the manual workflows around it, with a clinician in the loop.</p></details>
+            <details><summary>What can it automate?</summary><p>Mandatory, labour-intensive admin: clinical audits, registry and reporting returns, data extraction and cleaning, and ad-hoc data requests. Audits are where most teams start.</p></details>
+            <details><summary>Do we have to integrate it with our systems?</summary><p>No. The agents navigate the systems you already run, so there's no lengthy integration and no infrastructure change.</p></details>
+            <details><summary>Does any patient data leave the hospital?</summary><p>No. Everything runs on-premise, inside your network. Sensitive data never leaves the hospital.</p></details>
+            <details><summary>Is there human oversight?</summary><p>Yes. A clinician reviews and signs off on every output, and the agents learn from each correction.</p></details>
+            <details><summary>How quickly can we get started?</summary><p>Book a demo and we'll scope a first workflow with your team and how Melodic fits your environment.</p></details>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Final CTA + form ─────────────────────────────── -->
+      <section id="demo" class="cta">
+        <div class="blob blob--3" aria-hidden="true"></div>
+        <div class="container cta__inner">
+          <div class="cta__copy">
+            <h2 class="cta__title">See Melodic on your data.</h2>
+            <p class="cta__sub">Tell us where your team loses the most time, and we'll show how
+              Melodic clears it: on-premise, and under your control.</p>
+          </div>
+          <form class="form" id="demo-form" novalidate>
+            <label>Email*<input name="email" type="email" required placeholder="you@hospital.org" /></label>
+            <label>Organisation*<input name="org" type="text" required placeholder="Trust or department" /></label>
+            <label>Message<textarea name="message" rows="4" placeholder="Which audits would you like to see?"></textarea></label>
+            <button type="submit" class="btn btn--primary form__submit">Book a Demo</button>
+            <p class="form__ok" id="form-ok" hidden>Thanks, we'll be in touch shortly.</p>
+          </form>
+        </div>
+      </section>
     </main>
+
+    <!-- ── Footer ───────────────────────────────────────── -->
+    <footer class="footer">
+      <div class="container footer__inner">
+        <div class="footer__brand">
+          <span class="brand__name">Melodic Health</span>
+          <p>Clinical data, unlocked on-premise.</p>
+        </div>
+        <div class="footer__cols">
+          <div><h4>Platform</h4><a href="#how">How it works</a><a href="#usecases">Use cases</a><a href="#security">Security</a></div>
+          <div><h4>Company</h4><a href="./about.html">About</a></div>
+          <div><h4>Legal</h4><a href="#">Privacy</a><a href="#">Terms</a></div>
+        </div>
+      </div>
+      <div class="container footer__base">© 2026 Melodic Health. All rights reserved.</div>
+    </footer>
+
+    <script src="./site.js" defer></script>
   </body>
 </html>

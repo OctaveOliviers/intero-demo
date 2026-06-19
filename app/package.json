@@ -17,6 +17,7 @@
     "dompurify": "^3.4.7",
     "jspreadsheet-ce": "^5.0.0",
     "snarkdown": "^2.0.0",
+    "svelte-i18n": "^4.0.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

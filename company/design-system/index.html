@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Melodic Health Design System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://api.fontshare.com/v2/css?f[]=satoshi@700,900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -33,48 +37,67 @@
       <section class="content">
         <article id="color" class="card">
           <h2>Color Tokens</h2>
-          <p class="desc">Use these variables in all website and slide CSS.</p>
+          <p class="desc">
+            Deep blue + Cambridge blue. Deep blue is the spine; Cambridge blue is the single
+            signature accent. Full token set and rules in
+            <code>../brand/README.md</code> §3.
+          </p>
           <div class="swatch-grid">
+            <div class="swatch">
+              <span class="chip chip--ink"></span>
+              <strong>--ink</strong>
+              <code>#06152F</code>
+            </div>
+            <div class="swatch">
+              <span class="chip chip--deep-blue"></span>
+              <strong>--deep-blue</strong>
+              <code>#0E2F6E</code>
+            </div>
+            <div class="swatch">
+              <span class="chip chip--blue"></span>
+              <strong>--blue</strong>
+              <code>#1E4FB0</code>
+            </div>
+            <div class="swatch">
+              <span class="chip chip--cambridge"></span>
+              <strong>--cambridge</strong>
+              <code>#A3C1AD</code>
+            </div>
+            <div class="swatch">
+              <span class="chip chip--cambridge-deep"></span>
+              <strong>--cambridge-deep</strong>
+              <code>#6E9580</code>
+            </div>
+            <div class="swatch">
+              <span class="chip chip--cambridge-weak"></span>
+              <strong>--cambridge-weak</strong>
+              <code>#ECF2EE</code>
+            </div>
             <div class="swatch">
               <span class="chip chip--bg"></span>
               <strong>--bg</strong>
-              <code>#081622</code>
-            </div>
-            <div class="swatch">
-              <span class="chip chip--surface"></span>
-              <strong>--surface</strong>
-              <code>#0f2436</code>
-            </div>
-            <div class="swatch">
-              <span class="chip chip--brand"></span>
-              <strong>--brand</strong>
-              <code>#38b6ff</code>
-            </div>
-            <div class="swatch">
-              <span class="chip chip--accent"></span>
-              <strong>--accent</strong>
-              <code>#2dd4bf</code>
+              <code>#F5F7FA</code>
             </div>
             <div class="swatch">
               <span class="chip chip--text"></span>
               <strong>--text</strong>
-              <code>#f5fbff</code>
+              <code>#0F2547</code>
             </div>
             <div class="swatch">
               <span class="chip chip--muted"></span>
-              <strong>--muted</strong>
-              <code>#adc7dd</code>
+              <strong>--text-muted</strong>
+              <code>#8593A8</code>
             </div>
           </div>
         </article>
 
         <article id="type" class="card">
           <h2>Typography</h2>
-          <p class="desc">Default stack: Satoshi, Outfit, Avenir Next, Segoe UI, sans-serif.</p>
+          <p class="desc">Display: Satoshi (700/900). Body: Inter (400/500/600).</p>
           <div class="type-specs">
-            <p class="display">Display 56 / 1.05 / -0.03em</p>
+            <p class="display">Display 72 / 1.05 / -0.03em</p>
             <p class="h2">Heading 32 / 1.15 / -0.02em</p>
-            <p class="body">Body 18 / 1.55 regular for product and narrative text.</p>
+            <p class="body">Body 16 / 1.55 regular for narrative text.</p>
             <p class="meta">Meta 13 / 0.14em uppercase for labels only.</p>
           </div>
         </article>
