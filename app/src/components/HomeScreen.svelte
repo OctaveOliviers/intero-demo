@@ -12,6 +12,8 @@
   import ScanningEye from "./ScanningEye.svelte";
   import InputSpec from "./spec/InputSpec.svelte";
   import OutputSpec from "./spec/OutputSpec.svelte";
+  import DashboardCardGrid from "./DashboardCardGrid.svelte";
+  import { selectAudit } from "../stores/navigation.js";
 
   // ONE surface. The agent analyses LIVE: as soon as the operator types, the
   // bottom folds out (divider → "thinking" → suggested filters) without any
@@ -165,6 +167,16 @@
   // side is what determines when the whole entrance is done.
   $: revealMs = (nRows + 2) * STEP;
 
+  // The persistent agent band's label. It only ever changes the wording while the
+  // criteria below stay mounted (doc 2 §"The persistent agent band"): a first read
+  // with nothing extracted yet, a re-read once criteria exist, or the settled state.
+  $: bandLabel =
+    phase === "parsing"
+      ? spec
+        ? "Updating criteria…"
+        : "Reading your request…"
+      : "Suggested criteria";
+
   // Token so a superseded/stopped parse can never flip us into `ready`.
   let parseSeq = 0;
   // Debounce so a fast typist re-analyses once they pause, not per keystroke.
@@ -207,13 +219,20 @@
     try {
       const result = await parseRequest(text, { templates: flatTemplates(templateGroups) });
       if (seq !== parseSeq) return; // superseded by a newer edit, or stopped
+      // The staggered row reveal plays ONLY on the first transition into criteria
+      // (doc 2 §"The persistent agent band"). On a re-extraction the chips are
+      // already mounted and morph in place via cohortMerge, so we must not replay
+      // the entrance — that would re-stagger the whole set on every keystroke.
+      const firstCriteria = !spec;
       spec = result;
       phase = "ready";
-      revealRows = true;
-      // Let the staggered entrance finish, then stop applying index delays.
-      setTimeout(() => {
-        revealRows = false;
-      }, revealMs + 400);
+      if (firstCriteria) {
+        revealRows = true;
+        // Let the staggered entrance finish, then stop applying index delays.
+        setTimeout(() => {
+          revealRows = false;
+        }, revealMs + 400);
+      }
       // If the operator already hit the arrow while we were thinking, go now.
       if (pendingRun) {
         pendingRun = false;
@@ -227,12 +246,14 @@
     }
   }
 
-  // Stop the in-flight "thinking" and fold the agent's section back up.
+  // Stop the in-flight re-read. If criteria are already on screen, settle back to
+  // showing them ("Suggested criteria") rather than folding the whole analysis
+  // away; only collapse to idle when nothing has been extracted yet.
   function stopParsing() {
     clearTimeout(debounceTimer);
     parseSeq++;
     pendingRun = false;
-    phase = "idle";
+    phase = spec ? "ready" : "idle";
   }
 
   // The arrow (and Enter) run the analysis. It's never blocked while the agent
@@ -424,36 +445,46 @@
   <!-- BELOW the line: the agent's analysis. Top-anchored to the divider, so it
        grows DOWNWARD (and scrolls if very tall) while the line stays put. -->
   <div class="agent-zone">
+    <!-- The card grid is ALWAYS mounted in the same DOM position so its on-screen
+         place never shifts. While the agent suggestion is open it is only dimmed
+         (de-emphasised), never unmounted, hidden, or reflowed. -->
+    <div class="cards" class:dimmed={phase !== "idle"} aria-hidden={phase !== "idle"}>
+      <DashboardCardGrid on:select={(e) => selectAudit(e.detail.auditId)} />
+    </div>
     {#if phase !== "idle"}
-      <div class="fold">
-        {#if phase === "parsing"}
-          <div class="thinking" aria-live="polite">
-            <!-- Scanning-eye at rest; hovering the slot fades it out and
-                 reveals the stop button (same affordance as ResultsView's
-                 agent card). -->
-            <span class="slot">
-              <span class="eye" aria-hidden="true"><ScanningEye size={16} /></span>
-              <button
-                class="stop-btn"
-                type="button"
-                on:click={stopParsing}
-                title={$_("home.stop")}
-                aria-label={$_("home.stopReading")}
-              >
-                <Icon name="stop" size={16} />
-              </button>
-            </span>
-            <span class="status">{$_("home.readingRequest")}</span>
-          </div>
-        {:else if phase === "error"}
+      <div class="fold overlay">
+        {#if phase === "error"}
           <div class="error" role="alert">{errorMessage}</div>
-        {:else}
-          {#if indexing}
-            <div class="indexing-badge" aria-live="polite">
-              <span class="eye-sm" aria-hidden="true"><ScanningEye size={12} /></span>
-              <span>{$_("home.indexingTemplate")}</span>
-            </div>
-          {/if}
+        {:else if phase === "parsing" || spec}
+          <div class="band" aria-live="polite">
+            <span class="slot" class:interactive={phase === "parsing"}>
+              <span class="eye" aria-hidden="true">
+                <ScanningEye size={16} animate={phase === "parsing"} />
+              </span>
+              {#if phase === "parsing"}
+                <button
+                  class="stop-btn"
+                  type="button"
+                  on:click={stopParsing}
+                  title={$_("home.stop")}
+                  aria-label={$_("home.stopReading")}
+                >
+                  <Icon name="stop" size={16} />
+                </button>
+              {/if}
+            </span>
+            <span class="status">{bandLabel}</span>
+          </div>
+        {/if}
+
+        {#if indexing}
+          <div class="indexing-badge" aria-live="polite">
+            <span class="eye-sm" aria-hidden="true"><ScanningEye size={12} /></span>
+            <span>{$_("home.indexingTemplate")}</span>
+          </div>
+        {/if}
+
+        {#if spec}
           <div class="sections">
             <InputSpec
               cohort={spec.cohort}
@@ -520,6 +551,34 @@
     flex-direction: column;
     justify-content: flex-start; /* fold starts at the divider, grows downward */
     overflow-y: auto; /* very tall analyses scroll here; the line stays put */
+    position: relative; /* anchor for the agent-suggestion overlay */
+  }
+
+  /* The dashboard card grid lives here permanently. When the agent suggestion is
+     open the cards stay in the EXACT same position and size — they only recede
+     visually (lowered opacity/contrast), never unmount or reflow. */
+  .cards {
+    width: 100%;
+    /* Breathing room between the request bar (above the divider) and the cards. */
+    padding-top: var(--space-6);
+    transition: opacity var(--dur-fast) var(--ease), filter var(--dur-fast) var(--ease);
+  }
+  .cards.dimmed {
+    opacity: 0.35;
+    filter: saturate(0.85);
+    pointer-events: none; /* the overlay owns interaction while it's open */
+  }
+
+  /* The agent fold, rendered only while typing, sits ON TOP of the cards: pinned
+     to the top of the zone (the divider) and layered above via z-index. Its own
+     --color-surface background makes it read as a solid suggestion over the
+     dimmed cards. Because it is absolute, the cards below do not move. */
+  .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2;
   }
 
   /* ── The request bar (above the line) ── */
@@ -750,8 +809,8 @@
     box-sizing: border-box;
   }
 
-  /* ── "Agent thinking…" — scanning eye + hover-to-stop, like ResultsView ── */
-  .thinking {
+  /* ── The persistent agent band — scanning eye + hover-to-stop, like ResultsView ── */
+  .band {
     display: flex;
     align-items: center;
     gap: var(--space-2);
@@ -796,10 +855,11 @@
   .stop-btn:hover {
     color: var(--color-text);
   }
-  .slot:hover .eye {
+  /* Only the parsing-state slot swaps eye→stop on hover; at rest the eye stays. */
+  .slot.interactive:hover .eye {
     opacity: 0;
   }
-  .slot:hover .stop-btn {
+  .slot.interactive:hover .stop-btn {
     opacity: 1;
   }
   .status {

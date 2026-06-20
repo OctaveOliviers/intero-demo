@@ -800,6 +800,370 @@ function makeNpdaCell(colKey, { r, ref, db }) {
 
 
 // ===========================================================================
+// Dataset 4 — Epilepsy12 paediatric epilepsy audit (Flow E) — one sheet
+// ===========================================================================
+//
+// Epilepsy12: one row per child/young person (≤18) in their first year of
+// epilepsy care, coded to TFC 223. Same two value kinds as the other audits:
+//   • DIRECT      — copied from structured EHR tables (demographics, the
+//                   epilepsy-assessment record, radiology, cardiology and the
+//                   prescribing record).
+//   • INTERPRETIVE — read from the free-text epilepsy clinic letter and the
+//                   mental-health screening note (epilepsy expertise of the
+//                   assessing paediatrician, seizure type, and the MH
+//                   problem/support outcome).
+// Genuine "not done / not indicated / not applicable" cases carry an explicit
+// label backed by a lookup that proves the query ran — never a mysterious blank;
+// one MRI report is genuinely blocked.
+
+const EPILEPSY_NOTE_TYPES = new Set(["epilepsy_clinic", "mh_screening"]);
+
+const EPILEPSY_RECORDS = CONTENT.records.epilepsy;
+
+// One row per child in the first-year-of-care cohort; this is also the count.
+const EPILEPSY_ROW_ORDER = [
+  "EPI001", "EPI002", "EPI003", "EPI004", "EPI005",
+  "EPI006", "EPI007", "EPI008", "EPI009", "EPI010",
+];
+
+// The contract's "N patients match" must equal the Epilepsy row count.
+export const EPILEPSY_PATIENT_COUNT = EPILEPSY_ROW_ORDER.length;
+
+// Single sheet — "Epilepsy". Headers/widths live in the locale content pack.
+const EPILEPSY_COLUMNS = CONTENT.columns.epilepsy;
+
+// 10-digit NHS numbers. Rows are keyed internally on PATIENT_ID (EPI###); the
+// NHS number is a demographic field like any other.
+const EPILEPSY_NHS = {
+  EPI001: "9991002731", EPI002: "9991013448", EPI003: "9991024165",
+  EPI004: "9991035882", EPI005: "9991046509", EPI006: "9991057226",
+  EPI007: "9991068943", EPI008: "9991079660", EPI009: "9991080387",
+  EPI010: "9991091004",
+};
+
+// --- Epilepsy code maps (codes/keys are logic; labels live in CONTENT.codeMaps)
+const EPI_SEX = CONTENT.codeMaps.sex;                 // sex assigned at birth
+const EPI_SEIZURE_TYPE = CONTENT.codeMaps.seizureType; // convulsive vs not
+
+// Whole-days between two ISO dates (b − a). Used for the KPI time-windows shown
+// in the explanations (referral→assessment, MRI request→performed).
+function daysBetween(aIso, bIso) {
+  const a = Date.parse(aIso + "T00:00:00Z");
+  const b = Date.parse(bIso + "T00:00:00Z");
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return Math.round((b - a) / 86400000);
+}
+
+// --- Epilepsy cell builders -------------------------------------------------
+// DIRECT cell over an Epilepsy12 structured table, keyed on the PATIENT_ID.
+function epilepsyDirect({ code, ref, db, table, column, value, resultValue, explanation }) {
+  const sql = `SELECT PATIENT_ID, ${column} FROM ${table} WHERE PATIENT_ID = '${code}'`;
+  const rv = resultValue !== undefined ? resultValue : value;
+  return {
+    ref, value, sql,
+    result: structuredResult(["PATIENT_ID", column], [[code, rv]]),
+    meta: { kind: "direct", database: db, sql, explanation },
+  };
+}
+
+// INTERPRETIVE cell: a notes query over the child's clinical_notes filtered to
+// the relevant NOTE_TYPE(s), with verbatim quoted `evidence` spans.
+function epilepsyInterp({ r, ref, db, value, noteTypes, evidence, explanation }) {
+  const inList = noteTypes.map((t) => `'${t}'`).join(", ");
+  const sql = `SELECT AUTHOR_ROLE, DATE, NOTE_TYPE, TEXT FROM clinical_notes WHERE PATIENT = '${r.patient}' AND NOTE_TYPE IN (${inList})`;
+  const notes = r.notes.filter((n) => noteTypes.includes(n.type));
+  return {
+    ref, value, sql,
+    result: noteResult(notes),
+    meta: { kind: "interpretive", database: db, sql, evidence, explanation },
+  };
+}
+
+// A DIRECT date cell formatted DD/MM/YYYY (value present).
+const epilepsyDate = ({ code, ref, db, table, column, iso, explanation }) =>
+  epilepsyDirect({ code, ref, db, table, column, value: fmtDMY(iso), explanation });
+// A DIRECT "lookup ran, nothing recorded" cell — explicit label, null result.
+const epilepsyBlank = ({ code, ref, db, table, column, explanation }) =>
+  epilepsyDirect({ code, ref, db, table, column, value: "", resultValue: null, explanation });
+
+// Eligibility for the pregnancy-prevention-programme KPI (KPI 8): female aged 12
+// or over on valproate or topiramate. Mirrors the cohort logic in makeNpdaCell.
+const pppEligible = (r) =>
+  r.sex === "Female" && r.ageAtAssessment >= 12 &&
+  (r.onValproate === "Yes" || r.onTopiramate === "Yes");
+
+// Build one populated cell for the Epilepsy sheet. The cell value is the audit
+// value/format; the evidence + explanation justify it.
+function makeEpilepsyCell(colKey, { r, ref, db }) {
+  // One genuinely unresolvable cell, so the blocked state + its reason show in
+  // the demo: EPI007's MRI was requested but the report could not be located
+  // (imaging performed at a transferring unit and not yet returned).
+  if (r.code === "EPI007" && colKey === "mriPerformedDate") {
+    return {
+      ref,
+      value: "",
+      meta: {
+        kind: "direct",
+        state: "blocked",
+        database: db,
+        reason_code: "NOT_LOCATED",
+        reason_detail: CONTENT.blockedReason.epilepsyMriPerformed,
+      },
+    };
+  }
+  const i = r.i;
+  switch (colKey) {
+    case "patient": {
+      const nhs = EPILEPSY_NHS[r.code];
+      const sql = `SELECT PATIENT_ID, NHS_Number FROM patient_demographics WHERE PATIENT_ID = '${r.code}'`;
+      return {
+        ref, value: nhs, sql,
+        result: structuredResult(["PATIENT_ID", "NHS_Number"], [[r.code, nhs]]),
+        meta: { kind: "direct", database: db, sql, explanation: X.epiPatient(r.code) },
+      };
+    }
+    case "dob": return epilepsyDirect({ code: r.code, ref, db, table: "patient_demographics", column: "Date_of_birth", value: fmtDMY(r.dob), explanation: X.epiDob(r.code) });
+    case "sex": {
+      const m = EPI_SEX[r.sex];
+      return epilepsyDirect({ code: r.code, ref, db, table: "patient_demographics", column: "Sex_assigned_at_birth", value: m.code, resultValue: m.label, explanation: X.epiSex(r.code, m.label, m.code) });
+    }
+    case "ageAtAssessment": return epilepsyDirect({ code: r.code, ref, db, table: "epilepsy_assessments", column: "Age_at_first_assessment", value: r.ageAtAssessment, explanation: X.epiAgeAtAssessment(r.code, r.ageAtAssessment) });
+
+    // --- B1: epilepsy-expert paediatrician within 2 weeks of referral --------
+    case "referralDate": return epilepsyDate({ code: r.code, ref, db, table: "epilepsy_assessments", column: "Referral_date", iso: r.referralDate, explanation: X.epiReferralDate(r.code) });
+    case "firstAssessmentDate": return epilepsyDate({ code: r.code, ref, db, table: "epilepsy_assessments", column: "First_assessment_date", iso: r.firstAssessmentDate, explanation: X.epiFirstAssessmentDate(r.code, daysBetween(r.referralDate, r.firstAssessmentDate)) });
+    case "expertisePaediatrician": return epilepsyInterp({ r, ref, db, value: i.expertise.v, noteTypes: ["epilepsy_clinic"], evidence: i.expertise.e, explanation: X.epiExpertise(r.code, i.expertise.v === "Yes", i.expertise.v) });
+
+    // --- B2: ESN input within first year -------------------------------------
+    case "esnInputDate":
+      if (!r.esnInputDate) return epilepsyBlank({ code: r.code, ref, db, table: "epilepsy_assessments", column: "ESN_input_date", explanation: X.epiEsnInputNotDone(r.code) });
+      return epilepsyDate({ code: r.code, ref, db, table: "epilepsy_assessments", column: "ESN_input_date", iso: r.esnInputDate, explanation: X.epiEsnInputDate(r.code) });
+
+    // --- B3: MRI within 6 weeks where indicated ------------------------------
+    case "mriIndicated": return epilepsyDirect({ code: r.code, ref, db, table: "epilepsy_assessments", column: "MRI_indicated", value: r.mriIndicated, explanation: X.epiMriIndicated(r.code, r.mriIndicated === "Yes") });
+    case "mriRequestDate":
+      if (r.mriIndicated !== "Yes" || !r.mriRequestDate) return epilepsyBlank({ code: r.code, ref, db, table: "radiology_requests", column: "MRI_request_date", explanation: X.epiMriRequestNA(r.code) });
+      return epilepsyDate({ code: r.code, ref, db, table: "radiology_requests", column: "MRI_request_date", iso: r.mriRequestDate, explanation: X.epiMriRequestDate(r.code) });
+    case "mriPerformedDate":
+      if (r.mriIndicated !== "Yes") return epilepsyBlank({ code: r.code, ref, db, table: "radiology_results", column: "MRI_performed_date", explanation: X.epiMriPerformedNA(r.code) });
+      if (!r.mriPerformedDate) return epilepsyBlank({ code: r.code, ref, db, table: "radiology_results", column: "MRI_performed_date", explanation: X.epiMriPerformedNotDone(r.code) });
+      return epilepsyDate({ code: r.code, ref, db, table: "radiology_results", column: "MRI_performed_date", iso: r.mriPerformedDate, explanation: X.epiMriPerformedDate(r.code, daysBetween(r.mriRequestDate, r.mriPerformedDate)) });
+
+    // --- B4: ECG in convulsive seizures --------------------------------------
+    case "seizureType": {
+      const m = EPI_SEIZURE_TYPE[i.seizureType.v];
+      return epilepsyInterp({ r, ref, db, value: m.code, noteTypes: ["epilepsy_clinic"], evidence: i.seizureType.e, explanation: X.epiSeizureType(r.code, m.label, m.code) });
+    }
+    case "ecgDate":
+      if (i.seizureType.v !== "Convulsive") return epilepsyBlank({ code: r.code, ref, db, table: "cardiology_results", column: "ECG_date", explanation: X.epiEcgNA(r.code) });
+      if (!r.ecgDate) return epilepsyBlank({ code: r.code, ref, db, table: "cardiology_results", column: "ECG_date", explanation: X.epiEcgNotDone(r.code) });
+      return epilepsyDate({ code: r.code, ref, db, table: "cardiology_results", column: "ECG_date", iso: r.ecgDate, explanation: X.epiEcgDate(r.code) });
+
+    // --- B5: mental-health screening + support -------------------------------
+    case "mhScreeningDate":
+      if (!r.mhScreeningDate) return epilepsyBlank({ code: r.code, ref, db, table: "epilepsy_assessments", column: "MH_screening_date", explanation: X.epiMhScreeningNotDone(r.code) });
+      return epilepsyDate({ code: r.code, ref, db, table: "epilepsy_assessments", column: "MH_screening_date", iso: r.mhScreeningDate, explanation: X.epiMhScreeningDate(r.code) });
+    case "mhProblemIdentified": return epilepsyInterp({ r, ref, db, value: i.mhProblem.v, noteTypes: ["mh_screening"], evidence: i.mhProblem.e, explanation: X.epiMhProblem(r.code, i.mhProblem.v === "Yes", i.mhProblem.v) });
+    case "mhSupportProvided":
+      if (i.mhProblem.v !== "Yes") return epilepsyBlank({ code: r.code, ref, db, table: "epilepsy_assessments", column: "MH_support_provided", explanation: X.epiMhSupportNA(r.code) });
+      return epilepsyInterp({ r, ref, db, value: i.mhSupport.v, noteTypes: ["mh_screening"], evidence: i.mhSupport.e, explanation: X.epiMhSupportProvided(r.code, i.mhSupport.v === "Yes", i.mhSupport.v) });
+
+    // --- B6: comprehensive care plan by 12 months ----------------------------
+    case "carePlanDate":
+      if (!r.carePlanDate) return epilepsyBlank({ code: r.code, ref, db, table: "epilepsy_assessments", column: "Care_plan_date", explanation: X.epiCarePlanNotDone(r.code) });
+      return epilepsyDate({ code: r.code, ref, db, table: "epilepsy_assessments", column: "Care_plan_date", iso: r.carePlanDate, explanation: X.epiCarePlanDate(r.code) });
+
+    // --- B7: valproate/topiramate safety (PPP, females ≥12) ------------------
+    case "onValproate": return epilepsyDirect({ code: r.code, ref, db, table: "medications", column: "On_sodium_valproate", value: r.onValproate, explanation: X.epiOnValproate(r.code, r.onValproate === "Yes") });
+    case "onTopiramate": return epilepsyDirect({ code: r.code, ref, db, table: "medications", column: "On_topiramate", value: r.onTopiramate, explanation: X.epiOnTopiramate(r.code, r.onTopiramate === "Yes") });
+    case "pppInPlace":
+      if (!pppEligible(r)) return epilepsyBlank({ code: r.code, ref, db, table: "epilepsy_assessments", column: "PPP_in_place", explanation: X.epiPppNA(r.code) });
+      return epilepsyDirect({ code: r.code, ref, db, table: "epilepsy_assessments", column: "PPP_in_place", value: r.pppInPlace === "Yes" ? "Yes" : "No", explanation: X.epiPppInPlace(r.code, r.pppInPlace === "Yes") });
+
+    default:
+      return { ref, value: "" }; // blank spacer columns (_s1.._s7)
+  }
+}
+
+
+// ===========================================================================
+// Dataset 5 — National Major Trauma Registry (NMTR/TARN) paediatric audit
+// (Flow T) — one sheet
+// ===========================================================================
+//
+// NMTR: one row per paediatric (<16) major-trauma case at the MTC with ≥1 AIS3+
+// injury. Same two value kinds as the other audits:
+//   • DIRECT      — copied from structured tables (demographics, the trauma
+//                   registry record, the ED reception record, radiology and the
+//                   medication record).
+//   • INTERPRETIVE — read from the free-text resuscitation note and the
+//                   rehabilitation/discharge note (whether airway/intubation was
+//                   considered, and whether a rehabilitation prescription was
+//                   issued).
+// The BPT pays a two-level top-up: Level 1 (ISS ≥9) and the higher Level 2
+// (ISS ≥16); several process criteria are level-gated. Genuine "not applicable /
+// not done" cases carry an explicit lookup-backed label, never a mysterious
+// blank; one consultant-arrival time is genuinely blocked.
+
+const TRAUMA_NOTE_TYPES = new Set(["resus", "rehab"]);
+
+const TRAUMA_RECORDS = CONTENT.records.trauma;
+
+// One row per case in the paediatric major-trauma cohort; this is also the count.
+const TRAUMA_ROW_ORDER = [
+  "TRA001", "TRA002", "TRA003", "TRA004", "TRA005",
+  "TRA006", "TRA007", "TRA008", "TRA009", "TRA010",
+];
+
+// The contract's "N patients match" must equal the Trauma row count.
+export const TRAUMA_PATIENT_COUNT = TRAUMA_ROW_ORDER.length;
+
+// Single sheet — "Trauma". Headers/widths live in the locale content pack.
+const TRAUMA_COLUMNS = CONTENT.columns.trauma;
+
+// 10-digit NHS numbers. Rows are keyed internally on PATIENT_ID (TRA###); the
+// NHS number is a demographic field like any other.
+const TRAUMA_NHS = {
+  TRA001: "9992001839", TRA002: "9992012556", TRA003: "9992023273",
+  TRA004: "9992034990", TRA005: "9992045617", TRA006: "9992056334",
+  TRA007: "9992067051", TRA008: "9992078778", TRA009: "9992089495",
+  TRA010: "9992090112",
+};
+
+// --- Trauma code maps (codes/keys are logic; labels live in CONTENT.codeMaps)
+const TRA_SEX = CONTENT.codeMaps.sex;                 // sex assigned at birth
+
+// BPT level label from the Injury Severity Score (Level 2 ≥16, Level 1 ≥9).
+const traumaLevel = (iss) =>
+  iss >= 16 ? "Level 2" : iss >= 9 ? "Level 1" : "below Level 1";
+
+// --- Eligibility / level gating (mirrors the cohort logic in makeEpilepsyCell) -
+const isLevel2 = (r) => r.iss >= 16;                   // C2 / C3 / C4 process gate
+const ctHeadEligible = (r) =>                          // C3: Level 2 head injury, GCS ≤13
+  r.headInjury === "Yes" && r.iss >= 16 && r.gcs <= 13;
+const airwayEligible = (r) => r.gcs < 9;               // C5: GCS <9 (Level 1)
+const rehabApplies = (r) => r.iss >= 9;                // C6: cohort ISS ≥9
+
+// --- Trauma cell builders ---------------------------------------------------
+// DIRECT cell over an NMTR structured table, keyed on the PATIENT_ID.
+function traumaDirect({ code, ref, db, table, column, value, resultValue, explanation }) {
+  const sql = `SELECT PATIENT_ID, ${column} FROM ${table} WHERE PATIENT_ID = '${code}'`;
+  const rv = resultValue !== undefined ? resultValue : value;
+  return {
+    ref, value, sql,
+    result: structuredResult(["PATIENT_ID", column], [[code, rv]]),
+    meta: { kind: "direct", database: db, sql, explanation },
+  };
+}
+
+// INTERPRETIVE cell: a notes query over the case's clinical_notes filtered to the
+// relevant NOTE_TYPE(s), with verbatim quoted `evidence` spans.
+function traumaInterp({ r, ref, db, value, noteTypes, evidence, explanation }) {
+  const inList = noteTypes.map((t) => `'${t}'`).join(", ");
+  const sql = `SELECT AUTHOR_ROLE, DATE, NOTE_TYPE, TEXT FROM clinical_notes WHERE PATIENT = '${r.patient}' AND NOTE_TYPE IN (${inList})`;
+  const notes = r.notes.filter((n) => noteTypes.includes(n.type));
+  return {
+    ref, value, sql,
+    result: noteResult(notes),
+    meta: { kind: "interpretive", database: db, sql, evidence, explanation },
+  };
+}
+
+// A DIRECT date cell formatted DD/MM/YYYY (value present).
+const traumaDate = ({ code, ref, db, table, column, iso, explanation }) =>
+  traumaDirect({ code, ref, db, table, column, value: fmtDMY(iso), explanation });
+// A DIRECT "lookup ran, nothing recorded" cell — explicit label, null result.
+const traumaBlank = ({ code, ref, db, table, column, explanation }) =>
+  traumaDirect({ code, ref, db, table, column, value: "", resultValue: null, explanation });
+
+// Build one populated cell for the Trauma sheet. The cell value is the audit
+// value/format; the evidence + explanation justify it.
+function makeTraumaCell(colKey, { r, ref, db }) {
+  // One genuinely unresolvable cell, so the blocked state + its reason show in
+  // the demo: TRA009's consultant-arrival time was not captured in the ED record.
+  if (r.code === "TRA009" && colKey === "consultantArrivalMin") {
+    return {
+      ref,
+      value: "",
+      meta: {
+        kind: "direct",
+        state: "blocked",
+        database: db,
+        reason_code: "NOT_LOCATED",
+        reason_detail: CONTENT.blockedReason.traumaConsultantArrival,
+      },
+    };
+  }
+  const i = r.i;
+  switch (colKey) {
+    case "patient": {
+      const nhs = TRAUMA_NHS[r.code];
+      const sql = `SELECT PATIENT_ID, NHS_Number FROM patient_demographics WHERE PATIENT_ID = '${r.code}'`;
+      return {
+        ref, value: nhs, sql,
+        result: structuredResult(["PATIENT_ID", "NHS_Number"], [[r.code, nhs]]),
+        meta: { kind: "direct", database: db, sql, explanation: X.traPatient(r.code) },
+      };
+    }
+    case "dob": return traumaDirect({ code: r.code, ref, db, table: "patient_demographics", column: "Date_of_birth", value: fmtDMY(r.dob), explanation: X.traDob(r.code) });
+    case "sex": {
+      const m = TRA_SEX[r.sex];
+      return traumaDirect({ code: r.code, ref, db, table: "patient_demographics", column: "Sex_assigned_at_birth", value: m.code, resultValue: m.label, explanation: X.traSex(r.code, m.label, m.code) });
+    }
+    case "ageYears": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "Age_years", value: r.ageYears, explanation: X.traAgeYears(r.code, r.ageYears) });
+    case "iss": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "Injury_severity_score", value: r.iss, explanation: X.traIss(r.code, r.iss, traumaLevel(r.iss)) });
+    case "ais3plus": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "AIS_3plus_injury", value: r.ais3plus, explanation: X.traAis3plus(r.code, r.ais3plus === "Yes") });
+
+    // --- C1: registry submission within 25 days of discharge -----------------
+    case "edArrivalDateTime": return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "ED_arrival_datetime", value: r.edArrivalDateTime, explanation: X.traEdArrival(r.code) });
+    case "dischargeDate": return traumaDate({ code: r.code, ref, db, table: "trauma_registry", column: "Discharge_date", iso: r.dischargeDate, explanation: X.traDischargeDate(r.code) });
+    case "nmtrSubmitted": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "NMTR_submitted", value: r.nmtrSubmitted, explanation: X.traNmtrSubmitted(r.code, r.nmtrSubmitted === "Yes") });
+    case "datasetComplete": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "NMTR_dataset_complete", value: r.datasetComplete, explanation: X.traDatasetComplete(r.code, r.datasetComplete === "Yes") });
+    case "submissionDate": return traumaDate({ code: r.code, ref, db, table: "trauma_registry", column: "NMTR_submission_date", iso: r.submissionDate, explanation: X.traSubmissionDate(r.code, daysBetween(r.dischargeDate, r.submissionDate)) });
+
+    // --- C2: consultant-led trauma-team reception ≤5 min (Level 2) -----------
+    case "traumaTeamActivated": return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Trauma_team_activated", value: r.traumaTeamActivated, explanation: X.traTeamActivated(r.code, r.traumaTeamActivated === "Yes") });
+    case "consultantPresent": return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Consultant_present", value: r.consultantPresent, explanation: X.traConsultantPresent(r.code, r.consultantPresent === "Yes") });
+    case "consultantArrivalMin":
+      if (!isLevel2(r)) return traumaBlank({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Consultant_arrival_min", explanation: X.traConsultantArrivalNA(r.code) });
+      return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Consultant_arrival_min", value: r.consultantArrivalMin, explanation: X.traConsultantArrival(r.code, r.consultantArrivalMin) });
+
+    // --- C3: CT head ≤60 min (GCS ≤13 head injury, Level 2) ------------------
+    case "gcs": return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "GCS_at_arrival", value: r.gcs, explanation: X.traGcs(r.code, r.gcs) });
+    case "headInjury": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "Head_injury", value: r.headInjury, explanation: X.traHeadInjury(r.code, r.headInjury === "Yes") });
+    case "ctHeadMin":
+      if (r.headInjury !== "Yes") return traumaBlank({ code: r.code, ref, db, table: "radiology_results", column: "CT_head_min", explanation: X.traCtHeadNAnoHead(r.code) });
+      if (!ctHeadEligible(r)) return traumaBlank({ code: r.code, ref, db, table: "radiology_results", column: "CT_head_min", explanation: X.traCtHeadNAnotEligible(r.code) });
+      return traumaDirect({ code: r.code, ref, db, table: "radiology_results", column: "CT_head_min", value: r.ctHeadMin, explanation: X.traCtHead(r.code, r.ctHeadMin) });
+
+    // --- C4: tranexamic acid ≤1 h (Level 2) ---------------------------------
+    case "txaIndicated": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "TXA_indicated", value: r.txaIndicated, explanation: X.traTxaIndicated(r.code, r.txaIndicated === "Yes") });
+    case "txaGiven":
+      if (r.txaIndicated !== "Yes") return traumaBlank({ code: r.code, ref, db, table: "medications", column: "TXA_given", explanation: X.traTxaNAnotIndicated(r.code) });
+      return traumaDirect({ code: r.code, ref, db, table: "medications", column: "TXA_given", value: r.txaGiven, explanation: X.traTxaGiven(r.code, r.txaGiven === "Yes") });
+    case "txaMin":
+      if (r.txaIndicated !== "Yes" || r.txaMin == null) return traumaBlank({ code: r.code, ref, db, table: "medications", column: "TXA_given_min", explanation: X.traTxaNAnotIndicated(r.code) });
+      return traumaDirect({ code: r.code, ref, db, table: "medications", column: "TXA_given_min", value: r.txaMin, explanation: X.traTxaMin(r.code, r.txaMin) });
+
+    // --- C5: airway considered ≤30 min (GCS <9, Level 1) --------------------
+    case "intubationConsidered": return traumaInterp({ r, ref, db, value: i.intubationConsidered.v, noteTypes: ["resus"], evidence: i.intubationConsidered.e, explanation: X.traIntubationConsidered(r.code, i.intubationConsidered.v === "Yes", i.intubationConsidered.v) });
+    case "airwayConsideredMin":
+      if (!airwayEligible(r)) return traumaBlank({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Airway_considered_min", explanation: X.traAirwayNA(r.code) });
+      return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Airway_considered_min", value: r.airwayConsideredMin, explanation: X.traAirwayMin(r.code, r.airwayConsideredMin) });
+
+    // --- C6: rehabilitation prescription (ISS ≥9, Level 1) ------------------
+    case "rehabNeedsAssessed": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "Rehab_needs_assessed", value: r.rehabNeedsAssessed, explanation: X.traRehabNeedsAssessed(r.code, r.rehabNeedsAssessed === "Yes") });
+    case "rehabPrescriptionIssued":
+      if (!rehabApplies(r)) return traumaBlank({ code: r.code, ref, db, table: "trauma_registry", column: "Rehab_prescription_issued", explanation: X.traRehabNA(r.code) });
+      return traumaInterp({ r, ref, db, value: i.rehabPrescription.v, noteTypes: ["rehab"], evidence: i.rehabPrescription.e, explanation: X.traRehabPrescription(r.code, i.rehabPrescription.v === "Yes", i.rehabPrescription.v) });
+
+    default:
+      return { ref, value: "" }; // blank spacer columns (_s1.._s6)
+  }
+}
+
+
+// ===========================================================================
 // Dataset descriptor — bundles the data + builders for one dataset so all
 // flows share identical workbook/timeline/SQL machinery (POLISH T3).
 // ===========================================================================
@@ -952,6 +1316,16 @@ const npda = buildDataset({
   columns: NPDA_COLUMNS, rowOrder: NPDA_ROW_ORDER, records: NPDA_RECORDS, makeCell: makeNpdaCell,
 });
 
+const epilepsy = buildDataset({
+  id: "epilepsy", sheet: "Epilepsy", label: "epilepsy12-audit.xlsx",
+  columns: EPILEPSY_COLUMNS, rowOrder: EPILEPSY_ROW_ORDER, records: EPILEPSY_RECORDS, makeCell: makeEpilepsyCell,
+});
+
+const trauma = buildDataset({
+  id: "trauma", sheet: "Trauma", label: "nmtr-trauma-audit.xlsx",
+  columns: TRAUMA_COLUMNS, rowOrder: TRAUMA_ROW_ORDER, records: TRAUMA_RECORDS, makeCell: makeTraumaCell,
+});
+
 // The cord audit is one workbook with TWO sheets (ALL + NICU). The viewer reads
 // cellMetadata keyed "<Sheet>!<ref>", so the two datasets' metadata merge.
 function cordWorkbookEvent() {
@@ -979,6 +1353,8 @@ cordAll.registerSql(SQL_RESULTS);
 cordNicu.registerSql(SQL_RESULTS);
 chestPain.registerSql(SQL_RESULTS);
 npda.registerSql(SQL_RESULTS);
+epilepsy.registerSql(SQL_RESULTS);
+trauma.registerSql(SQL_RESULTS);
 
 export function resolveSql(query) {
   const q = (query || "").trim();
@@ -999,6 +1375,60 @@ export function resolveSql(query) {
     return structuredResult(["PATIENT_CODE", "value"], []);
   }
 
+
+  // --- Major-trauma dataset (TRA###; trauma-registry / ED / resus tables) ---
+  // registerSql already covers every exact query; this is robustness for note
+  // lookups. Checked before epilepsy/NPDA so a TRA### query is never caught by a
+  // shared `medications` or `radiology_results` table match.
+  const traMatch = /'(TRA\d{3})'/.exec(q);
+  const traPatient = /'(trauma-patient-\d+)'/.exec(q);
+  if (traMatch || traPatient || /trauma_registry|ed_trauma_receptions/i.test(q)) {
+    const tcode = traMatch
+      ? traMatch[1]
+      : (traPatient ? TRAUMA_ROW_ORDER.find((k) => TRAUMA_RECORDS[k].patient === traPatient[1]) : null);
+    const tr = tcode ? TRAUMA_RECORDS[tcode] : null;
+    if (tr && /clinical_notes/i.test(q)) {
+      const types = (q.match(/'([a-z_]+)'/g) || [])
+        .map((s) => s.slice(1, -1))
+        .filter((t) => TRAUMA_NOTE_TYPES.has(t));
+      const notes = types.length ? tr.notes.filter((n) => types.includes(n.type)) : tr.notes;
+      return noteResult(notes.length ? notes : tr.notes);
+    }
+    if (tr) {
+      return structuredResult(
+        ["PATIENT_ID", "NHS_Number", "Injury_severity_score"],
+        [[tr.code, TRAUMA_NHS[tr.code], tr.iss]],
+      );
+    }
+    return structuredResult(["PATIENT_ID", "value"], []);
+  }
+
+  // --- Epilepsy12 dataset (EPI###; epilepsy/radiology/cardiology tables) ---
+  // registerSql already covers every exact query; this is robustness for note
+  // lookups. Checked before NPDA so an EPI### query is never caught by NPDA's
+  // shared `medications` table match.
+  const epiMatch = /'(EPI\d{3})'/.exec(q);
+  const epiPatient = /'(epilepsy-patient-\d+)'/.exec(q);
+  if (epiMatch || epiPatient || /epilepsy_assessments|radiology_requests|radiology_results|cardiology_results/i.test(q)) {
+    const ecode = epiMatch
+      ? epiMatch[1]
+      : (epiPatient ? EPILEPSY_ROW_ORDER.find((k) => EPILEPSY_RECORDS[k].patient === epiPatient[1]) : null);
+    const er = ecode ? EPILEPSY_RECORDS[ecode] : null;
+    if (er && /clinical_notes/i.test(q)) {
+      const types = (q.match(/'([a-z_]+)'/g) || [])
+        .map((s) => s.slice(1, -1))
+        .filter((t) => EPILEPSY_NOTE_TYPES.has(t));
+      const notes = types.length ? er.notes.filter((n) => types.includes(n.type)) : er.notes;
+      return noteResult(notes.length ? notes : er.notes);
+    }
+    if (er) {
+      return structuredResult(
+        ["PATIENT_ID", "NHS_Number", "Seizure_type"],
+        [[er.code, EPILEPSY_NHS[er.code], EPI_SEIZURE_TYPE[er.i.seizureType.v].code]],
+      );
+    }
+    return structuredResult(["PATIENT_ID", "value"], []);
+  }
 
   // --- NPDA paediatric diabetes dataset (NPD###; diabetes/clinic tables) ---
   const npdMatch = /'(NPD\d{3})'/.exec(q);
@@ -1061,6 +1491,33 @@ export function buildWorkbookEvent() {
 }
 export function buildPopulatedWorkbook() {
   return cordPopulatedWorkbook();
+}
+
+// --- Dataset-keyed snapshot + seeded dashboard audits -----------------------
+// The 3 seeded BPT dashboards each open to their OWN workbook: a runId maps to
+// the dataset whose populated snapshot openWorkbook should return. Anything not
+// in this map falls back to the cord-pH workbook (the live-upload Flow A).
+const SEEDED_DASHBOARD_RUNS = [
+  { runId: "mock-run-npda", dataset: npda },
+  { runId: "mock-run-epilepsy", dataset: epilepsy },
+  { runId: "mock-run-trauma", dataset: trauma },
+];
+
+export function buildPopulatedWorkbookForRun(runId) {
+  const hit = SEEDED_DASHBOARD_RUNS.find((s) => s.runId === runId);
+  return hit ? hit.dataset.populatedWorkbook() : cordPopulatedWorkbook();
+}
+
+// The 3 seed audit records (sidebar rows). Hardcoded per the wiring contract so
+// this works even before any CONTENT.dashboards exists. `createdAt` is set by
+// the store seeder, keeping this pure.
+export function seededDashboardAuditRecords() {
+  const base = { status: "completed", messages: [], activity: [], reviewSummary: null, workbook: null, runStartedAt: null, runEndedAt: null, filters: {}, criteria: [] };
+  return [
+    { ...base, id: "npda-lo-audit", runId: "mock-run-npda", title: "Diabetes BPT", submissionDeadline: "2026-07-20" },
+    { ...base, id: "epilepsy12-lo-audit", runId: "mock-run-epilepsy", title: "Epilepsy BPT", submissionDeadline: "2027-01-12" },
+    { ...base, id: "nmtr-trauma-lo-audit", runId: "mock-run-trauma", title: "Major Trauma BPT", submissionDeadline: "Submit ≤25 days of discharge" },
+  ];
 }
 
 // --- Run timeline -----------------------------------------------------------
@@ -1339,8 +1796,114 @@ function timelineC() {
   ];
 }
 
+// Epilepsy12 population: fill the single sheet in mixed-cadence batches
+// (structured columns fast, interpretive note reads slower), mirroring NPDA.
+function epilepsyPopulation(ds) {
+  const steps = [];
+  const ic = () => rnd(200, 420);
+
+  steps.push(act(rnd(400, 600), T.epilepsy.mapTemplate.headline, T.epilepsy.mapTemplate.detail));
+  steps.push(ds.columnBatch(rnd(400, 600), "patient"));
+
+  steps.push(act(rnd(350, 550), T.epilepsy.demographics.headline, T.epilepsy.demographics.detail));
+  steps.push(ds.multiColumnBatch(rnd(600, 800), ["dob", "sex", "ageAtAssessment"]));
+  steps.push(ds.multiColumnBatch(rnd(550, 750), ["referralDate", "firstAssessmentDate"]));
+
+  // INTERPRETIVE: read each child's epilepsy clinic letter for the assessing
+  // paediatrician's expertise (B1) and the seizure type (B4), cell by cell.
+  steps.push(act(rnd(550, 750), T.epilepsy.clinicLetters.headline, T.epilepsy.clinicLetters.detail));
+  steps.push(...ds.streamColumns(ic, ["expertisePaediatrician", "seizureType"]));
+
+  steps.push(act(rnd(400, 600), T.epilepsy.specialistInput.headline, T.epilepsy.specialistInput.detail));
+  steps.push(ds.multiColumnBatch(rnd(600, 850), ["esnInputDate", "carePlanDate"])); // EPI006 ESN / EPI010 plan Not done
+
+  steps.push(tool(rnd(450, 650), "sql_execute", "ok", T.tools.epilepsyInvestigations));
+  steps.push(act(rnd(400, 600), T.epilepsy.investigations.headline, T.epilepsy.investigations.detail));
+  steps.push(ds.multiColumnBatch(rnd(650, 900), ["mriIndicated", "mriRequestDate", "mriPerformedDate"])); // EPI007 MRI blocked
+  steps.push(ds.columnBatch(rnd(500, 700), "ecgDate")); // EPI005 ECG Not done / non-convulsive N/A
+
+  // INTERPRETIVE: mental-health screening note for the problem/support outcome.
+  steps.push(act(rnd(450, 650), T.epilepsy.mentalHealth.headline, T.epilepsy.mentalHealth.detail));
+  steps.push(ds.columnBatch(rnd(450, 650), "mhScreeningDate")); // EPI009 screening Not done
+  steps.push(...ds.streamColumns(ic, ["mhProblemIdentified", "mhSupportProvided"]));
+
+  steps.push(act(rnd(450, 650), T.epilepsy.medicationSafety.headline, T.epilepsy.medicationSafety.detail));
+  steps.push(ds.multiColumnBatch(rnd(600, 850), ["onValproate", "onTopiramate", "pppInPlace"])); // EPI005 PPP missing (safety-critical)
+
+  steps.push(act(rnd(450, 650), T.epilepsy.finalizing.headline, T.epilepsy.finalizing.detail));
+  steps.push(reviewSummary(rnd(250, 450), {
+    totals: totalsFromCellMetadata(ds.populatedWorkbook().cellMetadata),
+  }));
+  steps.push({ kind: "done", wait: rnd(400, 600), event: { type: "done" } });
+  return steps;
+}
+
+// Flow E — run the uploaded Epilepsy12 template: structure ready, then populate.
+function timelineEpilepsy() {
+  return [
+    act(250, T.flowE.reviewingTemplate.headline, T.flowE.reviewingTemplate.detail),
+    tool(rnd(550, 750), "query_schema", "ok", T.tools.inspectedSchema),
+    { kind: "workbook", wait: rnd(550, 750), event: epilepsy.workbookEvent() },
+    ...epilepsyPopulation(epilepsy),
+  ];
+}
+
+// Major-trauma population: fill the single sheet in mixed-cadence batches
+// (structured columns fast, interpretive note reads slower), mirroring epilepsy.
+function traumaPopulation(ds) {
+  const steps = [];
+  const ic = () => rnd(200, 420);
+
+  steps.push(act(rnd(400, 600), T.trauma.mapTemplate.headline, T.trauma.mapTemplate.detail));
+  steps.push(ds.columnBatch(rnd(400, 600), "patient"));
+
+  steps.push(act(rnd(350, 550), T.trauma.demographics.headline, T.trauma.demographics.detail));
+  steps.push(ds.multiColumnBatch(rnd(600, 800), ["dob", "sex", "ageYears", "iss", "ais3plus"]));
+
+  steps.push(act(rnd(400, 600), T.trauma.registrySubmission.headline, T.trauma.registrySubmission.detail));
+  steps.push(ds.multiColumnBatch(rnd(650, 900), ["edArrivalDateTime", "dischargeDate", "nmtrSubmitted", "datasetComplete", "submissionDate"])); // TRA003 submitted at 31 days (>25)
+
+  steps.push(tool(rnd(450, 650), "sql_execute", "ok", T.tools.traumaReception));
+  steps.push(act(rnd(400, 600), T.trauma.reception.headline, T.trauma.reception.detail));
+  steps.push(ds.multiColumnBatch(rnd(600, 850), ["traumaTeamActivated", "consultantPresent", "consultantArrivalMin"])); // TRA009 arrival blocked / TRA002 late
+
+  steps.push(tool(rnd(450, 650), "sql_execute", "ok", T.tools.traumaInterventions));
+  steps.push(act(rnd(400, 600), T.trauma.investigations.headline, T.trauma.investigations.detail));
+  steps.push(ds.multiColumnBatch(rnd(650, 900), ["gcs", "headInjury", "ctHeadMin"])); // TRA002 CT late / TRA005 no head N/A
+  steps.push(ds.multiColumnBatch(rnd(600, 850), ["txaIndicated", "txaGiven", "txaMin"])); // TRA006 TXA late
+  steps.push(ds.columnBatch(rnd(500, 700), "airwayConsideredMin")); // gated to GCS <9
+
+  // INTERPRETIVE: read each case's resuscitation note for airway/intubation.
+  steps.push(act(rnd(450, 650), T.trauma.resusNotes.headline, T.trauma.resusNotes.detail));
+  steps.push(...ds.streamColumn(ic, "intubationConsidered"));
+
+  // INTERPRETIVE: rehabilitation prescription read from the rehab/discharge note.
+  steps.push(act(rnd(450, 650), T.trauma.rehabilitation.headline, T.trauma.rehabilitation.detail));
+  steps.push(ds.columnBatch(rnd(450, 650), "rehabNeedsAssessed"));
+  steps.push(...ds.streamColumn(ic, "rehabPrescriptionIssued")); // TRA005 prescription Not done
+
+  steps.push(act(rnd(450, 650), T.trauma.finalizing.headline, T.trauma.finalizing.detail));
+  steps.push(reviewSummary(rnd(250, 450), {
+    totals: totalsFromCellMetadata(ds.populatedWorkbook().cellMetadata),
+  }));
+  steps.push({ kind: "done", wait: rnd(400, 600), event: { type: "done" } });
+  return steps;
+}
+
+// Flow T — run the uploaded NMTR trauma template: structure ready, then populate.
+function timelineTrauma() {
+  return [
+    act(250, T.flowT.reviewingTemplate.headline, T.flowT.reviewingTemplate.detail),
+    tool(rnd(550, 750), "query_schema", "ok", T.tools.inspectedSchema),
+    { kind: "workbook", wait: rnd(550, 750), event: trauma.workbookEvent() },
+    ...traumaPopulation(trauma),
+  ];
+}
+
 export function buildTimeline(flow) {
   if (flow === "C") return timelineC();
+  if (flow === "E") return timelineEpilepsy();
+  if (flow === "T") return timelineTrauma();
   return flow === "B" ? timelineB() : timelineA();
 }
 

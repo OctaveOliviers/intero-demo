@@ -1,7 +1,9 @@
 <script>
   import { onMount } from "svelte";
   import { listMyRuns } from "./lib/api.js";
-  import { mergeServerRunHistory } from "./stores/audits.js";
+  import { isMockMode } from "./lib/mock.js";
+  import { seededDashboardAuditRecords } from "./lib/mockData.js";
+  import { mergeServerRunHistory, seedMockDashboardRecords } from "./stores/audits.js";
   import { resultViewUiState } from "./stores/resultViewUi.js";
   import { currentView } from "./stores/navigation.js";
   import { authStatus, authUser, bootstrapSession, setAuthenticated } from "./stores/auth.js";
@@ -65,6 +67,7 @@
       pendingHistoryUserKey = null;
     } else if (userKey !== lastHistoryUserKey) {
       lastHistoryUserKey = userKey;
+      if (isMockMode("audits")) seedMockDashboardRecords(seededDashboardAuditRecords());
       void hydrateHistoryForUser(userKey);
     }
   }

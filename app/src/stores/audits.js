@@ -177,6 +177,18 @@ export function startAudit(template, filters, criteria = []) {
   return id;
 }
 
+// Idempotently add seeded mock dashboard records to the sidebar. Adds only
+// records whose id is not already present, so re-running on every login is a
+// no-op. `createdAt` is stamped here to keep the seed source pure.
+export function seedMockDashboardRecords(records) {
+  if (!Array.isArray(records) || !records.length) return;
+  audits.update((list) => {
+    const have = new Set(list.map((a) => a.id));
+    const additions = records.filter((r) => r && r.id && !have.has(r.id)).map((r) => ({ createdAt: Date.now(), ...r }));
+    return additions.length ? [...additions, ...list] : list;
+  });
+}
+
 export function setAuditRefreshState(id, state = {}) {
   const patch = {};
   if (typeof state.refreshAvailable === "boolean") patch.refreshAvailable = state.refreshAvailable;

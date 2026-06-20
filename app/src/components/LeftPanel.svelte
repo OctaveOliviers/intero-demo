@@ -18,7 +18,15 @@
   import Icon from "./Icon.svelte";
   import SettingsModal from "./SettingsModal.svelte";
   import FeedbackModal from "./FeedbackModal.svelte";
+  import { CONTENT } from "../lib/mock/content/index.js";
   import { _ } from "svelte-i18n";
+
+  // Tracked-dashboard descriptors (§7.1) drive the per-row leading logos and the
+  // collapsed-rail logo stack (§4.2/§4.3). Map an audit row to its logo by auditId.
+  const dashboards = CONTENT.dashboards || [];
+  function dashboardFor(auditId) {
+    return dashboards.find((d) => d.auditId === auditId);
+  }
 
   let showSettings = false;
   let showFeedback = false;
@@ -294,6 +302,11 @@
                 on:click={() => selectAudit(audit.id)}
                 title={audit.title}
               >
+                {#if dashboardFor(audit.id)}
+                  <span class="item-logo">
+                    <Icon name={dashboardFor(audit.id).logo} size={16} />
+                  </span>
+                {/if}
                 <span class="title">{audit.title}</span>
                 {#if audit.status === "running"}
                   <span class="dot running" title={$_("common.running")} aria-hidden="true" />
@@ -399,6 +412,21 @@
       >
         <Icon name="database" />
       </button>
+
+      {#if dashboards.length}
+        <div class="rail-dashboards">
+          {#each dashboards as d (d.id)}
+            <button
+              class="icon-btn"
+              on:click={() => selectAudit(d.auditId)}
+              title={d.title}
+              aria-label={d.title}
+            >
+              <Icon name={d.logo} />
+            </button>
+          {/each}
+        </div>
+      {/if}
 
       <button
         class="icon-btn rail-feedback"
@@ -642,6 +670,16 @@
     background: var(--color-hover);
   }
 
+  /* Leading dashboard logo on tracked-dashboard rows (§4.2). The `.item` flex
+     row + its existing gap handle the spacing; keep the glyph from shrinking. */
+  .item-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--color-text-secondary);
+  }
+
   .title {
     flex: 1;
     min-width: 0;
@@ -800,6 +838,23 @@
 
   .rail-logo:hover .logo-hover {
     display: inline-flex;
+  }
+
+  /* Collapsed-rail dashboard logo stack (§4.3): below the fixed nav icons,
+     visually separated by a hairline divider, above the pinned controls. */
+  .rail-dashboards {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    padding-top: var(--space-2);
+    margin-top: var(--space-1);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .rail-dashboards .icon-btn {
+    color: var(--color-text);
   }
 
   .rail-feedback {

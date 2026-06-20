@@ -12,7 +12,7 @@ import {
   MOCK_ANALYSES,
   MOCK_DATABASES,
   buildTimeline,
-  buildPopulatedWorkbook,
+  buildPopulatedWorkbookForRun,
   resolveSql,
 } from "./mockData.js";
 import { dispatchMockTimelineStep } from "./mockTimeline.js";
@@ -321,8 +321,14 @@ export async function mockGetDatabaseDetail(id) {
 export async function mockCreateRunFromTemplate(templateId, _filters) {
   await delay(300);
   const runId = newId("mock");
-  // Diabetes (NPDA) plays Flow C; every other template plays the cord-pH Flow A.
-  runFlows.set(runId, templateId === "npda-lo-audit" ? "C" : "A");
+  // Each seeded dashboard plays its own dataset flow; every other template
+  // plays the cord-pH Flow A.
+  const flowByTemplate = {
+    "npda-lo-audit": "C",
+    "epilepsy12-lo-audit": "E",
+    "nmtr-trauma-lo-audit": "T",
+  };
+  runFlows.set(runId, flowByTemplate[templateId] || "A");
   return { runId };
 }
 
@@ -391,9 +397,9 @@ export function mockStartRunStream(
 
 // openWorkbook fallback (e.g. restoring a finished analysis after reload). The
 // live timeline is the primary path; this returns a fully-populated snapshot.
-export async function mockGetWorkbook(_runId) {
+export async function mockGetWorkbook(runId) {
   await delay(150);
-  return buildPopulatedWorkbook();
+  return buildPopulatedWorkbookForRun(runId);
 }
 
 export async function mockExecuteSql(query) {

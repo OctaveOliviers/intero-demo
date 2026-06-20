@@ -2,10 +2,13 @@
   import { _ } from "svelte-i18n";
   /** Size in pixels — matches whatever width/height the parent needs. */
   export let size = 16;
+  /** When false, the pupil holds still (eye "at rest") instead of scanning. */
+  export let animate = true;
 </script>
 
 <svg
   class="eye-search"
+  class:still={!animate}
   width={size}
   height={size}
   viewBox="0 0 24 24"
@@ -30,6 +33,9 @@
     transform-box: fill-box;
     transform-origin: center;
     animation: eye-scan 3.2s cubic-bezier(.68, 0, .27, 1) infinite;
+  }
+  .eye-search.still .pupil {
+    animation: none;
   }
   @keyframes eye-scan {
     0%, 9%    { transform: translate(0px, 0px); }

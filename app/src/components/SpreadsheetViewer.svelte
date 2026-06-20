@@ -16,10 +16,25 @@
   import jspreadsheet from "jspreadsheet-ce";
   import "jspreadsheet-ce/dist/jspreadsheet.css";
 
+  // Optional: exact "Sheet!A1" CELL refs to highlight (e.g. the source cells
+  // behind a clicked tracker element — qualifying rows × the criterion's
+  // measurement columns, spec §7.3). Default [] is a visual no-op and an empty
+  // set highlights NOTHING. The highlight is layered on top of the status
+  // background via an inset box-shadow so the status colour stays visible; it
+  // never overwrites it. Each new set fully REPLACES the previous one.
+  export let highlightRefs = [];
+
   // A cell with metadata is clickable (-> evidence panel). No link styling: the
   // value stays plain black text; the cell's STATE is conveyed by its background
   // colour (below), not by a blue underline. Just the pointer affordance.
   const CLICKABLE_STYLE = "cursor: pointer;";
+  // Cell-highlight marker layered on top of a cell's status background (§7.3).
+  // An inset box-shadow tints the cell without touching background-color, so the
+  // status colour underneath stays visible. jspreadsheet's setStyle MERGES
+  // properties, so the OFF state must set box-shadow:none by name to truly clear
+  // it — otherwise a prior highlight persists and selections accumulate.
+  const HIGHLIGHT_ON = "box-shadow: inset 0 0 0 9999px rgba(37, 99, 235, 0.18);";
+  const HIGHLIGHT_OFF = "box-shadow: none;";
   const STATUS_BACKGROUND = Object.freeze({
     [CELL_VISUAL_STATUS.LEGACY]: "var(--cell-bg-legacy-not-applicable)",
     [CELL_VISUAL_STATUS.BLOCKED]: "var(--cell-bg-blocked)",
@@ -56,6 +71,10 @@
   let mountedRunId = null;
   let mountedIndex = -1;
   let lastTick = -1;
+  // Display refs (e.g. "T3") currently carrying the cell-highlight, so a change
+  // to highlightRefs (or an empty []) can switch OFF exactly those cells before
+  // the new set is switched on (replace, never accumulate).
+  let highlightedDisplayRefs = [];
 
   function colToLetters(n) {
     let s = "";
@@ -353,6 +372,9 @@
     mountedRunId = wb.runId;
     mountedIndex = sheetIndex;
     lastTick = wb.updateTick ?? 0;
+    // Fresh grid carries no highlight yet; drop stale refs so the next
+    // applyHighlight clears against this sheet, not the previous one.
+    highlightedDisplayRefs = [];
   }
 
   // Briefly flash a freshly written cell and settle back to its final status background.
@@ -400,9 +422,97 @@
     }
   }
 
+  // Re-apply the CELL-level highlight to match the current `highlightRefs` (spec
+  // §7.3). Switches OFF exactly the cells highlighted last time that are not in
+  // the new set, then switches ON the new set — a full REPLACE, so switching
+  // elements/trackers (or clearing to []) never accumulates. Only the exact
+  // cells are highlighted (qualifying rows × criterion columns), not whole rows.
+  function applyHighlight(wb, sheetIndex) {
+    const sheet = wb?.sheets?.[sheetIndex];
+    const ws = getWs();
+    if (!sheet || !ws) return;
+
+    const prefix = sheet.name + "!";
+    // Map each exact cell ref on this sheet to its display ref (header hidden).
+    const nextCells = [];
+    for (const fullRef of highlightRefs || []) {
+      if (typeof fullRef !== "string" || !fullRef.startsWith(prefix)) continue;
+      const rc = refToRC(fullRef.slice(prefix.length));
+      if (!rc) continue;
+      const displayRow = rc.row - HEADER_ROWS;
+      if (displayRow < 0) continue;
+      nextCells.push(colToLetters(rc.col) + (displayRow + 1));
+    }
+
+    const nextSet = new Set(nextCells);
+    const prevSet = new Set(highlightedDisplayRefs);
+    const styleMap = {};
+    // OFF for cells highlighted last time but not now (box-shadow:none by name —
+    // setStyle merges, so omitting it would leave the old highlight on the cell).
+    for (const displayRef of highlightedDisplayRefs) {
+      if (!nextSet.has(displayRef)) styleMap[displayRef] = HIGHLIGHT_OFF;
+    }
+    // ON for the current cells (layered over the status background).
+    for (const displayRef of nextCells) styleMap[displayRef] = HIGHLIGHT_ON;
+
+    if (Object.keys(styleMap).length) {
+      try { ws.setStyle(styleMap); } catch (_) {}
+    }
+
+    // Auto-scroll the leftmost highlighted column into view when the selection
+    // changes to a new non-empty set — the wide sheet otherwise hides the source
+    // cells (spec §3.5 / Fix 2). No scroll on clear or on no-op re-renders.
+    const changed =
+      nextCells.length !== prevSet.size || nextCells.some((r) => !prevSet.has(r));
+    if (changed && nextCells.length) scrollToHighlight(ws, nextCells);
+
+    highlightedDisplayRefs = nextCells;
+  }
+
+  // Bring the highlighted region into view — horizontally to the leftmost
+  // relevant column AND vertically to the topmost relevant row — scrolling the
+  // grid's own scroller, not the page (spec §3.5 / Fix 3).
+  function scrollToHighlight(ws, displayRefs) {
+    let minCol = Infinity;
+    let minRow = Infinity;
+    for (const ref of displayRefs) {
+      const rc = refToRC(ref);
+      if (!rc) continue;
+      if (rc.col < minCol) minCol = rc.col;
+      if (rc.row < minRow) minRow = rc.row;
+    }
+    if (!Number.isFinite(minCol) || !Number.isFinite(minRow)) return;
+    requestAnimationFrame(() => {
+      try {
+        const td = ws.getCellFromCoords(minCol, minRow);
+        if (!td) return;
+        const scroller = container?.querySelector(".jss_content");
+        if (scroller) {
+          // Offset past the frozen header row + row-number column so the target
+          // cell lands inside the viewport rather than under them.
+          const thead = scroller.querySelector("thead");
+          const headH = thead ? thead.offsetHeight : 0;
+          const rowEl = td.parentElement;
+          const firstCell = rowEl ? rowEl.firstElementChild : null;
+          const rowNumW = firstCell && firstCell !== td ? firstCell.offsetWidth : 0;
+          scroller.scrollLeft = Math.max(0, td.offsetLeft - rowNumW - 8);
+          scroller.scrollTop = Math.max(0, td.offsetTop - headH - 8);
+        } else if (td.scrollIntoView) {
+          td.scrollIntoView({ block: "nearest", inline: "nearest" });
+        }
+      } catch (_) {}
+    });
+  }
+
   // Reactive sync: mount on a new workbook/sheet, otherwise apply each batch in
   // place. `container` is referenced so this re-runs once bind:this resolves.
   $: syncSheet($activeWorkbook, container);
+
+  // Re-apply the row-highlight whenever the refs change or the sheet re-renders
+  // (mount/update advances lastTick; a sheet/run swap advances mountedIndex/
+  // mountedRunId). Listing those alongside highlightRefs makes this re-run after
+  // the grid has been (re)built, so the highlight survives remounts.
+  $: applyHighlight($activeWorkbook, mountedIndex, highlightRefs, lastTick, mountedRunId, container);
 
   function syncSheet(wb, el) {
     if (!wb) {

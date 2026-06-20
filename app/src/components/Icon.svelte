@@ -117,6 +117,18 @@
     <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
     <path d="M10 17l5-5-5-5" />
     <path d="M15 12H3" />
+  {:else if name === "dash-diabetes"}
+    <!-- diabetes: blood drop with inner glucose mark -->
+    <path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z" />
+    <path d="M9.5 14.5 12 12l2.5 2.5" />
+  {:else if name === "dash-epilepsy"}
+    <!-- epilepsy / neurology: head profile with EEG wave -->
+    <path d="M19.5 12a7.5 7.5 0 1 0-3.6 6.4V21" />
+    <path d="m6.5 12 2-2.5 2 5 2-5 2 2.5h1.5" />
+  {:else if name === "dash-trauma"}
+    <!-- major trauma: medical cross with pulse line -->
+    <rect x="4" y="4" width="16" height="16" rx="3" />
+    <path d="M4 13h3l1.5-3 2 6 1.5-3H20" />
   {/if}
 </svg>
 

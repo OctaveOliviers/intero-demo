@@ -206,6 +206,19 @@ const ADMISSION_OPTIONS = [
 function extractDates(text) {
   const t = text.toLowerCase();
 
+  // Quarters: "q2 2025", "Q2 2025", "2025 q2". Maps to the calendar quarter's
+  // first and last day (Q1 = Jan–Mar, Q2 = Apr–Jun, Q3 = Jul–Sep, Q4 = Oct–Dec).
+  const q = t.match(/\bq([1-4])\s*(\d{4})\b/) || t.match(/\b(\d{4})\s*q([1-4])\b/);
+  if (q) {
+    const quarter = q[0].trim().startsWith("q") ? +q[1] : +q[2];
+    const year = q[0].trim().startsWith("q") ? +q[2] : +q[1];
+    const startMonth = (quarter - 1) * 3;
+    return {
+      dateFrom: new Date(year, startMonth, 1),
+      dateTo: new Date(year, startMonth + 3, 0), // day 0 of next month = last day
+    };
+  }
+
   const rel = t.match(/(?:last|past|previous)\s+(\d+)\s+(day|week|month|year)s?/);
   if (rel) {
     const n = parseInt(rel[1], 10);
@@ -436,20 +449,27 @@ export async function parseRequest(text, { templates = null } = {}) {
   // cord branch defaults to the audit quarter; other branches emit dates only
   // when the request text names them.
   if (isDiabetes) {
+    // Default to the NPDA audit year, but honour an explicit date phrase in the
+    // prompt (e.g. "q2 2025", "in 2025") so the appointment window tracks what
+    // the user asked for. A phrase that only fixes a start date keeps the audit
+    // year's end; one with no date at all keeps the full audit year.
+    const window = extractDates(text || "");
+    const from = window?.dateFrom || NPDA_YEAR.dateFrom;
+    const to = window?.dateTo || NPDA_YEAR.dateTo;
     cohort.push(
       chip({
         kind: "date",
         field: "appointmentDate",
         label: "Appointment",
-        value: fmtDate(NPDA_YEAR.dateFrom),
-        raw: isoDate(NPDA_YEAR.dateFrom),
+        value: fmtDate(from),
+        raw: isoDate(from),
       }),
       chip({
         kind: "date",
         field: "appointmentDate",
         label: "Appointment",
-        value: fmtDate(NPDA_YEAR.dateTo),
-        raw: isoDate(NPDA_YEAR.dateTo),
+        value: fmtDate(to),
+        raw: isoDate(to),
         connector: "to",
       }),
     );
