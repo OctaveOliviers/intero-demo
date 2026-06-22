@@ -1,29 +1,37 @@
 <script>
-  // Home card grid (spec §2.2) — one card per tracked BPT dashboard.
-  // Presentational: reads CONTENT.dashboards and draws a card showing
-  // logo / title / deadline. Clicking a card emits `select`
-  // with { auditId }; the consumer (HomeScreen) calls selectAudit(auditId).
-  //
-  // Each card is a native <button>, so Enter/Space activation and focus
-  // are handled by the platform. No other interactive controls.
+  // Home card grid (spec §2.2) — one card per tracked dashboard whose audit
+  // EXISTS in the store (seeded, or created at runtime). Cord-pH is NOT seeded in
+  // the base state, so it has no card until the user creates it; the moment its
+  // audit exists its card appears alongside the three BPTs (Change 1).
+  // Presentational: clicking a card emits `select` with { auditId } — the matching
+  // audit's REAL id; the consumer (HomeScreen) calls selectAudit(auditId).
   import { createEventDispatcher } from "svelte";
+  import { audits } from "../stores/audits.js";
   import { CONTENT } from "../lib/mock/content/index.js";
   import { dashboardDeadlineValue } from "../lib/dashboardDeadline.js";
   import Icon from "./Icon.svelte";
 
   const dispatch = createEventDispatcher();
 
-  const dashboards = CONTENT.dashboards || [];
+  // Show a card only for a dashboard whose audit exists, matched by the audit's id
+  // OR templateId (a created audit has a uuid id but its templateId equals the
+  // descriptor's auditId). `openId` is the matching audit's real id to open.
+  $: cards = (CONTENT.dashboards || [])
+    .map((d) => {
+      const audit = $audits.find((a) => a.id === d.auditId || a.templateId === d.auditId);
+      return audit ? { ...d, openId: audit.id } : null;
+    })
+    .filter(Boolean);
 
-  function select(auditId) {
-    dispatch("select", { auditId });
+  function select(openId) {
+    dispatch("select", { auditId: openId });
   }
 </script>
 
 <div class="card-grid">
-  {#each dashboards as d (d.id)}
+  {#each cards as d (d.id)}
     {@const deadline = dashboardDeadlineValue(d.submissionDeadline)}
-    <button type="button" class="card" on:click={() => select(d.auditId)}>
+    <button type="button" class="card" on:click={() => select(d.openId)}>
       <span class="logo"><Icon name={d.logo} size={30} /></span>
       <span class="title">{d.title}</span>
       {#if deadline}

@@ -549,6 +549,34 @@ export async function parseRequest(text, { templates = null } = {}) {
   };
 }
 
+// Synchronous default cohort for a directly selected (or uploaded) template — the
+// SAME prefilled inclusion criteria a bare typed request for that audit yields
+// (it mirrors parseRequest's cord/diabetes branches with no extra request text),
+// so the "+"→select-template path lands in the identical agent-suggestion state as
+// typing the request (Change 2). Unknown ids default to the cord branch — the
+// demo's create flow. Includes the same default database chips.
+export function defaultCohortForTemplate(templateId) {
+  const cohort = [];
+  if (templateId === "npda-lo-audit") {
+    cohort.push(
+      chip({ kind: "date", field: "dateOfBirth", label: "Date of birth after", value: fmtDate(NPDA_DOB_CUTOFF), raw: isoDate(NPDA_DOB_CUTOFF) }),
+      chip({ kind: "date", field: "appointmentDate", label: "Appointment", value: fmtDate(NPDA_YEAR.dateFrom), raw: isoDate(NPDA_YEAR.dateFrom) }),
+      chip({ kind: "date", field: "appointmentDate", label: "Appointment", value: fmtDate(NPDA_YEAR.dateTo), raw: isoDate(NPDA_YEAR.dateTo), connector: "to" }),
+    );
+  } else {
+    cohort.push(
+      chip({ kind: "value", field: "condition", label: "Condition", value: SPEC_VALUES.condition.cordBloodGasSampling }),
+      chip({ kind: "value", field: "specialty", label: "Specialty", value: SPEC_VALUES.specialty.neonatology, options: SPECIALTY_OPTIONS }),
+      chip({ kind: "value", field: "ward", label: "Ward", value: SPEC_VALUES.ward.maternityUnit }),
+      chip({ kind: "value", field: "gestation", label: "Gestation", value: SPEC_VALUES.gestation.minWeeks }),
+      chip({ kind: "date", field: "birthDate", label: "Birth", value: fmtDate(CORD_QUARTER.dateFrom), raw: isoDate(CORD_QUARTER.dateFrom) }),
+      chip({ kind: "date", field: "birthDate", label: "Birth", value: fmtDate(CORD_QUARTER.dateTo), raw: isoDate(CORD_QUARTER.dateTo), connector: "to" }),
+    );
+  }
+  cohort.push(...defaultDatabaseChipsForMode({ mockDatabases: isMockMode("databases") }));
+  return cohort;
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // parseAdditionalFilters — the ~1s parse behind the "+" add-filter chip.
 // Turns a free-text phrase into one or more new cohort chips. Chips are

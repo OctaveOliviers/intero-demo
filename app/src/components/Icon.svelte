@@ -121,6 +121,11 @@
     <!-- diabetes: blood drop with inner glucose mark -->
     <path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z" />
     <path d="M9.5 14.5 12 12l2.5 2.5" />
+  {:else if name === "dash-cordph"}
+    <!-- cord pH: blood-gas sample vial with a fluid level line -->
+    <path d="M9 3h6" />
+    <path d="M10 3v6l-3.5 7a2 2 0 0 0 1.8 3h7.4a2 2 0 0 0 1.8-3L14 9V3" />
+    <path d="M7.6 16h8.8" />
   {:else if name === "dash-epilepsy"}
     <!-- epilepsy / neurology: head profile with EEG wave -->
     <path d="M19.5 12a7.5 7.5 0 1 0-3.6 6.4V21" />

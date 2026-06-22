@@ -12,10 +12,11 @@
   // --- Props (fixed by spec §7.2) -------------------------------------------
   // kind: "donut" | "timeseries" | "histogram" | "stat"
   export let kind = "stat";
-  // elements: Array<{ key, label, value, highlightRefs? }>
+  // elements: Array<{ key, label, value, status?, highlightRefs? }>
   //   donut/histogram → value = proportion (0..1) / bar height
   //   timeseries      → ordered points (label = month, value = metric)
   //   stat            → single elements[0]
+  //   status: "met" | "not-met" drives the fill colour (Fix 3).
   export let elements = [];
   // target: { op, value } | null — a threshold/target to draw where given.
   export let target = null;
@@ -45,6 +46,15 @@
 
   // Format a 0..1 proportion as a whole-number percent.
   const pct = (v) => `${Math.round(clamp01(v) * 100)}%`;
+
+  // Status-driven fill (Fix 3): met (clears its target) = green, not-yet-met =
+  // light orange. Blue (--color-accent) is reserved for the workbook cell
+  // highlight and is never used on the charts.
+  const STATUS_FILL = {
+    met: "var(--color-chart-met)",
+    "not-met": "var(--color-chart-unmet)",
+  };
+  const fillFor = (d) => STATUS_FILL[d && d.status] || "var(--color-chart-unmet)";
 
   // -------------------------------------------------------------------------
   // DONUT — the first element is the "pass"/headline proportion drawn as a
@@ -88,14 +98,6 @@
           inner: ringPoint(donutTarget, donutR - DONUT.stroke / 2 - 2),
           outer: ringPoint(donutTarget, donutR + DONUT.stroke / 2 + 2),
         };
-
-  // Palette for slices beyond the first (the first uses the accent fill).
-  const SLICE_VARS = [
-    "var(--color-accent)",
-    "var(--color-border-strong)",
-    "var(--color-text-faint)",
-    "var(--color-accent-border)",
-  ];
 
   // -------------------------------------------------------------------------
   // TIMESERIES — ordered points (label = month, value = metric) drawn as a
@@ -164,7 +166,8 @@
 
   // -------------------------------------------------------------------------
   // STAT — a single headline number/percentage vs target on a clickable card.
-  // Values in 0..1 read as percentages; anything else is shown as-is.
+  // Values in 0..1 read as percentages; anything else is shown as-is. The
+  // headline colour follows the element's status (Fix 3).
   // -------------------------------------------------------------------------
   $: statEl = hasData ? items[0] : null;
   $: statIsProportion =
@@ -180,20 +183,6 @@
         ? pct(target.value)
         : String(target.value)
       : null;
-  // Pass/fail tint for the stat headline when a comparable target exists.
-  $: statMeetsTarget = (() => {
-    if (statEl == null || !target || !Number.isFinite(target.value)) return null;
-    const v = num(statEl.value);
-    switch (target.op) {
-      case ">=": return v >= target.value;
-      case ">":  return v > target.value;
-      case "<=": return v <= target.value;
-      case "<":  return v < target.value;
-      case "==":
-      case "=":  return v === target.value;
-      default:   return null;
-    }
-  })();
 
   // Human-readable target label reused by the legend / caption.
   $: targetLabel =
@@ -233,7 +222,7 @@
           cy={DONUT.size / 2}
           r={donutR}
           fill="none"
-          stroke={SLICE_VARS[s.i % SLICE_VARS.length]}
+          stroke={fillFor(s)}
           stroke-width={DONUT.stroke}
           stroke-dasharray="{s.frac * donutC} {donutC}"
           stroke-dashoffset={-s.start * donutC}
@@ -270,6 +259,7 @@
         >
       {/if}
     </svg>
+    <!-- Legend BELOW the chart (Fix 2): full-width rows, fully readable. -->
     <ul class="legend">
       {#each donutSlices as s (s.key)}
         <li>
@@ -278,10 +268,7 @@
             type="button"
             on:click={() => activate(s.key)}
           >
-            <span
-              class="swatch"
-              style="background:{SLICE_VARS[s.i % SLICE_VARS.length]}"
-            ></span>
+            <span class="swatch" style="background:{fillFor(s)}"></span>
             <span class="legend-label">{s.label}</span>
             <span class="legend-value">{pct(s.value)}</span>
           </button>
@@ -323,7 +310,7 @@
       {#if tsPoints.length > 1}
         <polyline class="ts-line" points={tsLine} fill="none" />
       {/if}
-      <!-- points (each a hit-target) -->
+      <!-- points (each a hit-target), coloured by status -->
       {#each tsPoints as p (p.key)}
         <g
           class="ts-point"
@@ -335,7 +322,7 @@
         >
           <!-- generous transparent hit area -->
           <circle class="ts-hit" cx={p.x} cy={p.y} r="12" />
-          <circle class="ts-dot" cx={p.x} cy={p.y} r="4" />
+          <circle class="ts-dot" cx={p.x} cy={p.y} r="4" style="fill:{fillFor(p)}" />
           <text class="ts-x" x={p.x} y={TS.h - 6} text-anchor="middle"
             >{p.label}</text
           >
@@ -358,7 +345,7 @@
         x2={HG.w - HG.padX}
         y2={HG.padTop + hgPlotH}
       />
-      <!-- bars (each a hit-target) -->
+      <!-- bars (each a hit-target), coloured by status -->
       {#each hgBars as b (b.key)}
         <g
           class="hg-bar"
@@ -375,6 +362,7 @@
             width={b.w}
             height={b.h}
             rx="2"
+            style="fill:{fillFor(b)}"
           />
           <text
             class="hg-x"
@@ -398,16 +386,32 @@
         </line>
       {/if}
     </svg>
-    {#if targetLabel}
-      <div class="caption">Target {targetLabel}</div>
-    {/if}
+    <!-- Legend BELOW the chart (Fix 2): one full-width row per band. -->
+    <ul class="legend">
+      {#each hgBars as b (b.key)}
+        <li>
+          <button
+            class="legend-item"
+            type="button"
+            on:click={() => activate(b.key)}
+          >
+            <span class="swatch" style="background:{fillFor(b)}"></span>
+            <span class="legend-label">{b.label}</span>
+            <span class="legend-value">{hgIsProportion ? pct(b.value) : b.value}</span>
+          </button>
+        </li>
+      {/each}
+      {#if targetLabel}
+        <li class="legend-target">Target {targetLabel}</li>
+      {/if}
+    </ul>
   </div>
 {:else if kind === "stat"}
-  <!-- whole card is the single hit-target -->
+  <!-- whole card is the single hit-target; headline colour follows status -->
   <button
     class="stat-card"
-    class:meets={statMeetsTarget === true}
-    class:misses={statMeetsTarget === false}
+    class:status-met={statEl && statEl.status === "met"}
+    class:status-unmet={statEl && statEl.status === "not-met"}
     type="button"
     on:click={() => activate(statEl && statEl.key)}
   >
@@ -448,14 +452,15 @@
   }
 
   /* --- Donut --------------------------------------------------------------- */
+  /* Legend sits BELOW the chart (Fix 2): column layout, svg centred on top. */
   .donut-chart {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     align-items: center;
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
   .donut-chart svg {
-    flex: 0 0 132px;
+    flex: 0 0 auto;
     width: 132px;
   }
 
@@ -486,9 +491,12 @@
     fill: var(--color-text);
   }
 
+  /* --- Legend (below donut + histogram) ----------------------------------- */
   .legend {
-    flex: 1;
+    width: 100%;
     min-width: 0;
+    margin: 0;
+    padding: 0;
     list-style: none;
     display: flex;
     flex-direction: column;
@@ -521,9 +529,6 @@
   .legend-label {
     flex: 1;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
   .legend-value {
     flex: 0 0 auto;
@@ -548,10 +553,14 @@
     stroke-width: 1.5;
     stroke-dasharray: 4 3;
   }
+  .caption {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
 
-  /* --- Timeseries --------------------------------------------------------- */
+  /* --- Timeseries (line neutral; dots coloured by status inline) ---------- */
   .ts-line {
-    stroke: var(--color-accent);
+    stroke: var(--color-border-strong);
     stroke-width: 2;
     stroke-linejoin: round;
     stroke-linecap: round;
@@ -563,7 +572,6 @@
     fill: transparent;
   }
   .ts-dot {
-    fill: var(--color-accent);
     transition: r var(--dur-fast) var(--ease);
   }
   .ts-point:hover .ts-dot,
@@ -578,17 +586,16 @@
     font-size: 10px;
   }
 
-  /* --- Histogram ---------------------------------------------------------- */
+  /* --- Histogram (bars coloured by status inline) ------------------------- */
   .hg-bar {
     cursor: pointer;
   }
   .hg-rect {
-    fill: var(--color-accent);
-    transition: fill var(--dur-fast) var(--ease);
+    transition: opacity var(--dur-fast) var(--ease);
   }
   .hg-bar:hover .hg-rect,
   .hg-bar:focus-visible .hg-rect {
-    fill: var(--color-accent-hover);
+    opacity: 0.82;
   }
   .hg-bar:focus-visible {
     outline: none;
@@ -621,9 +628,8 @@
     box-shadow: var(--shadow-sm);
   }
   .stat-card:focus-visible {
-    outline: none;
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px var(--color-accent-weak);
+    outline: 2px solid var(--color-text);
+    outline-offset: 2px;
   }
   .stat-value {
     font-size: var(--text-2xl);
@@ -632,11 +638,11 @@
     font-variant-numeric: tabular-nums;
     line-height: 1.1;
   }
-  .stat-card.meets .stat-value {
-    color: var(--color-success);
+  .stat-card.status-met .stat-value {
+    color: var(--color-chart-met);
   }
-  .stat-card.misses .stat-value {
-    color: var(--color-danger);
+  .stat-card.status-unmet .stat-value {
+    color: var(--color-chart-unmet);
   }
   .stat-label {
     font-size: var(--text-sm);

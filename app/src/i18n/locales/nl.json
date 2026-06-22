@@ -232,7 +232,8 @@
     "databases": "Databases",
     "noDatabasePaired": "Er is nog geen database aan deze audit gekoppeld.",
     "template": "Sjabloon",
-    "pairDatabaseHint": "Koppel een database aan deze audit om te zien hoe elk veld wordt ingevuld."
+    "pairDatabaseHint": "Koppel een database aan deze audit om te zien hoe elk veld wordt ingevuld.",
+    "metrics": "Metrics tracked"
   },
   "spec": {
     "searchDatabases": "Databases zoeken…",

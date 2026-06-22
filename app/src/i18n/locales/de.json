@@ -232,7 +232,8 @@
     "databases": "Datenbanken",
     "noDatabasePaired": "Mit diesem Audit ist noch keine Datenbank verknüpft.",
     "template": "Vorlage",
-    "pairDatabaseHint": "Verknüpfen Sie eine Datenbank mit diesem Audit, um zu sehen, wie jedes Feld befüllt wird."
+    "pairDatabaseHint": "Verknüpfen Sie eine Datenbank mit diesem Audit, um zu sehen, wie jedes Feld befüllt wird.",
+    "metrics": "Metrics tracked"
   },
   "spec": {
     "searchDatabases": "Datenbanken durchsuchen…",

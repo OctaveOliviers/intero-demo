@@ -232,7 +232,8 @@
     "databases": "Bases de données",
     "noDatabasePaired": "Aucune base de données n’est encore associée à cet audit.",
     "template": "Modèle",
-    "pairDatabaseHint": "Associez une base de données à cet audit pour voir comment chaque champ est rempli."
+    "pairDatabaseHint": "Associez une base de données à cet audit pour voir comment chaque champ est rempli.",
+    "metrics": "Metrics tracked"
   },
   "spec": {
     "searchDatabases": "Rechercher des bases de données…",

@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { _ } from "svelte-i18n";
-  import { parseRequest } from "../lib/spec.js";
+  import { parseRequest, defaultCohortForTemplate } from "../lib/spec.js";
   import { runFromSpec } from "../lib/runFromSpec.js";
   import {
     allTemplatesGrouped, setRuntimeTemplateGroups,
@@ -101,15 +101,6 @@
   function mkChip(props) {
     return { id: crypto.randomUUID(), ...props };
   }
-  // In mock mode keep seeded DB chips for the scripted demo. In real mode we
-  // omit default DB chips so `/api/runs` can use backend default DB selection.
-  function defaultDbChips() {
-    if (!isMockMode("databases")) return [];
-    return [
-      mkChip({ kind: "database", field: "database", label: "Database", value: "Patient notes", raw: "patient-notes-db" }),
-      mkChip({ kind: "database", field: "database", label: "Database", value: "Lab results", raw: "lab-results-db" }),
-    ];
-  }
   // Strip the trailing "(local)" / "(regional)" / "(national)" qualifier — the
   // picker already groups by level, so the per-row bracket is redundant.
   function baseName(template) {
@@ -125,7 +116,9 @@
     errorMessage = "";
     spec = {
       request,
-      cohort: defaultDbChips(),
+      // Selecting (or uploading) a template prefills the SAME inclusion criteria a
+      // typed request would (Change 2) — both paths converge to one contract state.
+      cohort: defaultCohortForTemplate(templateChip.raw),
       output: { summary, templateChip },
       resolvedCount: 0,
       countNoun: "patients",

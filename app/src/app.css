@@ -30,6 +30,11 @@
   --color-warning: #b45309; --color-warning-weak: #fef3c7;
   --color-danger:  #b91c1c; --color-danger-weak:  #fee2e2;
   --color-highlight: #fff3cd; --color-highlight-edge: #f4d35e; /* note highlight */
+  /* Tracker-chart status fills (Fix 3): met (clears target) = green,
+     not-yet-met = light orange. Blue (--color-accent) is reserved for the
+     workbook cell highlight and must not appear on the charts. */
+  --color-chart-met:   #16a34a;
+  --color-chart-unmet: #f59e0b;
 
   /* Typography */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,

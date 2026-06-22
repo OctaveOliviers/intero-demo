@@ -172,6 +172,17 @@ function makeStreamSink(auditId, runId, seed = {}) {
   // mark just-changed cells for the fill flash.
   function applyCells(event) {
     if (!wb) return;
+    // Rebase on the latest workbook from the store before applying this batch.
+    // markCellReviewed's dwell (yellow -> white) writes review flips straight to
+    // the store via updateCurrentAuditWorkbook, bumping ITS updateTick. If we
+    // kept building on our private closure, our next updateTick would re-use the
+    // value the dwell already produced — the viewer's `updateTick !== lastTick`
+    // guard then treats this batch as already-seen and SKIPS painting it, so the
+    // streamed cells land in the data model but never render (they look blank
+    // until clicked). Re-reading keeps one monotonic tick across both writers
+    // (and preserves the just-reviewed state instead of reverting it).
+    const owner = get(audits).find((a) => a.id === auditId);
+    if (owner?.workbook) wb = owner.workbook;
     const sheets = wb.sheets.slice();
     const si = sheets.findIndex((s) => s.name === event.sheet);
     if (si === -1) return;

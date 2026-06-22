@@ -1503,9 +1503,31 @@ const SEEDED_DASHBOARD_RUNS = [
   { runId: "mock-run-trauma", dataset: trauma },
 ];
 
+// Mark every populated cell reviewed and clear any blocked state, so a seeded
+// snapshot reads as a fully-clean dashboard (zero needs-review, zero blocked,
+// Change 2). ONLY the 3 pre-seeded BPT dashboards use this; the cord-pH workbook
+// (created live from the home flow, and its reopen fallback) keeps its
+// needs-review + blocked cells so the review walkthrough happens there.
+function markAllReviewed(workbook) {
+  const cellMetadata = {};
+  for (const [ref, meta] of Object.entries(workbook.cellMetadata || {})) {
+    if (!meta || typeof meta !== "object") {
+      cellMetadata[ref] = meta;
+      continue;
+    }
+    const next = { ...meta };
+    if (next.state === "blocked") next.state = "filled";
+    if (next.review_state === "not_reviewed") next.review_state = "reviewed";
+    cellMetadata[ref] = next;
+  }
+  return { ...workbook, cellMetadata };
+}
+
 export function buildPopulatedWorkbookForRun(runId) {
   const hit = SEEDED_DASHBOARD_RUNS.find((s) => s.runId === runId);
-  return hit ? hit.dataset.populatedWorkbook() : cordPopulatedWorkbook();
+  // Seeded BPT dashboards open fully clean; cord-pH (the fallback, created live)
+  // keeps its needs-review/blocked cells for the live review walkthrough.
+  return hit ? markAllReviewed(hit.dataset.populatedWorkbook()) : cordPopulatedWorkbook();
 }
 
 // The 3 seed audit records (sidebar rows). Hardcoded per the wiring contract so

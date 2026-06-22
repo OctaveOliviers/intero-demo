@@ -35,15 +35,55 @@
   //   { mode: "single", pane: "dashboard" }  — default, full tracker dashboard
   //   { mode: "single", pane: "workbook"  }  — full workbook
   //   { mode: "split",  selection: { trackerId, elementKey } }  — dashboard L + workbook R
-  let view = { mode: "single", pane: "dashboard" };
+  // The initial pane is the landing RULE applied to the audit selected at mount —
+  // NOT a hardcoded "dashboard". This is the create-flow fix: ResultsView mounts
+  // fresh on create (it is unmounted on the home screen), and the reactive guard
+  // below cannot fire on first mount (lastAuditId already equals currentAuditId),
+  // so a hardcoded default would win. A brand-new cord-pH audit (still running,
+  // empty workbook) must land on its WORKBOOK here. landingPane()/its helpers are
+  // function declarations (hoisted), so calling them in this initializer is safe.
+  let view = { mode: "single", pane: landingPane(auditRecord($currentAuditId)) };
   // Selector-chip dropdown open/closed (single mode only, spec §3.6).
   let selectorOpen = false;
 
-  // Reset to the default view whenever the selected audit changes (spec §3.1).
+  // Landing-view RULE (Piece 1): an audit opens to the WORKBOOK while its
+  // dashboard has no populated metrics yet, and to the DASHBOARD once metrics are
+  // populated. A general rule (not per-audit) — a freshly created audit lands on
+  // its workbook as it populates, then on its dashboard once the run completes.
+  // Resolve the descriptor by id OR templateId so created audits (uuid id) map too.
+  function dashboardForAudit(a) {
+    return a
+      ? CONTENT.dashboards.find(
+          (d) => d.auditId === a.id || d.auditId === a.templateId,
+        ) || null
+      : null;
+  }
+  // "Populated metrics" = extraction finished (seeded/done records are
+  // "completed"; a live run stays "running" until done) or the workbook already
+  // carries cells — until then the dashboard would be premature/empty.
+  function isPopulated(a) {
+    if (!a) return false;
+    if (a.status === "completed" || a.status === "done") return true;
+    const cm = a.workbook && a.workbook.cellMetadata;
+    return Boolean(cm && Object.keys(cm).length > 0);
+  }
+  // The landing RULE itself: DASHBOARD only once the audit's run/workbook is
+  // actually POPULATED (isPopulated) — the dashboard descriptor merely EXISTING
+  // from creation is NOT enough. So a just-created, still-empty audit → workbook;
+  // it resolves to dashboard only on a later open, once isPopulated() is true.
+  function auditRecord(id) {
+    return $audits.find((x) => x.id === id) || null;
+  }
+  function landingPane(a) {
+    return dashboardForAudit(a) && isPopulated(a) ? "dashboard" : "workbook";
+  }
+  // Re-apply the rule whenever the selected audit changes (§3.1). First mount is
+  // handled by the `view` initializer above (lastAuditId starts equal to
+  // currentAuditId), so this fires only on a genuine switch between audits.
   let lastAuditId = $currentAuditId;
   $: if ($currentAuditId !== lastAuditId) {
     lastAuditId = $currentAuditId;
-    view = { mode: "single", pane: "dashboard" };
+    view = { mode: "single", pane: landingPane(auditRecord($currentAuditId)) };
     selectorOpen = false;
   }
 

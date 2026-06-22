@@ -22,11 +22,22 @@
   import { _ } from "svelte-i18n";
 
   // Tracked-dashboard descriptors (§7.1) drive the per-row leading logos and the
-  // collapsed-rail logo stack (§4.2/§4.3). Map an audit row to its logo by auditId.
+  // collapsed-rail logo stack (§4.2/§4.3). Map an audit row to its logo by its id
+  // OR templateId, so a freshly created audit (uuid id) also shows its logo.
   const dashboards = CONTENT.dashboards || [];
-  function dashboardFor(auditId) {
-    return dashboards.find((d) => d.auditId === auditId);
+  function dashboardFor(audit) {
+    if (!audit) return undefined;
+    return dashboards.find((d) => d.auditId === audit.id || d.auditId === audit.templateId);
   }
+  // The collapsed rail shows a logo only for dashboards whose audit EXISTS, so
+  // cord-pH appears only once created — not in the base state (Change 1). `openId`
+  // is the matching audit's real id to open.
+  $: railDashboards = dashboards
+    .map((d) => {
+      const a = $audits.find((x) => x.id === d.auditId || x.templateId === d.auditId);
+      return a ? { logo: d.logo, title: d.title, openId: a.id } : null;
+    })
+    .filter(Boolean);
 
   let showSettings = false;
   let showFeedback = false;
@@ -302,9 +313,9 @@
                 on:click={() => selectAudit(audit.id)}
                 title={audit.title}
               >
-                {#if dashboardFor(audit.id)}
+                {#if dashboardFor(audit)}
                   <span class="item-logo">
-                    <Icon name={dashboardFor(audit.id).logo} size={16} />
+                    <Icon name={dashboardFor(audit).logo} size={16} />
                   </span>
                 {/if}
                 <span class="title">{audit.title}</span>
@@ -413,12 +424,12 @@
         <Icon name="database" />
       </button>
 
-      {#if dashboards.length}
+      {#if railDashboards.length}
         <div class="rail-dashboards">
-          {#each dashboards as d (d.id)}
+          {#each railDashboards as d (d.openId)}
             <button
               class="icon-btn"
-              on:click={() => selectAudit(d.auditId)}
+              on:click={() => selectAudit(d.openId)}
               title={d.title}
               aria-label={d.title}
             >

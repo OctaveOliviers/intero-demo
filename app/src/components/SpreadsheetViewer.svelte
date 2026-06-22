@@ -464,15 +464,20 @@
     // cells (spec §3.5 / Fix 2). No scroll on clear or on no-op re-renders.
     const changed =
       nextCells.length !== prevSet.size || nextCells.some((r) => !prevSet.has(r));
-    if (changed && nextCells.length) scrollToHighlight(ws, nextCells);
+    if (changed && nextCells.length) scrollToHighlight(nextCells);
 
     highlightedDisplayRefs = nextCells;
   }
 
-  // Bring the highlighted region into view — horizontally to the leftmost
-  // relevant column AND vertically to the topmost relevant row — scrolling the
-  // grid's own scroller, not the page (spec §3.5 / Fix 3).
-  function scrollToHighlight(ws, displayRefs) {
+  // Bring the highlighted region into view — both axes — on every drill. When
+  // the user drills from the dashboard, the workbook grid is FRESHLY MOUNTED in
+  // the split pane and jspreadsheet renders its cells asynchronously, so a single
+  // rAF often fires before the target cell exists (the real cause the earlier
+  // attempt missed). Retry across frames until getCellFromCoords resolves, then
+  // use the browser's own scrollIntoView (robust to jspreadsheet's DOM) to centre
+  // the top-left highlighted cell. Scrolls the grid's own scroller, not the page
+  // (spec §3.5 / Fix 1).
+  function scrollToHighlight(displayRefs) {
     let minCol = Infinity;
     let minRow = Infinity;
     for (const ref of displayRefs) {
@@ -482,26 +487,25 @@
       if (rc.row < minRow) minRow = rc.row;
     }
     if (!Number.isFinite(minCol) || !Number.isFinite(minRow)) return;
-    requestAnimationFrame(() => {
+    let tries = 0;
+    const attempt = () => {
+      const ws = getWs();
+      const td = ws && ws.getCellFromCoords ? ws.getCellFromCoords(minCol, minRow) : null;
+      if (!td) {
+        if (tries++ < 12) requestAnimationFrame(attempt);
+        return;
+      }
       try {
-        const td = ws.getCellFromCoords(minCol, minRow);
-        if (!td) return;
+        td.scrollIntoView({ block: "center", inline: "center" });
+      } catch (_) {
         const scroller = container?.querySelector(".jss_content");
         if (scroller) {
-          // Offset past the frozen header row + row-number column so the target
-          // cell lands inside the viewport rather than under them.
-          const thead = scroller.querySelector("thead");
-          const headH = thead ? thead.offsetHeight : 0;
-          const rowEl = td.parentElement;
-          const firstCell = rowEl ? rowEl.firstElementChild : null;
-          const rowNumW = firstCell && firstCell !== td ? firstCell.offsetWidth : 0;
-          scroller.scrollLeft = Math.max(0, td.offsetLeft - rowNumW - 8);
-          scroller.scrollTop = Math.max(0, td.offsetTop - headH - 8);
-        } else if (td.scrollIntoView) {
-          td.scrollIntoView({ block: "nearest", inline: "nearest" });
+          scroller.scrollLeft = Math.max(0, td.offsetLeft - 60);
+          scroller.scrollTop = Math.max(0, td.offsetTop - 30);
         }
-      } catch (_) {}
-    });
+      }
+    };
+    requestAnimationFrame(attempt);
   }
 
   // Reactive sync: mount on a new workbook/sheet, otherwise apply each batch in

@@ -13,6 +13,7 @@
   import ChipPopover from "./spec/ChipPopover.svelte";
   import Icon from "./Icon.svelte";
   import { databases, refreshDatabases } from "../stores/databases.js";
+  import { CONTENT } from "../lib/mock/content/index.js";
 
   // The doc-9 audit detail: a single-column page — back-link, title,
   // description, deadline — then three sections: Inclusion criteria (editable
@@ -58,6 +59,27 @@
 
   $: fieldChips = buildFieldChips(spec, mapping);
   $: databaseChips = buildDatabaseChips(mapping, $databases);
+
+  // --- Metrics tracked (read-only) -------------------------------------------
+  // Resolve the dashboard descriptor for this template from the content pack and
+  // list its trackers. Only the four BPT/cord audits have a descriptor; for any
+  // other template `descriptor` is undefined and the section is not rendered.
+  $: descriptor = templateId
+    ? CONTENT.dashboards?.find((d) => d.auditId === templateId)
+    : null;
+  $: metricTrackers = descriptor
+    ? descriptor.trackers.map((id) => CONTENT.trackers?.[id]).filter(Boolean)
+    : [];
+
+  // Mirror TrackerChart's target convention: proportions (0–1) read as a percent.
+  function formatTarget(target) {
+    if (!target || !Number.isFinite(target.value)) return null;
+    const v =
+      target.value >= 0 && target.value <= 1
+        ? `${Math.round(target.value * 100)}%`
+        : String(target.value);
+    return `${target.op || ""} ${v}`.trim();
+  }
 
   // --- Inclusion criteria: editable working copy, auto-saved -----------------
   // `criteria` is the on-screen state; `savedCriteria` is the last state the
@@ -240,6 +262,24 @@
         {/each}
       </div>
     </section>
+
+    {#if descriptor && metricTrackers.length}
+      <section class="section">
+        <h4 class="section-title">{$_("audit.metrics")}</h4>
+        <div class="rows">
+          {#each metricTrackers as t (t.id)}
+            <div class="row">
+              <Chip value={t.title} variant="template" editable={false} />
+              <span class="kind-badge">{t.kind}</span>
+              {#if formatTarget(t.target)}
+                <span class="kind-badge target">Target {formatTarget(t.target)}</span>
+              {/if}
+              {#if t.criterion}<span class="row-desc">{t.criterion}</span>{/if}
+            </div>
+          {/each}
+        </div>
+      </section>
+    {/if}
   {/if}
 </div>
 
@@ -316,6 +356,19 @@
   .rows { display: flex; flex-direction: column; gap: var(--space-2); }
   .row { display: flex; align-items: baseline; gap: var(--space-2); }
   .row-desc { font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.5; }
+
+  .kind-badge {
+    flex-shrink: 0;
+    padding: 1px var(--space-2);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--color-text-secondary);
+    background: var(--color-surface-muted);
+    border: 1px solid var(--color-border);
+    text-transform: capitalize;
+  }
+  .kind-badge.target { text-transform: none; }
 
   .anchor { position: relative; display: inline-block; }
 

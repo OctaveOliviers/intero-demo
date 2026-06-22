@@ -12,16 +12,22 @@
   // event with detail `{ trackerId, elementKey }` — the §3.1 selection model
   // that ResultsView uses to enter split view.
   import { createEventDispatcher } from "svelte";
-  import { currentAuditId } from "../stores/audits.js";
+  import { audits, currentAuditId } from "../stores/audits.js";
   import { CONTENT } from "../lib/mock/content/index.js";
   import TrackerChart from "./TrackerChart.svelte";
 
   const dispatch = createEventDispatcher();
 
   // Resolve the current dashboard reactively, then its trackers (skip any id
-  // that doesn't resolve to a tracker descriptor).
-  $: dashboard =
-    CONTENT.dashboards.find((d) => d.auditId === $currentAuditId) || null;
+  // that doesn't resolve to a tracker descriptor). Match by the audit's id OR its
+  // templateId so a freshly created audit (uuid id, catalog templateId) maps to
+  // its dashboard too — not only the seeded records.
+  $: audit = $audits.find((a) => a.id === $currentAuditId) || null;
+  $: dashboard = audit
+    ? CONTENT.dashboards.find(
+        (d) => d.auditId === audit.id || d.auditId === audit.templateId,
+      ) || null
+    : null;
   $: trackers = dashboard
     ? dashboard.trackers.map((id) => CONTENT.trackers[id]).filter(Boolean)
     : [];
@@ -49,9 +55,6 @@
             on:elementclick={(e) => onElementClick(t, e.detail.key)}
           />
         </div>
-        {#if t.criterion}
-          <p class="tracker-criterion">{t.criterion}</p>
-        {/if}
       </section>
     {/each}
   </div>
@@ -87,13 +90,6 @@
 
   .tracker-chart {
     display: flex;
-  }
-
-  .tracker-criterion {
-    margin: 0;
-    font-size: var(--text-xs);
-    line-height: 1.4;
-    color: var(--color-text-muted);
   }
 
   .empty {

@@ -232,7 +232,8 @@
     "databases": "Databases",
     "noDatabasePaired": "No database is paired with this audit yet.",
     "template": "Template",
-    "pairDatabaseHint": "Pair a database with this audit to see how each field is filled."
+    "pairDatabaseHint": "Pair a database with this audit to see how each field is filled.",
+    "metrics": "Metrics tracked"
   },
   "spec": {
     "searchDatabases": "Search databases…",
