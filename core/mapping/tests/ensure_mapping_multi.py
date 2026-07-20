@@ -27,14 +27,16 @@ class EnsureMappingMultiDbTest(unittest.TestCase):
         (self.audits / "npda" / "spec.json").write_text(json.dumps({"audit": "npda"}))
         for db in ("npda-demographics", "npda-clinical"):
             (self.databases / db).mkdir(parents=True)
-            (self.databases / db / "model.json").write_text(json.dumps({"database": db}))
+            (self.databases / db / "model.json").write_text(
+                json.dumps({"database": db})
+            )
 
     def tearDown(self):
         self._dir.cleanup()
 
     def _patched(self):
         return (
-            mock.patch.object(mapping_mod, "AUDITS_DIR", self.audits),
+            mock.patch.object(mapping_mod, "TEMPLATES_DIR", self.audits),
             mock.patch.object(mapping_mod, "DATABASES_DIR", self.databases),
         )
 
@@ -46,11 +48,17 @@ class EnsureMappingMultiDbTest(unittest.TestCase):
             return {"audit": audit_id, "databases": [d for d, _ in databases]}
 
         p1, p2 = self._patched()
-        with p1, p2, mock.patch.object(
-            mapping_mod, "build_audit_database_mapping", side_effect=fake_build
+        with (
+            p1,
+            p2,
+            mock.patch.object(
+                mapping_mod, "build_audit_database_mapping", side_effect=fake_build
+            ),
         ):
             result = asyncio.run(
-                mapping_mod.ensure_mapping("npda", ["npda-demographics", "npda-clinical"])
+                mapping_mod.ensure_mapping(
+                    "npda", ["npda-demographics", "npda-clinical"]
+                )
             )
         self.assertIsNotNone(result)
         self.assertEqual(
@@ -65,8 +73,12 @@ class EnsureMappingMultiDbTest(unittest.TestCase):
             return {"audit": audit_id, "databases": [d for d, _ in databases]}
 
         p1, p2 = self._patched()
-        with p1, p2, mock.patch.object(
-            mapping_mod, "build_audit_database_mapping", side_effect=fake_build
+        with (
+            p1,
+            p2,
+            mock.patch.object(
+                mapping_mod, "build_audit_database_mapping", side_effect=fake_build
+            ),
         ):
             result = asyncio.run(mapping_mod.ensure_mapping("npda", "npda-clinical"))
         self.assertIsNotNone(result)
@@ -74,14 +86,23 @@ class EnsureMappingMultiDbTest(unittest.TestCase):
 
     def test_cached_mapping_short_circuits(self):
         (self.audits / "npda" / "mapping.json").write_text(
-            json.dumps({"databases": ["npda-demographics", "npda-clinical"], "cached": True})
+            json.dumps(
+                {"databases": ["npda-demographics", "npda-clinical"], "cached": True}
+            )
         )
         p1, p2 = self._patched()
-        with p1, p2, mock.patch.object(
-            mapping_mod, "build_audit_database_mapping",
-            side_effect=AssertionError("must not rebuild a cached mapping"),
+        with (
+            p1,
+            p2,
+            mock.patch.object(
+                mapping_mod,
+                "build_audit_database_mapping",
+                side_effect=AssertionError("must not rebuild a cached mapping"),
+            ),
         ):
-            result = asyncio.run(mapping_mod.ensure_mapping("npda", ["npda-demographics"]))
+            result = asyncio.run(
+                mapping_mod.ensure_mapping("npda", ["npda-demographics"])
+            )
         self.assertTrue(json.loads(result)["cached"])
 
     def test_missing_model_returns_none(self):

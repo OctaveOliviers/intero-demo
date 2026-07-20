@@ -22,8 +22,12 @@ class _Resp:
 
 def _stage(extra_body):
     return model_config.StageConfig(
-        stage="tier2", provider="openai-compatible", model="fast-mini",
-        endpoint="https://fast/v1", api_key="k", extra_body=extra_body,
+        stage="mapping",
+        provider="openai-compatible",
+        model="fast-mini",
+        endpoint="https://fast/v1",
+        api_key="k",
+        extra_body=extra_body,
         source="models.local.yaml",
     )
 
@@ -31,13 +35,19 @@ def _stage(extra_body):
 class ExtraBodyMergeTest(unittest.TestCase):
     def _capture_body(self, extra_body):
         post = AsyncMock(return_value=_Resp())
-        with patch.object(model_config, "resolve_stage", return_value=_stage(extra_body)), \
-             patch.object(llm, "_post_with_retry", post):
-            asyncio.run(llm.respond("sys", "user", stage="tier2"))
+        with (
+            patch.object(
+                model_config, "resolve_stage", return_value=_stage(extra_body)
+            ),
+            patch.object(llm, "_post_with_retry", post),
+        ):
+            asyncio.run(llm.respond("sys", "user", stage="mapping"))
         return post.await_args.args[1]  # (url, body, headers)
 
     def test_extra_body_keys_reach_the_request(self):
-        body = self._capture_body({"reasoning_effort": "none", "enable_thinking": False})
+        body = self._capture_body(
+            {"reasoning_effort": "none", "enable_thinking": False}
+        )
         self.assertEqual(body["reasoning_effort"], "none")
         self.assertFalse(body["enable_thinking"])
         # The computed fields are still present.
@@ -57,11 +67,13 @@ class ExtraBodyMergeTest(unittest.TestCase):
     def test_null_extra_body_value_drops_the_key(self):
         # OpenAI reasoning models reject `max_tokens` (want `max_completion_tokens`)
         # and reject a non-default `temperature` — extra_body nulls drop both.
-        body = self._capture_body({
-            "max_tokens": None,
-            "max_completion_tokens": 10000,
-            "temperature": None,
-        })
+        body = self._capture_body(
+            {
+                "max_tokens": None,
+                "max_completion_tokens": 10000,
+                "temperature": None,
+            }
+        )
         self.assertNotIn("max_tokens", body)
         self.assertNotIn("temperature", body)
         self.assertEqual(body["max_completion_tokens"], 10000)

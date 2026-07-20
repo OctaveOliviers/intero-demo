@@ -1,8 +1,8 @@
 """Background indexing of audit templates and database schemas.
 
 Indexing emits ONE structured JSON model per entity — `spec.json` for audits,
-`model.json` for databases — under `var/audits/<id>/` and `var/databases/<id>/`
-per the storage-layout contract (docs/mvp/contracts/storage-layout.md §2). The
+`model.json` for databases — under `var/templates/<id>/` and `var/databases/<id>/`
+per the storage-layout contract (specs/mvp/contracts/storage-layout.md §2). The
 indexing-lifecycle STATE (`status`/`error`) lives inside that same model (the
 S0 schemas declare `status`/`error` as operational fields), so there is no
 separate status sidecar: one file is the source of truth for both the model and
@@ -34,9 +34,9 @@ from pathlib import Path
 from typing import AsyncIterator, Literal
 
 from core.indexing.build_audit_spec import build_audit_spec
-from core.config import AUDITS_DIR, DATABASES_DIR, WORKBOOK_NAME
+from core.config import DATABASES_DIR, TEMPLATES_DIR, WORKBOOK_NAME
 from core.indexing.build_database_model import build_database_model
-from core.indexing.profile import validate_against_schema
+from core.contracts import validate_against_schema
 
 _AUDIT_SCHEMA = "audit-spec.schema.json"
 _DATABASE_SCHEMA = "database-model.schema.json"
@@ -76,7 +76,7 @@ def _json_path(kind: Kind, entity_id: str) -> Path:
     """Path to the structured model emitted by indexing — the single source of
     truth for both the model and its build state (storage-layout §2)."""
     if kind == "audit":
-        return AUDITS_DIR / entity_id / "spec.json"
+        return TEMPLATES_DIR / entity_id / "spec.json"
     return DATABASES_DIR / entity_id / "model.json"
 
 
@@ -87,7 +87,9 @@ def database_rel_path(db_id: str) -> str:
 
 
 def _write_json_model(path: Path, model: dict) -> None:
-    path.write_text(json.dumps(model, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(model, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 def _read_json(path: Path) -> dict | None:
@@ -122,7 +124,9 @@ def read_meta(kind: Kind, entity_id: str) -> dict | None:
             "source": "json",
         }
         if kind == "audit":
-            meta["excel_path"] = (model.get("source") or {}).get("template") or WORKBOOK_NAME
+            meta["excel_path"] = (model.get("source") or {}).get(
+                "template"
+            ) or WORKBOOK_NAME
         else:
             meta["type"] = "sqlite"
             meta["path"] = database_rel_path(entity_id)
@@ -154,6 +158,7 @@ def set_display_name(kind: Kind, entity_id: str, name: str) -> bool:
 
 # --- write stubs ------------------------------------------------------------
 
+
 def write_audit_stub(audit_id: str, name: str) -> None:
     """Write the initial `spec.json` stub (status: indexing). It is a partial
     document — fields/criteria are filled when the build completes — so it is not
@@ -161,29 +166,38 @@ def write_audit_stub(audit_id: str, name: str) -> None:
     ready."""
     path = _json_path("audit", audit_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    _write_json_model(path, {
-        "schema_version": "1",
-        "audit": audit_id,
-        "title": name,
-        "status": "indexing",
-    })
+    _write_json_model(
+        path,
+        {
+            "schema_version": "1",
+            "audit": audit_id,
+            "title": name,
+            "status": "indexing",
+        },
+    )
 
 
-def write_database_stub(db_id: str, name: str, relative_path: str | None = None) -> None:
+def write_database_stub(
+    db_id: str, name: str, relative_path: str | None = None
+) -> None:
     """Write the initial `model.json` stub (status: indexing). `relative_path`
     is accepted for call-site compatibility but the SQLite path is derived from
     the id (`database_rel_path`), so it is not stored."""
     path = _json_path("database", db_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    _write_json_model(path, {
-        "schema_version": "1",
-        "database": db_id,
-        "title": name,
-        "status": "indexing",
-    })
+    _write_json_model(
+        path,
+        {
+            "schema_version": "1",
+            "database": db_id,
+            "title": name,
+            "status": "indexing",
+        },
+    )
 
 
 # --- pub/sub ----------------------------------------------------------------
+
 
 def _publish(event: dict) -> None:
     dead: list[asyncio.Queue[dict]] = []
@@ -214,6 +228,7 @@ async def subscribe() -> AsyncIterator[dict]:
 
 # --- core: await_ready ------------------------------------------------------
 
+
 async def await_ready(kind: Kind, entity_id: str, timeout: float = 300.0) -> None:
     """Block until the entity model says `status: ready`.
 
@@ -231,7 +246,9 @@ async def await_ready(kind: Kind, entity_id: str, timeout: float = 300.0) -> Non
             raise IndexingError(f"{kind} {entity_id} not found")
         remaining = deadline - asyncio.get_event_loop().time()
         if remaining <= 0:
-            raise IndexingError(f"Timed out waiting for {kind} {entity_id} to finish indexing")
+            raise IndexingError(
+                f"Timed out waiting for {kind} {entity_id} to finish indexing"
+            )
         ev = _event_for(kind, entity_id)
         try:
             # Cap each wait at 2s as a safety net against missed wake-ups
@@ -247,6 +264,7 @@ async def await_ready(kind: Kind, entity_id: str, timeout: float = 300.0) -> Non
 
 # --- core: run_indexing -----------------------------------------------------
 
+
 async def run_indexing(kind: Kind, entity_id: str) -> None:
     """Run the appropriate builder in the background, atomically writing the
     validated JSON model when done. Always fires the wake-up event and a pub/sub
@@ -256,13 +274,15 @@ async def run_indexing(kind: Kind, entity_id: str) -> None:
     # state immediately. (New clients get it via the snapshot in list_all; this
     # covers uploads/retries that happen mid-session.)
     start = read_meta(kind, entity_id)
-    _publish({
-        "kind": kind,
-        "id": entity_id,
-        "name": (start or {}).get("name") or entity_id,
-        "status": "indexing",
-        "error": None,
-    })
+    _publish(
+        {
+            "kind": kind,
+            "id": entity_id,
+            "name": (start or {}).get("name") or entity_id,
+            "status": "indexing",
+            "error": None,
+        }
+    )
     try:
         if kind == "audit":
             await _run_audit_indexing(entity_id)
@@ -282,7 +302,7 @@ async def run_indexing(kind: Kind, entity_id: str) -> None:
 
 
 async def _run_audit_indexing(audit_id: str) -> None:
-    workbook = AUDITS_DIR / audit_id / WORKBOOK_NAME
+    workbook = TEMPLATES_DIR / audit_id / WORKBOOK_NAME
     if not workbook.exists():
         raise IndexingError(f"{WORKBOOK_NAME} missing for {audit_id}")
     meta = read_meta("audit", audit_id) or {}
@@ -304,7 +324,9 @@ async def _run_audit_indexing(audit_id: str) -> None:
         raise IndexingError("audit spec invalid before write: " + "; ".join(problems))
 
     _write_json_model(_json_path("audit", audit_id), model)
-    _publish({"kind": "audit", "id": audit_id, "name": model["title"], "status": "ready"})
+    _publish(
+        {"kind": "audit", "id": audit_id, "name": model["title"], "status": "ready"}
+    )
 
 
 async def _run_database_indexing(db_id: str) -> None:
@@ -328,8 +350,11 @@ async def _run_database_indexing(db_id: str) -> None:
     # the asserted prose to preserve for structurally-unchanged tables (§6).
     previous = _read_json(_json_path("database", db_id))
     model = await build_database_model(
-        sqlite_path, db_id, display_name=display_name,
-        sibling_databases=siblings, previous=previous,
+        sqlite_path,
+        db_id,
+        display_name=display_name,
+        sibling_databases=siblings,
+        previous=previous,
     )
     # The user-chosen display name (from upload or a rename) is authoritative —
     # the builder's LLM title is only a fallback when none was set.
@@ -338,10 +363,14 @@ async def _run_database_indexing(db_id: str) -> None:
     # Final guard: never write a broken model.
     problems = validate_against_schema(model, _DATABASE_SCHEMA)
     if problems:
-        raise IndexingError("database model invalid before write: " + "; ".join(problems))
+        raise IndexingError(
+            "database model invalid before write: " + "; ".join(problems)
+        )
 
     _write_json_model(_json_path("database", db_id), model)
-    _publish({"kind": "database", "id": db_id, "name": model["title"], "status": "ready"})
+    _publish(
+        {"kind": "database", "id": db_id, "name": model["title"], "status": "ready"}
+    )
 
 
 def _mark_error(kind: Kind, entity_id: str, error: str) -> None:
@@ -354,10 +383,13 @@ def _mark_error(kind: Kind, entity_id: str, error: str) -> None:
     model["error"] = error
     _write_json_model(jpath, model)
     name = model.get("title") or entity_id
-    _publish({"kind": kind, "id": entity_id, "name": name, "status": "error", "error": error})
+    _publish(
+        {"kind": kind, "id": entity_id, "name": name, "status": "error", "error": error}
+    )
 
 
 # --- launch helpers ---------------------------------------------------------
+
 
 def launch(kind: Kind, entity_id: str) -> None:
     """Fire-and-forget background task.
@@ -418,9 +450,10 @@ def reindex(kind: Kind, entity_id: str) -> str:
 
 # --- list for status API ----------------------------------------------------
 
+
 def list_all() -> list[dict]:
     out: list[dict] = []
-    for kind, base in (("audit", AUDITS_DIR), ("database", DATABASES_DIR)):
+    for kind, base in (("audit", TEMPLATES_DIR), ("database", DATABASES_DIR)):
         if not base.exists():
             continue
         for d in sorted(base.iterdir()):
@@ -429,17 +462,20 @@ def list_all() -> list[dict]:
             meta = read_meta(kind, d.name)  # type: ignore[arg-type]
             if meta is None:
                 continue
-            out.append({
-                "kind": kind,
-                "id": d.name,
-                "name": meta["name"],
-                "status": meta["status"],
-                "error": meta["error"],
-            })
+            out.append(
+                {
+                    "kind": kind,
+                    "id": d.name,
+                    "name": meta["name"],
+                    "status": meta["status"],
+                    "error": meta["error"],
+                }
+            )
     return out
 
 
 # --- startup rescan ---------------------------------------------------------
+
 
 def rescan_on_startup() -> None:
     """Re-launch indexing for any entity whose stub says `status: indexing`.
@@ -449,5 +485,7 @@ def rescan_on_startup() -> None:
     """
     for entry in list_all():
         if entry["status"] == "indexing":
-            logger.info("Resuming indexing for %s %s after restart", entry["kind"], entry["id"])
+            logger.info(
+                "Resuming indexing for %s %s after restart", entry["kind"], entry["id"]
+            )
             launch(entry["kind"], entry["id"])

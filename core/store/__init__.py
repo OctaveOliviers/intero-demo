@@ -1,6 +1,6 @@
 """State store (W0.2 contract): durable `runs` / `cells` / `events`.
 
-The single source of truth for run status, the blocked list, and the run log
+The single source of truth for table result status, the blocked list, and the audit log
 (doc 7 §State data model; GAP-3) — never the chat stream or the workbook.
 Lane B writes here; Lane D reads here.
 """

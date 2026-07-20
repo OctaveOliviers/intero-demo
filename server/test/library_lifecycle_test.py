@@ -5,22 +5,31 @@ from unittest.mock import patch
 
 from fastapi import HTTPException
 
-from server.routes import audits as audits_routes
+from server.routes import templates as templates_routes
 from server.routes import databases as databases_routes
+from server.test._audit_auth_helper import AuditAuthMixin
 
 
-class LibraryLifecycleTest(unittest.IsolatedAsyncioTestCase):
+class LibraryLifecycleTest(AuditAuthMixin, unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self._audit_auth_setup()
+
+    def tearDown(self):
+        self._audit_auth_teardown()
+
     async def test_empty_var_lists_return_empty_arrays(self):
         with (
-            patch.object(audits_routes, "load_audit_registry", return_value=[]),
+            patch.object(templates_routes, "load_audit_registry", return_value=[]),
             patch.object(databases_routes, "load_database_catalog", return_value=[]),
         ):
-            audits = await audits_routes.list_audits()
+            audits = await templates_routes.list_templates(self._owner_request())
             databases = await databases_routes.list_databases()
         self.assertEqual(audits, [])
         self.assertEqual(databases, [])
 
-    async def test_audit_partial_drift_list_stable_detail_missing_spec_returns_404(self):
+    async def test_audit_partial_drift_list_stable_detail_missing_spec_returns_404(
+        self,
+    ):
         audit = {
             "id": "a1",
             "name": "Audit",
@@ -32,18 +41,24 @@ class LibraryLifecycleTest(unittest.IsolatedAsyncioTestCase):
             # Partial drift: registry entry still exists, but spec.json is missing.
             (Path(tmpdir) / "a1").mkdir(parents=True, exist_ok=True)
             with (
-                patch.object(audits_routes, "load_audit_registry", return_value=[audit]),
-                patch.object(audits_routes, "get_audit_by_id", return_value=audit),
-                patch.object(audits_routes, "AUDITS_DIR", Path(tmpdir)),
+                patch.object(
+                    templates_routes, "load_audit_registry", return_value=[audit]
+                ),
+                patch.object(templates_routes, "get_audit_by_id", return_value=audit),
+                patch.object(templates_routes, "TEMPLATES_DIR", Path(tmpdir)),
             ):
-                rows = await audits_routes.list_audits()
+                rows = await templates_routes.list_templates(self._owner_request("a1"))
                 self.assertEqual(len(rows), 1)
                 with self.assertRaises(HTTPException) as ctx:
-                    await audits_routes.get_audit_detail("a1")
+                    await templates_routes.get_template_detail(
+                        "a1", self._owner_request("a1")
+                    )
         self.assertEqual(ctx.exception.status_code, 404)
-        self.assertEqual(ctx.exception.detail, "Audit spec not found.")
+        self.assertEqual(ctx.exception.detail, "Template spec not found.")
 
-    async def test_database_partial_drift_list_stable_detail_missing_model_returns_404(self):
+    async def test_database_partial_drift_list_stable_detail_missing_model_returns_404(
+        self,
+    ):
         db = {
             "id": "d1",
             "name": "Database",
@@ -56,7 +71,9 @@ class LibraryLifecycleTest(unittest.IsolatedAsyncioTestCase):
             # Partial drift: catalog entry still exists, but model.json is missing.
             (Path(tmpdir) / "d1").mkdir(parents=True, exist_ok=True)
             with (
-                patch.object(databases_routes, "load_database_catalog", return_value=[db]),
+                patch.object(
+                    databases_routes, "load_database_catalog", return_value=[db]
+                ),
                 patch.object(databases_routes, "_get_database_by_id", return_value=db),
                 patch.object(databases_routes, "DATABASES_DIR", Path(tmpdir)),
             ):

@@ -1,38 +1,38 @@
-// Run streaming + the LIVE VIEWS of the selected audit.
+// Run streaming + the LIVE VIEWS of the selected populated table.
 //
-// Since the single-run-store refactor (T3): the per-audit record in
-// audits.js is the ONLY owned run state. The stores components read here
-// (messages / activity / activeWorkbook / reviewSummary / runStatus) are
-// DERIVED from (audits, currentAuditId, activeStream) — switching audits is
-// just a pointer move, the stream sink writes once through the audits.js
-// mutators, and persistence is audits.js's localStorage subscriber. The old
-// dual-write (transient stores + per-audit copies + mirror layer) is gone.
+// Since the single-run-store refactor (T3): the per-populated-table record in
+// populatedTables.js is the ONLY owned run state. The stores components read here
+// (messages / activity / activeWorkbook / reviewSummary / tablePopulationStatus) are
+// DERIVED from (populatedTables, currentPopulatedTableId, activeStream) — switching populated tables is
+// just a pointer move, the stream sink writes once through the populatedTables.js
+// mutators, and persistence is populatedTables.js's localStorage subscriber. The old
+// dual-write (transient stores + per-record copies + mirror layer) is gone.
 import { writable, derived, get } from "svelte/store";
 import * as XLSX from "xlsx";
 import {
-  getWorkbook as apiGetWorkbook,
-  downloadWorkbookExport as apiDownloadWorkbookExport,
+  getTablePopulationWorkbook,
+  downloadTablePopulationWorkbook,
   executeSql,
-  stopRun as apiStopRun,
-  createRunFromDescription,
-  refreshRun as apiRefreshRun,
+  stopTablePopulation,
+  createTablePopulationFromDescription,
+  refreshTablePopulation,
 } from "../lib/api.js";
 import { handleRefreshConflict } from "../lib/refreshConflict.js";
-import { isMockMode, mockStartRunStream } from "../lib/mock.js";
+import { isMockMode, mockStartTablePopulationStream } from "../lib/mock.js";
 import {
-  audits,
-  currentAuditId,
+  populatedTables,
+  currentPopulatedTableId,
   activeStream,
-  syncAuditActivity,
-  syncAuditMessages,
-  syncAuditReviewSummary,
-  syncAuditWorkbook,
-  setAuditRefreshState,
-  setAuditStatus,
-  setAuditRunTiming,
-  startAudit,
-  setAuditRunId,
-} from "./audits.js";
+  syncPopulatedTableActivity,
+  syncPopulatedTableMessages,
+  syncPopulatedTableReviewSummary,
+  syncPopulatedTableWorkbook,
+  setPopulatedTableRefreshState,
+  setPopulatedTableStatus,
+  setPopulatedTableRunTiming,
+  startTablePopulation,
+  setPopulatedTablePopulationId,
+} from "./populatedTables.js";
 import { goToResults } from "./navigation.js";
 import {
   closePanel as closeResultViewPanel,
@@ -45,7 +45,7 @@ import { parseRunSsePayload, runEventDiscriminator } from "./runSseContract.js";
 // state and lives in resultViewUi.js).
 export { activeCommand };
 
-// Transient, audit-independent state.
+// Transient, populated-table-independent state.
 export const isSubmitting = writable(false);
 export const error = writable(null);
 // True from the moment the user hits the activity-box stop button until the run
@@ -53,9 +53,9 @@ export const error = writable(null);
 // closing summary.
 export const runStopping = writable(false);
 
-// --- The live views: derived from the selected audit's record -------------
+// --- The live views: derived from the selected populated table's record -------------
 
-const currentEntry = derived([audits, currentAuditId], ([list, id]) =>
+const currentEntry = derived([populatedTables, currentPopulatedTableId], ([list, id]) =>
   id ? list.find((a) => a.id === id) || null : null,
 );
 
@@ -67,12 +67,12 @@ export const activeWorkbook = derived(currentEntry, (e) => e?.workbook || null);
 export const runStartedAt = derived(currentEntry, (e) => e?.runStartedAt || null);
 export const runEndedAt = derived(currentEntry, (e) => e?.runEndedAt || null);
 
-// "running" only while this audit IS the active stream. A record whose stored
+// "running" only while this populated table IS the active stream. A record whose stored
 // status is "running" but which is no longer streaming (e.g. after a page
-// reload) reads as idle — same rule the old selectAudit restore applied.
-export const runStatus = derived([currentEntry, activeStream], ([e, s]) => {
+// reload) reads as idle — same rule the old sidebar-select restore applied.
+export const tablePopulationStatus = derived([currentEntry, activeStream], ([e, s]) => {
   if (!e) return "idle";
-  if (s && s.auditId === e.id) return "running";
+  if (s && s.populatedTableId === e.id) return "running";
   if (e.status === "running") return "idle";
   return e.status || "idle";
 });
@@ -81,9 +81,9 @@ let activeSource = null;
 let activeMockHandle = null;
 
 // The run id currently streaming (null when idle). Lets other modules tell
-// whether an audit being viewed is the one still actively streaming.
+// whether a populated table being viewed is the one still actively streaming.
 export function getActiveRunId() {
-  return get(activeStream)?.runId || null;
+  return get(activeStream)?.tablePopulationId || null;
 }
 
 // Parse an A1 ref ("C4") into zero-based { row, col } for cell_update writes.
@@ -95,25 +95,25 @@ function refToRC(ref) {
   return { row: parseInt(m[2], 10) - 1, col: col - 1 };
 }
 
-// Append a message to the CURRENT audit's record (no-op without one — every
-// run flow creates its record via startAudit before messaging).
+// Append a message to the CURRENT populated table's record (no-op without one — every
+// run flow creates its record via startTablePopulation before messaging).
 export function addMessage(msg) {
-  const id = get(currentAuditId);
+  const id = get(currentPopulatedTableId);
   if (!id) return;
-  const owner = get(audits).find((a) => a.id === id);
-  syncAuditMessages(id, [...(owner?.messages || []), { id: crypto.randomUUID(), ...msg }]);
+  const owner = get(populatedTables).find((a) => a.id === id);
+  syncPopulatedTableMessages(id, [...(owner?.messages || []), { id: crypto.randomUUID(), ...msg }]);
 }
 
-// A stream belongs to the audit that started it, NOT to whatever audit happens
-// to be on screen. The sink writes ONLY into the owner audit's record; the
-// derived views above reflect it automatically when that audit is the one
-// being viewed — a background run can never pollute the audit you switched to.
+// A stream belongs to the populated table that started it, NOT to whatever record happens
+// to be on screen. The sink writes ONLY into the owner populated table's record; the
+// derived views above reflect it automatically when that populated table is the one
+// being viewed — a background run can never pollute the populated table you switched to.
 // On a fresh run the sink starts blank. On RESUME (reconnecting to an in-flight
 // run after a reload) it is seeded with the snapshot workbook + hydrated
 // activity already on screen, so incoming cell_update / activity events apply
 // ON TOP of what we fetched rather than replacing it. The stream has no replay,
 // so a fresh connection only delivers FUTURE events — snapshot + future = whole.
-function makeStreamSink(auditId, runId, seed = {}) {
+function makeStreamSink(populatedTableId, tablePopulationId, seed = {}) {
   const acts = Array.isArray(seed.activity) ? seed.activity.slice() : [];
   let wb = seed.workbook || null;
   let chipEmitted = Boolean(seed.workbook);  // resumed runs already showed the chip
@@ -127,31 +127,31 @@ function makeStreamSink(auditId, runId, seed = {}) {
       const i = acts.findIndex((a) => a && a.id === event.id);
       if (i !== -1) {
         acts[i] = event;
-        syncAuditActivity(auditId, acts.slice());
+        syncPopulatedTableActivity(populatedTableId, acts.slice());
         return;
       }
     }
     acts.push(event);
-    syncAuditActivity(auditId, acts.slice());
+    syncPopulatedTableActivity(populatedTableId, acts.slice());
   }
 
   function emitMessage(msg) {
-    const owner = get(audits).find((a) => a.id === auditId);
-    syncAuditMessages(auditId, [
+    const owner = get(populatedTables).find((a) => a.id === populatedTableId);
+    syncPopulatedTableMessages(populatedTableId, [
       ...(owner?.messages || []),
       { id: crypto.randomUUID(), ...msg },
     ]);
   }
 
   function setStatus(status) {
-    setAuditStatus(auditId, status);
+    setPopulatedTableStatus(populatedTableId, status);
   }
 
   // workbook_created: structured workbook with a blank body. Cells fill via
   // applyCells; cellMetadata grows as cells gain values + provenance.
   function createWorkbook(event) {
     wb = {
-      runId,
+      tablePopulationId,
       sheets: (event.sheets || []).map((s) => ({
         ...s,
         data: (s.data || []).map((row) => row.slice()),
@@ -165,7 +165,7 @@ function makeStreamSink(auditId, runId, seed = {}) {
       recentlyUpdated: [],
       updateTick: 0,
     };
-    syncAuditWorkbook(auditId, wb);
+    syncPopulatedTableWorkbook(populatedTableId, wb);
   }
 
   // cell_update: write value(s) + metadata immutably so the viewer reacts, and
@@ -174,14 +174,14 @@ function makeStreamSink(auditId, runId, seed = {}) {
     if (!wb) return;
     // Rebase on the latest workbook from the store before applying this batch.
     // markCellReviewed's dwell (yellow -> white) writes review flips straight to
-    // the store via updateCurrentAuditWorkbook, bumping ITS updateTick. If we
+    // the store via updateCurrentPopulatedTableWorkbook, bumping ITS updateTick. If we
     // kept building on our private closure, our next updateTick would re-use the
     // value the dwell already produced — the viewer's `updateTick !== lastTick`
     // guard then treats this batch as already-seen and SKIPS painting it, so the
     // streamed cells land in the data model but never render (they look blank
     // until clicked). Re-reading keeps one monotonic tick across both writers
     // (and preserves the just-reviewed state instead of reverting it).
-    const owner = get(audits).find((a) => a.id === auditId);
+    const owner = get(populatedTables).find((a) => a.id === populatedTableId);
     if (owner?.workbook) wb = owner.workbook;
     const sheets = wb.sheets.slice();
     const si = sheets.findIndex((s) => s.name === event.sheet);
@@ -205,7 +205,7 @@ function makeStreamSink(auditId, runId, seed = {}) {
       recentlyUpdated: updated,
       updateTick: (wb.updateTick || 0) + 1,
     };
-    syncAuditWorkbook(auditId, wb);
+    syncPopulatedTableWorkbook(populatedTableId, wb);
   }
 
   // Emit the file chip exactly once, on workbook_created.
@@ -216,13 +216,13 @@ function makeStreamSink(auditId, runId, seed = {}) {
       role: "assistant",
       type: "chip",
       label: label || "result.xlsx",
-      workbookUrl: `/api/runs/${runId}/workbook`,
+      workbookUrl: `/api/table-populations/${tablePopulationId}/workbook`,
       downloadUrl: null,
     });
   }
 
   function setReviewSummary(event) {
-    syncAuditReviewSummary(auditId, event);
+    syncPopulatedTableReviewSummary(populatedTableId, event);
   }
 
   return {
@@ -237,7 +237,7 @@ function makeStreamSink(auditId, runId, seed = {}) {
   };
 }
 
-export function startRunStream(runId, auditId, { resume = false, startedAt = null } = {}) {
+export function startRunStream(tablePopulationId, populatedTableId, { resume = false, startedAt = null } = {}) {
   // One live stream at a time: `activeSource`/`activeMockHandle` are module
   // globals, so starting a new stream (e.g. opening a second still-running run,
   // now that reconnect fires for any in-flight run) must first tear down the
@@ -254,36 +254,36 @@ export function startRunStream(runId, auditId, { resume = false, startedAt = nul
     activeMockHandle.close();
     activeMockHandle = null;
   }
-  activeStream.set({ auditId, runId });
-  const owner0 = get(audits).find((a) => a.id === auditId);
+  activeStream.set({ populatedTableId, tablePopulationId });
+  const owner0 = get(populatedTables).find((a) => a.id === populatedTableId);
   // Resume seeds the sink from what's already on screen (the snapshot we just
   // fetched + hydrated activity); a fresh run starts blank.
   const sink = resume
-    ? makeStreamSink(auditId, runId, {
+    ? makeStreamSink(populatedTableId, tablePopulationId, {
         workbook: owner0?.workbook || null,
         activity: owner0?.activity || [],
       })
-    : makeStreamSink(auditId, runId);
+    : makeStreamSink(populatedTableId, tablePopulationId);
   const isRefreshRun = Boolean(owner0?.refreshInFlight);
 
   function finalizeRefreshStateOnDone() {
     if (isRefreshRun) {
-      setAuditRefreshState(auditId, { refreshInFlight: false, refreshAvailable: false });
+      setPopulatedTableRefreshState(populatedTableId, { refreshInFlight: false, refreshAvailable: false });
       return;
     }
-    setAuditRefreshState(auditId, { refreshInFlight: false, refreshAvailable: true });
+    setPopulatedTableRefreshState(populatedTableId, { refreshInFlight: false, refreshAvailable: true });
   }
 
   function clearRefreshStateOnFailure() {
     if (!isRefreshRun) return;
-    setAuditRefreshState(auditId, { refreshInFlight: false, refreshAvailable: false });
+    setPopulatedTableRefreshState(populatedTableId, { refreshInFlight: false, refreshAvailable: false });
   }
 
   function endStream() {
     isSubmitting.set(false);
     runStopping.set(false);
     // Freeze the elapsed timer at the moment the run reached a terminal state.
-    setAuditRunTiming(auditId, { endedAt: Date.now() });
+    setPopulatedTableRunTiming(populatedTableId, { endedAt: Date.now() });
     activeStream.set(null);
     activeSource = null;
     activeMockHandle = null;
@@ -294,24 +294,24 @@ export function startRunStream(runId, auditId, { resume = false, startedAt = nul
   // top of it). Refresh runs keep activity history either way.
   if (!resume) {
     if (!isRefreshRun) {
-      syncAuditActivity(auditId, []);
+      syncPopulatedTableActivity(populatedTableId, []);
     }
-    syncAuditReviewSummary(auditId, null);
-    syncAuditWorkbook(auditId, null);
-    setAuditRefreshState(auditId, { refreshAvailable: false, refreshInFlight: isRefreshRun });
+    syncPopulatedTableReviewSummary(populatedTableId, null);
+    syncPopulatedTableWorkbook(populatedTableId, null);
+    setPopulatedTableRefreshState(populatedTableId, { refreshAvailable: false, refreshInFlight: isRefreshRun });
   }
   // Seed the elapsed-timer clock: a fresh/refresh run starts now; a resume
   // prefers the backend's authoritative started_at so a reconnect shows the
   // TRUE elapsed time, falling back to any local stamp, then now.
   runStopping.set(false);
-  setAuditRunTiming(auditId, {
+  setPopulatedTableRunTiming(populatedTableId, {
     startedAt: resume ? (startedAt || owner0?.runStartedAt || Date.now()) : Date.now(),
     endedAt: null,
   });
-  setAuditStatus(auditId, "running");
+  setPopulatedTableStatus(populatedTableId, "running");
 
-  if (isMockMode("runs")) {
-    activeMockHandle = mockStartRunStream(runId, {
+  if (isMockMode("table_populations")) {
+    activeMockHandle = mockStartTablePopulationStream(tablePopulationId, {
       onActivity(event) {
         applyRunEvent(event, sink);
       },
@@ -332,7 +332,7 @@ export function startRunStream(runId, auditId, { resume = false, startedAt = nul
       },
       onError(event) {
         applyRunEvent(
-          { type: "error", message: "Run failed: " + ((event && event.message) || "unknown error") },
+          { type: "error", message: "Table population failed: " + ((event && event.message) || "unknown error") },
           sink,
         );
         clearRefreshStateOnFailure();
@@ -343,7 +343,7 @@ export function startRunStream(runId, auditId, { resume = false, startedAt = nul
     return activeMockHandle;
   }
 
-  const source = new EventSource(`/api/runs/${runId}/stream`);
+  const source = new EventSource(`/api/table-populations/${tablePopulationId}/stream`);
   activeSource = source;
 
   source.onmessage = (e) => {
@@ -400,7 +400,7 @@ export function startRunStream(runId, auditId, { resume = false, startedAt = nul
     // completed rather than surfacing a failure over good data. A user STOP holds
     // the stream open for the backend's finalize frames; if the transport drops
     // in that window we still settle to completed, never a failure.
-    const owner = get(audits).find((a) => a.id === auditId);
+    const owner = get(populatedTables).find((a) => a.id === populatedTableId);
     if (owner?.status === "running") {
       sink.setStatus(resume || get(runStopping) ? "completed" : "error");
     }
@@ -420,8 +420,8 @@ export function startRunStream(runId, auditId, { resume = false, startedAt = nul
 // old behavior) would drop those finalize events and lose the summary.
 export async function stopActiveRun() {
   const stream = get(activeStream);
-  if (!stream?.runId) return;
-  const { runId } = stream;
+  if (!stream?.tablePopulationId) return;
+  const { tablePopulationId } = stream;
 
   runStopping.set(true);
 
@@ -438,7 +438,7 @@ export async function stopActiveRun() {
   }
 
   try {
-    await apiStopRun(runId);
+    await stopTablePopulation(tablePopulationId);
   } catch (_) {
     // Best-effort — if the stop call fails the run keeps streaming to its own
     // natural end, which still finalizes correctly.
@@ -447,7 +447,7 @@ export async function stopActiveRun() {
 
 // Hard reset transient chat/run runtime on auth transitions (e.g. logout) so
 // no in-memory run state remains visible. The derived views clear when
-// resetAuditHistory wipes the records.
+// resetPopulatedTableHistory wipes the records.
 export function resetChatRuntime() {
   if (activeSource) {
     activeSource.close();
@@ -470,20 +470,20 @@ export function resetChatRuntime() {
 // workbook is being live-filled by the stream and must not be clobbered by a
 // snapshot. A run with no local record (server history on a fresh browser) gets
 // a minimal record so the snapshot has somewhere durable to live.
-export async function openWorkbook(runId) {
+export async function openWorkbook(tablePopulationId) {
   // The actively-streaming run is authoritative live — focus it, don't refetch.
-  if (getActiveRunId() === runId) {
-    const owner = get(audits).find((a) => a.runId === runId);
-    if (owner) currentAuditId.set(owner.id);
+  if (getActiveRunId() === tablePopulationId) {
+    const owner = get(populatedTables).find((a) => a.tablePopulationId === tablePopulationId);
+    if (owner) currentPopulatedTableId.set(owner.id);
     return;
   }
 
-  let owner = get(audits).find((a) => a.runId === runId);
+  let owner = get(populatedTables).find((a) => a.tablePopulationId === tablePopulationId);
   if (!owner) {
     owner = {
-      id: `run:${runId}`,
-      runId,
-      title: `Run ${String(runId).slice(0, 8)}`,
+      id: `run:${tablePopulationId}`,
+      tablePopulationId,
+      title: `Run ${String(tablePopulationId).slice(0, 8)}`,
       createdAt: Date.now(),
       status: "completed",
       messages: [],
@@ -493,7 +493,7 @@ export async function openWorkbook(runId) {
       runStartedAt: null,
       runEndedAt: null,
     };
-    audits.update((list) => [owner, ...list]);
+    populatedTables.update((list) => [owner, ...list]);
   }
 
   // Always re-read the authoritative state from the backend. This is what makes
@@ -502,9 +502,9 @@ export async function openWorkbook(runId) {
   // response even if it never reached this browser over the live stream.
   let snapshot = null;
   try {
-    snapshot = await apiGetWorkbook(runId);
-    syncAuditWorkbook(owner.id, {
-      runId,
+    snapshot = await getTablePopulationWorkbook(tablePopulationId);
+    syncPopulatedTableWorkbook(owner.id, {
+      tablePopulationId,
       sheets: snapshot.sheets,
       cellMetadata: snapshot.cellMetadata || {},
       currentSheetIndex: 0,
@@ -516,7 +516,7 @@ export async function openWorkbook(runId) {
       return;
     }
   }
-  currentAuditId.set(owner.id);
+  currentPopulatedTableId.set(owner.id);
 
   // Seed the activity-box timer from the snapshot. For a FINISHED run reopened
   // from history (reload / fresh browser) this is the only place it's set — no
@@ -525,24 +525,24 @@ export async function openWorkbook(runId) {
   // below by startRunStream (which clears endedAt).
   const snapStarted = snapshot?.startedAt ? Date.parse(snapshot.startedAt) : NaN;
   const snapEnded = snapshot?.endedAt ? Date.parse(snapshot.endedAt) : NaN;
-  setAuditRunTiming(owner.id, {
+  setPopulatedTableRunTiming(owner.id, {
     startedAt: Number.isFinite(snapStarted) ? snapStarted : null,
     endedAt: Number.isFinite(snapEnded) ? snapEnded : null,
   });
 
   // Reconnect the live stream iff the backend says the run is still live, so
   // cells AND agent activity keep updating on top of the snapshot we just
-  // loaded. `runStatus` from /workbook is the AUTHORITATIVE signal: a fresh
+  // loaded. `tablePopulationStatus` from /workbook is the AUTHORITATIVE signal: a fresh
   // browser (or any reload) has no trustworthy local "running" flag, because
   // server history is hydrated as "completed". The snapshot is the catch-up;
   // the stream is the live tail — re-fetching /workbook alone can't tail, HTTP
   // is one-shot pull. Reconnecting a run that actually finished is safe: the
   // broker settles it immediately (synthesized done), so this never hangs.
-  const live = snapshot?.runStatus === "in_progress" || snapshot?.runStatus === "queued";
-  if (live && getActiveRunId() !== runId && !isMockMode("runs")) {
+  const live = snapshot?.tablePopulationStatus === "running";
+  if (live && getActiveRunId() !== tablePopulationId && !isMockMode("table_populations")) {
     // Seed the elapsed timer from the backend's authoritative started_at so a
     // reconnect shows the true elapsed time, not a restart from 0.
-    startRunStream(runId, owner.id, {
+    startRunStream(tablePopulationId, owner.id, {
       resume: true,
       startedAt: Number.isFinite(snapStarted) ? snapStarted : null,
     });
@@ -551,11 +551,11 @@ export async function openWorkbook(runId) {
 
 // In real mode, download through the backend export route so server-side export
 // policy is enforced. Mock mode still serializes the in-memory workbook via SheetJS.
-export async function downloadWorkbook(runId, label) {
-  if (!runId) return;
-  if (!isMockMode("runs")) {
+export async function downloadWorkbook(tablePopulationId, label) {
+  if (!tablePopulationId) return;
+  if (!isMockMode("table_populations")) {
     try {
-      const blob = await apiDownloadWorkbookExport(runId);
+      const blob = await downloadTablePopulationWorkbook(tablePopulationId);
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = objectUrl;
@@ -573,15 +573,15 @@ export async function downloadWorkbook(runId, label) {
   let workbook = null;
 
   const live = get(activeWorkbook);
-  if (live && live.runId === runId) {
+  if (live && live.tablePopulationId === tablePopulationId) {
     workbook = live;
   } else {
-    const owner = get(audits).find((a) => a.runId === runId);
+    const owner = get(populatedTables).find((a) => a.tablePopulationId === tablePopulationId);
     if (owner && owner.workbook) {
       workbook = owner.workbook;
     } else {
       try {
-        workbook = await apiGetWorkbook(runId);
+        workbook = await getTablePopulationWorkbook(tablePopulationId);
       } catch (e) {
         error.set(e.message);
         return;
@@ -616,33 +616,33 @@ export function closeCommand() {
 
 // Right-panel refresh entrypoint. This calls the backend refresh API and
 // reconnects the live stream on success. When the backend reports an already
-// active execution, this returns `{ status: "resumed", runId }` after reattach.
+// active execution, this returns `{ status: "resumed", tablePopulationId }` after reattach.
 export async function startRefreshFromPanel() {
-  const auditId = get(currentAuditId);
-  if (!auditId) throw new Error("No audit selected for update check.");
+  const populatedTableId = get(currentPopulatedTableId);
+  if (!populatedTableId) throw new Error("No table selected for update check.");
 
-  const owner = get(audits).find((a) => a.id === auditId);
-  if (!owner) throw new Error("Selected audit was not found.");
-  if (get(runStatus) === "running") {
+  const owner = get(populatedTables).find((a) => a.id === populatedTableId);
+  if (!owner) throw new Error("Selected table was not found.");
+  if (get(tablePopulationStatus) === "running") {
     throw new Error("Execution is active; updates can only be checked while idle.");
   }
-  if (!owner.runId) throw new Error("No run is available yet for update checks.");
+  if (!owner.tablePopulationId) throw new Error("No table population is available yet for update checks.");
 
-  setAuditRefreshState(auditId, { refreshAvailable: false, refreshInFlight: true });
+  setPopulatedTableRefreshState(populatedTableId, { refreshAvailable: false, refreshInFlight: true });
   try {
-    const response = await apiRefreshRun(owner.runId);
-    startRunStream(owner.runId, auditId);
+    const response = await refreshTablePopulation(owner.tablePopulationId);
+    startRunStream(owner.tablePopulationId, populatedTableId);
     return response;
   } catch (err) {
     const code = err?.code;
-    const handled = handleRefreshConflict(code, owner.runId, auditId, startRunStream);
+    const handled = handleRefreshConflict(code, owner.tablePopulationId, populatedTableId, startRunStream);
     if (handled) {
       return handled;
     }
     throw err instanceof Error ? err : new Error(String(err));
   } finally {
-    if (get(runStatus) !== "running") {
-      setAuditRefreshState(auditId, { refreshInFlight: false });
+    if (get(tablePopulationStatus) !== "running") {
+      setPopulatedTableRefreshState(populatedTableId, { refreshInFlight: false });
     }
   }
 }
@@ -652,13 +652,13 @@ export async function startRefreshFromPanel() {
 function titleFromPrompt(text) {
   const lines = (text || "").split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
   const line = lines.find((l) => l.length >= 15) || lines[0];
-  if (!line) return "New audit";
+  if (!line) return "New table";
   return line.length > 48 ? line.slice(0, 47).trimEnd() + "…" : line;
 }
 
-// Flow B entry point (README §8): start the SAME live-population run engine from
-// a free-text description instead of a template. HOME calls this from the
-// "Describe the data you want" box in place of the old generateData text stream.
+// Mock-demo Flow B entry point: start the live-population demo from a free-text
+// description. Real v1 table populations are template-backed; pure prose →
+// populated table is deferred in the product spec.
 export async function startDescribeRun(promptText) {
   const text = (promptText || "").trim();
   if (!text || get(isSubmitting)) return;
@@ -666,15 +666,15 @@ export async function startDescribeRun(promptText) {
   isSubmitting.set(true);
   let histId = null;
   try {
-    histId = startAudit({ id: "describe", name: titleFromPrompt(text) }, {});
+    histId = startTablePopulation({ id: "describe", name: titleFromPrompt(text) }, {});
     goToResults();
     addMessage({ role: "user", type: "text", content: text });
-    const data = await createRunFromDescription(text);
-    setAuditRunId(histId, data.runId);
-    startRunStream(data.runId, histId);
+    const data = await createTablePopulationFromDescription(text);
+    setPopulatedTablePopulationId(histId, data.tablePopulationId);
+    startRunStream(data.tablePopulationId, histId);
   } catch (err) {
-    addMessage({ role: "assistant", type: "text", content: "Run failed: " + err.message });
-    if (histId) setAuditStatus(histId, "error");
+    addMessage({ role: "assistant", type: "text", content: "Table population failed: " + err.message });
+    if (histId) setPopulatedTableStatus(histId, "error");
     activeStream.set(null);
     isSubmitting.set(false);
   }

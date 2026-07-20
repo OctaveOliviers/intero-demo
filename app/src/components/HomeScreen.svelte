@@ -6,14 +6,14 @@
   import {
     allTemplatesGrouped, setRuntimeTemplateGroups,
   } from "../lib/templateCatalog.js";
-  import { listAudits } from "../lib/api.js";
+  import { listTemplates } from "../lib/api.js";
   import { isMockMode } from "../lib/mock.js";
   import Icon from "./Icon.svelte";
   import ScanningEye from "./ScanningEye.svelte";
   import InputSpec from "./spec/InputSpec.svelte";
   import OutputSpec from "./spec/OutputSpec.svelte";
   import DashboardCardGrid from "./DashboardCardGrid.svelte";
-  import { selectAudit } from "../stores/navigation.js";
+  import { selectPopulatedTable } from "../stores/navigation.js";
 
   // ONE surface. The agent analyses LIVE: as soon as the operator types, the
   // bottom folds out (divider → "thinking" → suggested filters) without any
@@ -45,19 +45,19 @@
   // route), so removing that file folds the analysis back up.
   let fromUpload = false;
   let templateGroups = allTemplatesGrouped();
-  let templateSourceReady = isMockMode("audits");
+  let templateSourceReady = isMockMode("templates");
 
   function flatTemplates(groups) {
     return (groups || []).flatMap((group) => group.templates || []);
   }
 
-  function toBackendTemplateGroup(audits) {
+  function toBackendTemplateGroup(items) {
     return [{
-      category: $_("home.availableAudits"),
-      templates: (audits || []).map((a) => ({
+      category: $_("home.availableTemplates"),
+      templates: (items || []).map((a) => ({
         id: a.id,
         name: a.name,
-        category: $_("home.availableAudits"),
+        category: $_("home.availableTemplates"),
         fileName: `${a.id}.xlsx`,
         description: a.description || "",
         columns: [],
@@ -66,14 +66,14 @@
   }
 
   onMount(async () => {
-    if (isMockMode("audits")) {
+    if (isMockMode("templates")) {
       templateGroups = allTemplatesGrouped();
       templateSourceReady = true;
       return;
     }
     try {
-      const audits = await listAudits();
-      templateGroups = toBackendTemplateGroup(audits);
+      const items = await listTemplates();
+      templateGroups = toBackendTemplateGroup(items);
       setRuntimeTemplateGroups(templateGroups);
       templateSourceReady = true;
     } catch (err) {
@@ -442,7 +442,7 @@
          place never shifts. While the agent suggestion is open it is only dimmed
          (de-emphasised), never unmounted, hidden, or reflowed. -->
     <div class="cards" class:dimmed={phase !== "idle"} aria-hidden={phase !== "idle"}>
-      <DashboardCardGrid on:select={(e) => selectAudit(e.detail.auditId)} />
+      <DashboardCardGrid on:select={(e) => selectPopulatedTable(e.detail.populatedTableId)} />
     </div>
     {#if phase !== "idle"}
       <div class="fold overlay">

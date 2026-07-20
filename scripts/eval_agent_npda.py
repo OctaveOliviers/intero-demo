@@ -1,12 +1,13 @@
-"""Headless NPDA Tier-1 → Tier-3 agent pass — a real end-to-end eval.
+"""Headless NPDA prepopulate → agent pass — a real end-to-end eval.
 
-Mirrors the production run wiring in ``server/routes/runs.py::_run_spine`` but
+Mirrors the production table-population wiring in
+``server/routes/table_populations.py::_execute_table_population_session`` but
 drives it from the command line so we can inspect the agent's behaviour:
 
-  * Tier 1 (``try_direct``) auto-fills the deterministic cells.
-  * Tier 2 is SKIPPED (``TIER2_ENABLED=0``) — cells go straight to the agent.
-  * Tier 3 is the REAL opencode agent (gpt-5.4-nano via models.local.yaml),
-    standing up a live ``opencode serve`` exactly as the server does.
+  * ``prepopulate`` copies the deterministic cells from the executable.
+  * the table agent is the REAL opencode agent (gpt-5.4-nano via
+    models.local.yaml), standing up a live ``opencode serve`` exactly as the
+    server does.
 
 After the run it prints a cell-state summary (filled / blocked / pending),
 the INTERPRET-cell breakdown by field, every blocked reason, and a digest of
@@ -21,28 +22,30 @@ Run::
 
 from __future__ import annotations
 
-import core.config  # noqa: F401  -- import FIRST: loads .env.local (Azure keys)
+import core.config  # noqa: F401  -- import FIRST: loads .env (Azure keys)
 
 import argparse
 import asyncio
 import json
 import os
 import sqlite3
-import sys
 import tempfile
 import time
 from collections import Counter
+from datetime import date, datetime
 from pathlib import Path
 
-from core.config import ROOT, DATABASES_DIR  # noqa: E402
+from core import table_population  # noqa: E402
+from core.config import ROOT  # noqa: E402
+from core.filters import cohort as cohort_filters  # noqa: E402
 from core.runtime import Runtime  # noqa: E402
-from core.running import stream_runner  # noqa: E402
-from core.running.orchestrator import orchestrate_run  # noqa: E402
-from core.running.try_agent import make_tier_agent  # noqa: E402
-from core.running.try_direct import try_direct  # noqa: E402
 from core.store import Run, Store  # noqa: E402
+from core.table_population.populate import (  # noqa: E402
+    TablePopulationContext,
+    run_population_steps,
+)
 
-SEED = ROOT / "seed"
+SEED = ROOT / "data" / "seed"
 VAR = ROOT / "var"
 
 
@@ -50,46 +53,65 @@ def _log(msg: str) -> None:
     print(f"[eval {time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
-async def _noop_tier(_run_store) -> None:
-    """Tier 2 placeholder — never invoked because TIER2_ENABLED=0."""
+def _resolve_cohort(
+    executable: dict, db_paths: dict[str, Path], extra_where: list[str] | None = None
+) -> list[str]:
+    """The ONE core cohort resolver (was a private SQL copy); ``extra_where``
+    (the eval's --dob-after predicate) rides through as runtime WHERE terms."""
+    return [
+        str(m)
+        for m in cohort_filters.resolve_cohort(
+            executable, db_paths, runtime_where=extra_where
+        )
+    ]
+
+
+def _parse_dob(raw: str) -> date | None:
+    text = (raw or "").strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
     return None
 
 
-def _resolve_cohort(executable: dict, db_paths: dict[str, Path]) -> list[str]:
-    cohort = executable.get("cohort") or {}
-    db_path = db_paths.get(cohort.get("database"))
-    if db_path is None:
-        return []
-    sql = f"SELECT DISTINCT {cohort['identity_select']} FROM {cohort['from']}"
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+def _dob_cohort_where(dob_after: str, db_paths: dict[str, Path]) -> list[str]:
+    """Scope the cohort to patients born strictly after ``dob_after`` (ISO).
+
+    DOB lives in npda-demographics (``patients.date_of_birth``, stored DD/MM/YYYY
+    text), while the cohort is built on npda-clinical. We resolve the eligible
+    patient identifiers here (``clinic_visits.patient_ref == patients.nhs_number``)
+    and return an ``IN (...)`` predicate over the cohort's ``b`` alias. Parsing the
+    date is required — a raw string compare on DD/MM/YYYY is wrong.
+    """
+    cutoff = _parse_dob(dob_after)
+    if cutoff is None:
+        raise ValueError(f"--dob-after must be a date, got {dob_after!r}")
+    demo = db_paths.get("npda-demographics")
+    if demo is None or not demo.exists():
+        raise ValueError("npda-demographics database not available for --dob-after")
+    conn = sqlite3.connect(f"file:{demo}?mode=ro", uri=True)
     try:
-        return [str(r[0]) for r in conn.execute(sql).fetchall()]
+        rows = conn.execute("SELECT nhs_number, date_of_birth FROM patients").fetchall()
     finally:
         conn.close()
+    refs = sorted(
+        str(nhs)
+        for nhs, dob in rows
+        if (parsed := _parse_dob(dob)) is not None and parsed > cutoff
+    )
+    if not refs:
+        return []
+    quoted = ", ".join(f"'{r}'" for r in refs)
+    _log(f"DOB filter: {len(refs)} patient(s) born after {dob_after}: {refs}")
+    return [f"b.patient_ref IN ({quoted})"]
 
 
-def _resolve_cohort_tables(database_id: str, anchor: str | None) -> dict[str, list[str]]:
-    """Mirror server/routes/runs.py::_resolve_cohort_tables."""
-    if not anchor:
-        return {}
-    model_path = DATABASES_DIR / database_id / "model.json"
-    if not model_path.exists():
-        return {database_id: []}
-    model = json.loads(model_path.read_text(encoding="utf-8"))
-    tables: list[str] = []
-    anchor_lower = anchor.lower()
-    for table in model.get("tables", []) or []:
-        if not isinstance(table, dict):
-            continue
-        cols = table.get("columns", []) or []
-        if any(
-            isinstance(col, dict) and str(col.get("name") or "").lower() == anchor_lower
-            for col in cols
-        ):
-            name = str(table.get("name") or "").strip()
-            if name:
-                tables.append(name)
-    return {database_id: tables}
+# Anchor-bearing source tables come from the ONE core derivation
+# (core.table_population.resolve_cohort_tables) — the private copy that
+# mirrored the route is gone.
+_resolve_cohort_tables = table_population.resolve_cohort_tables
 
 
 def _interpret_fields(executable: dict) -> set[str]:
@@ -178,15 +200,23 @@ def _digest_activity(run_dir: Path) -> None:
                     sql_queries.append(v)
                     break
     if sql_queries:
-        _log(f"  sql_execute queries observed: {len(sql_queries)} "
-             f"(distinct: {len(set(q.strip() for q in sql_queries))})")
+        _log(
+            f"  sql_execute queries observed: {len(sql_queries)} "
+            f"(distinct: {len(set(q.strip() for q in sql_queries))})"
+        )
         for q in sql_queries[:15]:
-            _log(f"    » {q.replace(chr(10),' ')[:200]}")
+            _log(f"    » {q.replace(chr(10), ' ')[:200]}")
     # surface any obvious cross-DB errors
     for r in records:
         blob = json.dumps(r)
-        for needle in ("no such column", "no such table", "cross-database",
-                       "cross database", "no cross", "nhs_number"):
+        for needle in (
+            "no such column",
+            "no such table",
+            "cross-database",
+            "cross database",
+            "no cross",
+            "nhs_number",
+        ):
             if needle in blob.lower():
                 _log(f"  !! ERROR SIGNAL ({needle}): {blob[:240]}")
                 break
@@ -213,39 +243,46 @@ def _digest_opencode_log(since: float) -> None:
             models[f"{prov}/{mid}"] += 1
         low = ln.lower()
         if any(s in low for s in ("error", "fail", " 4", " 5")) and (
-            "level=error" in low or "err=" in low or "status=4" in low or "status=5" in low
+            "level=error" in low
+            or "err=" in low
+            or "status=4" in low
+            or "status=5" in low
         ):
             errors.append(ln[:240])
     _log(f"OPENCODE LOG: {newest.name} — {llm_calls} llm round-trips")
-    _log(f"  MODEL(S) USED: {dict(models)}  <-- must be remote/<gpt-5.4-nano> to be a valid eval")
+    _log(
+        f"  MODEL(S) USED: {dict(models)}  <-- must be remote/<gpt-5.4-nano> to be a valid eval"
+    )
     if errors:
         _log(f"  errors in log ({len(errors)}):")
         for e in errors[:8]:
             _log(f"    {e}")
 
 
-async def run_eval(audit_id: str, cohort_cap: int, agent_stage: str) -> int:
-    os.environ["TIER2_ENABLED"] = "0"  # cells go Tier 1 -> Tier 3 agent
-    os.environ["TIER3_ENABLED"] = "1"
-
-    # The opencode agent process is configured from the `tier3_agent` stage via
-    # model_config.tier3_agent_env(). gpt-5.4-nano can't be driven through
+async def run_eval(
+    audit_id: str, cohort_cap: int, agent_stage: str, dob_after: str | None = None
+) -> int:
+    # The opencode agent process is configured from the `table_agent` stage via
+    # model_config.agent_env(). gpt-5.4-nano can't be driven through
     # opencode on the Azure /chat/completions endpoint (opencode injects the
     # Responses-API param `reasoningSummary`, which the endpoint rejects), so for
     # a behavioural eval allow pointing the agent at a known-working stage
     # (e.g. `index_db` -> Kimi-K2.6) without editing the user's models.local.yaml.
-    if agent_stage != "tier3_agent":
+    if agent_stage != "table_agent":
         from core import model_config as _mc
-        cfg = _mc.resolve_stage(agent_stage)
-        _mc.tier3_agent_env = lambda: {
-            "LLM_API_BASE": cfg.endpoint,
-            "LLM_MODEL": cfg.model,
-            "LLM_API_KEY": cfg.api_key,
-        }
-        _log(f"AGENT MODEL OVERRIDE: stage '{agent_stage}' -> {cfg.model} @ {cfg.endpoint}")
 
-    mapping = json.loads((SEED / "audits" / audit_id / "mapping.json").read_text())
-    audit_spec = json.loads((SEED / "audits" / audit_id / "spec.json").read_text())
+        cfg = _mc.resolve_stage(agent_stage)
+        _mc.agent_env = lambda: {
+            "LLM_TABLE_API_BASE": cfg.endpoint,
+            "LLM_TABLE_MODEL": cfg.model,
+            "LLM_TABLE_API_KEY": cfg.api_key,
+        }
+        _log(
+            f"AGENT MODEL OVERRIDE: stage '{agent_stage}' -> {cfg.model} @ {cfg.endpoint}"
+        )
+
+    mapping = json.loads((SEED / "templates" / audit_id / "mapping.json").read_text())
+    audit_spec = json.loads((SEED / "templates" / audit_id / "spec.json").read_text())
     executable = mapping["executable"]
     db_ids = mapping.get("databases") or []
     db_paths = {d: VAR / "databases" / d / "database.sqlite" for d in db_ids}
@@ -254,8 +291,12 @@ async def run_eval(audit_id: str, cohort_cap: int, agent_stage: str) -> int:
             _log(f"FATAL: missing seeded database {d}: {p} (run `make db seed`)")
             return 2
 
-    cohort_all = _resolve_cohort(executable, db_paths)
-    cohort = cohort_all[:cohort_cap]
+    extra_where = _dob_cohort_where(dob_after, db_paths) if dob_after else []
+    if dob_after and not extra_where:
+        _log(f"FATAL: no patients born after {dob_after}")
+        return 2
+    cohort_all = _resolve_cohort(executable, db_paths, extra_where=extra_where)
+    cohort = cohort_all if dob_after else cohort_all[:cohort_cap]
     anchor = next(iter(executable.get("identity_keys") or []), None)
     cohort_tables: dict[str, list[str]] = {}
     for d in db_ids:
@@ -272,7 +313,8 @@ async def run_eval(audit_id: str, cohort_cap: int, agent_stage: str) -> int:
     since = time.time()
     runtime = Runtime()
     await runtime.startup()
-    client = stream_runner.runner.agent_client() if stream_runner.runner else None
+    relay = table_population.get_session_relay()
+    client = relay.agent_client() if relay is not None else None
     if client is None:
         _log("FATAL: runtime did not expose an agent client")
         await runtime.shutdown()
@@ -280,61 +322,75 @@ async def run_eval(audit_id: str, cohort_cap: int, agent_stage: str) -> int:
     _log("opencode runtime up; agent client ready.")
 
     run_id = f"eval-{audit_id}-{int(time.time())}"
-    run_dir = VAR / "runs" / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
+    artifact_dir = VAR / "artifacts" / run_id
+    artifact_dir.mkdir(parents=True, exist_ok=True)
 
     tmp = tempfile.mkdtemp(prefix="eval-store-")
     store = Store(Path(tmp) / "state.db")
     rc = 0
     try:
-        store.create_run(Run(
-            id=run_id, audit_id=audit_id, status="in_progress",
-            database_ids=db_ids,
-        ))
-        tier_agent = make_tier_agent(
-            run_dir=run_dir,
-            session_directory=str(run_dir),
-            databases_dir=DATABASES_DIR,
-            client=client,
+        store.create_run(
+            Run(
+                id=run_id,
+                audit_id=audit_id,
+                status="in_progress",
+                database_ids=db_ids,
+            )
         )
-        _log(f"orchestrating run {run_id} (run_dir={run_dir})…")
+        _log(f"orchestrating run {run_id} (artifact_dir={artifact_dir})…")
         t0 = time.time()
         # Guard against a headless stall: opencode pauses on a `question` /
         # `doom_loop` permission "ask" with no one to answer, so the session may
         # never reach `session.idle`. The deadline cancels the wait; cells the
         # agent already wrote (via sql_execute on the "cells" db) are persisted,
         # and the activity log / opencode server log capture what it did.
+        #
+        # The eval drives the INGREDIENT-shaped inner seam
+        # (run_population_steps on a hand-built TablePopulationContext), not
+        # the request-shaped populate_table: this harness reads the SEED
+        # mapping (not the var/ cache the assembly resolves) and caps the
+        # cohort to --cohort members — a context no request identity produces.
+        run_store = TablePopulationContext(
+            store,
+            run_id,
+            executable=executable,
+            cohort=cohort,
+            database_paths=db_paths,
+            field_spec=audit_spec,
+            anchor=anchor,
+            cohort_tables=cohort_tables,
+        )
         deadline = float(os.environ.get("EVAL_DEADLINE", "480"))
         try:
             await asyncio.wait_for(
-                orchestrate_run(
-                    store, run_id, executable, cohort,
-                    tier_direct=try_direct,
-                    tier_llm=_noop_tier,
-                    tier_agent=tier_agent,
-                    database_paths=db_paths,
-                    audit=audit_spec,
-                    anchor=anchor,
-                    cohort_tables=cohort_tables,
+                run_population_steps(
+                    run_store,
+                    store,
+                    artifact_dir=artifact_dir,
+                    agent_client=client,
+                    session_directory=str(artifact_dir),
                 ),
                 timeout=deadline,
             )
-            _log(f"orchestrate_run finished in {time.time() - t0:.1f}s")
+            _log(f"populate_table finished in {time.time() - t0:.1f}s")
         except asyncio.TimeoutError:
-            _log(f"orchestrate_run hit the {deadline:.0f}s deadline — "
-                 f"reading partial results (agent likely stalled on a permission ask).")
+            _log(
+                f"populate_table hit the {deadline:.0f}s deadline — "
+                f"reading partial results (agent likely stalled on a permission ask)."
+            )
         cells = store.get_cells(run_id)
         print("\n" + "=" * 72, flush=True)
         _summarize_cells(cells, executable)
         print("=" * 72, flush=True)
-        _digest_activity(run_dir)
+        _digest_activity(artifact_dir)
         print("-" * 72, flush=True)
         _digest_opencode_log(since)
         print("=" * 72, flush=True)
-        _log(f"run dir for manual inspection: {run_dir}")
+        _log(f"artifact workspace for manual inspection: {artifact_dir}")
     except Exception as exc:  # noqa: BLE001
         _log(f"RUN FAILED: {type(exc).__name__}: {exc}")
         import traceback
+
         traceback.print_exc()
         rc = 1
     finally:
@@ -346,13 +402,29 @@ async def run_eval(audit_id: str, cohort_cap: int, agent_stage: str) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--audit", default="npda")
-    ap.add_argument("--cohort", type=int, default=3,
-                    help="cap the cohort to N members (keeps the agent run fast/cheap)")
-    ap.add_argument("--agent-stage", default="tier3_agent",
-                    help="models.yaml stage to drive the opencode agent (default tier3_agent; "
-                         "use index_db/tier2 to run the agent on Kimi-K2.6 if gpt-5.4-nano is blocked)")
+    ap.add_argument(
+        "--cohort",
+        type=int,
+        default=3,
+        help="cap the cohort to N members (keeps the agent run fast/cheap)",
+    )
+    ap.add_argument(
+        "--agent-stage",
+        default="table_agent",
+        help="models.yaml stage to drive the opencode agent (default table_agent; "
+        "use index_db to run the agent on Kimi-K2.6 if gpt-5.4-nano is blocked)",
+    )
+    ap.add_argument(
+        "--dob-after",
+        default=None,
+        help="scope the cohort to patients born strictly after this ISO date "
+        "(e.g. 2020-01-01); selects the single-patient NPDA cohort and "
+        "ignores --cohort",
+    )
     args = ap.parse_args()
-    return asyncio.run(run_eval(args.audit, args.cohort, args.agent_stage))
+    return asyncio.run(
+        run_eval(args.audit, args.cohort, args.agent_stage, args.dob_after)
+    )
 
 
 if __name__ == "__main__":

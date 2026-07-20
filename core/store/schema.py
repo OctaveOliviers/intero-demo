@@ -1,7 +1,7 @@
 """DDL for the state store (`runs` / `cells` / `events`).
 
 Implements the frozen W0.2 contract
-(`docs/mvp/contracts/state-schema.md`) as SQLite tables. The contract is
+(`specs/mvp/contracts/state-schema.md`) as SQLite tables. The contract is
 engine-agnostic and names list/map-valued fields (`database_ids`,
 `prompt_versions`, `filters`, `parameters`, `sources`) as
 JSON-encoded in a single store for the MVP; they may normalise to side tables
@@ -31,7 +31,19 @@ CREATE TABLE IF NOT EXISTS runs (
     filters          TEXT,   -- json list
     parameters       TEXT,   -- json map
     started_at       TEXT,
-    ended_at         TEXT
+    ended_at         TEXT,
+    -- Table-population PROCESS status (issue #326): the ONLY population
+    -- lifecycle record, written by the single canonical writer
+    -- (core.table_population.table_population_sessions.record_status).
+    -- queued | running | stopped | error | completed — DISTINCT from `status`
+    -- (the cell-derived RESULT status). Vocabulary enforced in Python
+    -- (Store.record_population_status), not by CHECK: a pre-#326 state.db
+    -- gains these columns via ALTER TABLE, which cannot retrofit a CHECK.
+    -- Legacy per-run-dir status.json files are adopted into this record once
+    -- at startup (adopt_legacy_status_files) and never written again.
+    population_status        TEXT,
+    population_status_detail TEXT,
+    population_result_status TEXT
 );
 
 CREATE TABLE IF NOT EXISTS cells (
@@ -43,8 +55,8 @@ CREATE TABLE IF NOT EXISTS cells (
     state            TEXT,            -- pending | filled | blocked | not_applicable (doc 5 §Cell state model)
     value            TEXT,
     confidence       TEXT,            -- low | medium | high
-    resolved_by      TEXT,            -- direct | LLM | agent (which tier settled it)
-    hypothesis       TEXT,            -- why the direct pass failed (first LLM to look)
+    resolved_by      TEXT,            -- prepopulated | agent (which step settled it)
+    hypothesis       TEXT,            -- note on why the value is hard to place (agent triage)
     attempts         TEXT,            -- json list (actual DB queries, in order)
     review_state     TEXT,            -- interpret only: not_reviewed | reviewed
     corrected        INTEGER,         -- interpret only: 0 | 1
@@ -57,9 +69,9 @@ CREATE TABLE IF NOT EXISTS cells (
     owner_needed     TEXT,            -- blocked only
     outstanding_since TEXT,           -- blocked only
     PRIMARY KEY (run_id, ref),
-    -- The cell lifecycle is enforced HERE so every writer (Tier 1/2/3, the
+    -- The cell lifecycle is enforced HERE so every writer (both population steps, the
     -- agent's raw SQL included) is held to the same contract at the DB level,
-    -- not in per-tier Python (cell-resolution.schema.json).
+    -- not in per-writer Python (cell-resolution.schema.json).
     -- The four STORED states only — "needs verification" is a DERIVED view
     -- (filled + interpret + review_state not_reviewed), never stored
     -- (doc 5 §Cell state model). NOTE: a state.db created before this change
@@ -76,7 +88,7 @@ CREATE TABLE IF NOT EXISTS cells (
 -- (Store.materialize_field_codes). spec.json stays the canonical, authored
 -- source; this is a derived, run-scoped projection (regenerated every run, never
 -- hand-authored) that exists ONLY so off-code writes can be rejected at the DB
--- level for every tier. The cell still carries no code set — it is resolved by
+-- level for every writer. The cell still carries no code set — it is resolved by
 -- the (run_id, field) key here, never copied onto the row.
 CREATE TABLE IF NOT EXISTS field_codes (
     run_id   TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
@@ -89,7 +101,7 @@ CREATE TABLE IF NOT EXISTS field_codes (
 -- Off-code guard: a value written to a cell whose field HAS a code set must be
 -- one of that field's codes. Fires only when the field is coded (free-text /
 -- numeric fields have no field_codes rows and pass through). The agent's raw
--- `UPDATE cells SET value=...` is rejected here exactly like a tier's write —
+-- `UPDATE cells SET value=...` is rejected here exactly like any other write —
 -- the enforcement lives in the DB, not in the tool. Free-form RAISE message; the
 -- write wrapper enriches it with the permitted set before returning to the agent.
 CREATE TRIGGER IF NOT EXISTS cells_offcode_guard_update

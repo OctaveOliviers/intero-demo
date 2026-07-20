@@ -2,7 +2,7 @@
 
 This is the Gate-1 foundation — Lane B writes runs/cells/events here (B1/B4/B5),
 Lane D reads them (D4/D7). It implements the frozen W0.2 contract
-(`docs/mvp/contracts/state-schema.md`).
+(`specs/mvp/contracts/state-schema.md`).
 
 MVP is a single local SQLite file under ``var/`` (gitignored, mountable); the
 schema and access paths anticipate moving to a hospital-hosted DB later
@@ -31,14 +31,53 @@ _RUN_JSON = ("database_ids", "prompt_versions", "filters", "parameters")
 _CELL_JSON = ("attempts", "sources")
 
 _RUN_COLS = (
-    "id", "audit_id", "user_id", "request", "template_version", "database_ids",
-    "status", "prompt_versions", "filters", "parameters", "started_at", "ended_at",
+    "id",
+    "audit_id",
+    "user_id",
+    "request",
+    "template_version",
+    "database_ids",
+    "status",
+    "prompt_versions",
+    "filters",
+    "parameters",
+    "started_at",
+    "ended_at",
+    "population_status",
+    "population_status_detail",
+    "population_result_status",
+)
+# The table-population PROCESS-status record on a run row (issue #326) — the
+# ONLY population lifecycle record (it retired the per-run-dir status.json),
+# written together by record_population_status. api_app-only
+# (runtime_permissions.py).
+_POPULATION_LIFECYCLE_COLS = (
+    "population_status",
+    "population_status_detail",
+    "population_result_status",
 )
 _CELL_COLS = (
-    "run_id", "ref", "field", "member", "kind", "state", "value", "confidence",
-    "resolved_by", "hypothesis", "attempts", "review_state", "corrected",
-    "explanation", "sources", "prompt_version", "extracted_at",
-    "reason_code", "reason_detail", "owner_needed", "outstanding_since",
+    "run_id",
+    "ref",
+    "field",
+    "member",
+    "kind",
+    "state",
+    "value",
+    "confidence",
+    "resolved_by",
+    "hypothesis",
+    "attempts",
+    "review_state",
+    "corrected",
+    "explanation",
+    "sources",
+    "prompt_version",
+    "extracted_at",
+    "reason_code",
+    "reason_detail",
+    "owner_needed",
+    "outstanding_since",
 )
 _EXEC_COLS = (
     "id",
@@ -121,13 +160,23 @@ class Store:
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_events_execution ON events(execution_id, id)"
         )
+        # Table-population lifecycle columns (issue #326): a pre-#326 runs table
+        # gains them here, appended in DDL order so PRAGMA table_info matches
+        # _RUN_COLS on migrated and fresh DBs alike.
+        run_cols = _table_columns(self._conn, "runs")
+        for col in _POPULATION_LIFECYCLE_COLS:
+            if col not in run_cols:
+                self._conn.execute(f"ALTER TABLE runs ADD COLUMN {col} TEXT")
 
     def with_runtime_role(self, runtime_role: str) -> "Store":
         """Open a role-tagged store session against the same state DB path."""
         return Store(self.path, runtime_role=runtime_role)
 
     def _require_permission(
-        self, table: str, action: str, columns: list[str] | tuple[str, ...] | None = None
+        self,
+        table: str,
+        action: str,
+        columns: list[str] | tuple[str, ...] | None = None,
     ) -> None:
         require_runtime_db_action(
             role=self.runtime_role,
@@ -152,13 +201,17 @@ class Store:
 
     def get_run(self, run_id: str) -> Run | None:
         self._require_permission("runs", "select")
-        row = self._conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
+        row = self._conn.execute(
+            "SELECT * FROM runs WHERE id = ?", (run_id,)
+        ).fetchone()
         return self._row_to_run(row) if row else None
 
     def list_runs(self, user_id: str | None = None) -> list[Run]:
         self._require_permission("runs", "select")
         if user_id is None:
-            rows = self._conn.execute("SELECT * FROM runs ORDER BY started_at").fetchall()
+            rows = self._conn.execute(
+                "SELECT * FROM runs ORDER BY started_at"
+            ).fetchall()
         else:
             rows = self._conn.execute(
                 "SELECT * FROM runs WHERE user_id = ? ORDER BY started_at", (user_id,)
@@ -201,6 +254,55 @@ class Store:
         values.append(run_id)
         self._conn.execute(f"UPDATE runs SET {', '.join(sets)} WHERE id = ?", values)
 
+    def record_population_status(
+        self,
+        run_id: str,
+        status: str,
+        *,
+        detail: str | None = None,
+        result_status: str | None = None,
+    ) -> bool:
+        """Record the table-population PROCESS status on the run row (issue #326).
+
+        The ONLY population lifecycle record; every transition arrives through
+        the single canonical writer
+        (``core.table_population.table_population_sessions.record_status``).
+        This is the process lifecycle — queued | running | stopped | error |
+        completed (the ``run_executions.status`` vocabulary) — DISTINCT from
+        ``runs.status``, the cell-derived RESULT status.
+
+        ``status`` and ``detail`` are replaced on every transition.
+        ``population_result_status`` is PRESERVED across a transition that does
+        not supply a new one (COALESCE) — issue #330: starting a refresh stamps
+        ``running`` with ``result_status=None``, and it must NOT null the prior
+        completed run's durable result snapshot. So a refresh that then crashes
+        leaves the row ``running`` but still carrying the last-known-good
+        result, which stays visible/recoverable instead of being destroyed. A
+        terminal transition supplies the fresh snapshot and overwrites it as
+        before; passing an explicit new ``result_status`` still replaces it.
+
+        Historical oddity (pinned by the lifecycle characterization tests):
+        a USER PAUSE finalizes as ``completed`` (with a result_status) even
+        though the stop endpoint answers "stopped"; only a hard abort/delete
+        records ``stopped``.
+
+        Returns True when a run row existed to record on, False when it does
+        not (a FRESH population's ``open_session`` stamps ``running`` before
+        the session executor creates the run row — the executor compensates by
+        creating the row with ``population_status='running'``).
+        """
+        if status not in _EXEC_STATUS:
+            raise ValueError(f"invalid population status: {status!r}")
+        self._require_permission("runs", "update", _POPULATION_LIFECYCLE_COLS)
+        cur = self._conn.execute(
+            "UPDATE runs SET population_status = ?, population_status_detail = ?, "
+            "population_result_status = COALESCE(?, population_result_status) "
+            "WHERE id = ?",
+            (status, detail, result_status, run_id),
+        )
+        self._conn.commit()
+        return cur.rowcount > 0
+
     # -- run executions -----------------------------------------------------
 
     def create_execution(self, execution: RunExecution) -> RunExecution:
@@ -208,7 +310,10 @@ class Store:
             raise ValueError(f"invalid execution status: {execution.status!r}")
         if execution.status == "running" and execution.started_at is None:
             execution.started_at = _now()
-        if execution.status in {"completed", "error", "stopped"} and execution.ended_at is None:
+        if (
+            execution.status in {"completed", "error", "stopped"}
+            and execution.ended_at is None
+        ):
             execution.ended_at = _now()
         self._conn.execute(
             f"INSERT INTO run_executions ({', '.join(_EXEC_COLS)}) "
@@ -243,7 +348,10 @@ class Store:
         execution = self.get_execution(execution_id)
         if execution is None:
             raise KeyError(f"unknown execution: {execution_id}")
-        if status != execution.status and status not in _EXEC_TRANSITIONS[execution.status]:
+        if (
+            status != execution.status
+            and status not in _EXEC_TRANSITIONS[execution.status]
+        ):
             raise ValueError(
                 f"illegal execution status transition: {execution.status!r} -> {status!r}"
             )
@@ -252,7 +360,10 @@ class Store:
             patch["status"] = status
             if status == "running" and execution.started_at is None:
                 patch["started_at"] = _now()
-            if status in {"completed", "error", "stopped"} and execution.ended_at is None:
+            if (
+                status in {"completed", "error", "stopped"}
+                and execution.ended_at is None
+            ):
                 patch["ended_at"] = _now()
         if summary_json is not None:
             patch["summary_json"] = summary_json
@@ -302,7 +413,9 @@ class Store:
             (member.run_id, member.member),
         ).fetchone()
         if row is None:
-            raise KeyError(f"unknown run member: ({member.run_id!r}, {member.member!r})")
+            raise KeyError(
+                f"unknown run member: ({member.run_id!r}, {member.member!r})"
+            )
         return self._row_to_member(row)
 
     def list_run_members(self, run_id: str) -> list[RunMember]:
@@ -321,7 +434,9 @@ class Store:
             cell.extracted_at = _now()
         self._require_permission("cells", "insert", _CELL_COLS)
         self._require_permission(
-            "cells", "update", tuple(c for c in _CELL_COLS if c not in ("run_id", "ref"))
+            "cells",
+            "update",
+            tuple(c for c in _CELL_COLS if c not in ("run_id", "ref")),
         )
         self._conn.execute(
             f"INSERT INTO cells ({', '.join(_CELL_COLS)}) "
@@ -396,7 +511,9 @@ class Store:
         column or a missing cell.
         """
         if self.runtime_role == "clinician_editor_runtime" and not fields:
-            raise PermissionError("clinician runtime update requires at least one editable field")
+            raise PermissionError(
+                "clinician runtime update requires at least one editable field"
+            )
         if (
             "value" in fields
             and fields["value"] is not None
@@ -414,7 +531,8 @@ class Store:
             self._require_permission("cells", "update", tuple(fields.keys()))
             values += [run_id, ref]
             self._conn.execute(
-                f"UPDATE cells SET {', '.join(sets)} WHERE run_id = ? AND ref = ?", values
+                f"UPDATE cells SET {', '.join(sets)} WHERE run_id = ? AND ref = ?",
+                values,
             )
             self._conn.commit()
         if self.runtime_role == "clinician_editor_runtime":
@@ -524,13 +642,18 @@ class Store:
         run = self.get_run(run_id)
         if run is None:
             raise KeyError(f"unknown run: {run_id}")
-        new_status = derive_status(self.get_cells(run_id), started=run.started_at is not None)
+        new_status = derive_status(
+            self.get_cells(run_id), started=run.started_at is not None
+        )
         if new_status != run.status:
             self._exec_update_run(run_id, {"status": new_status})
-            self._exec_append_event(Event(
-                run_id=run_id, type="status_change",
-                payload={"from": run.status, "to": new_status},
-            ))
+            self._exec_append_event(
+                Event(
+                    run_id=run_id,
+                    type="status_change",
+                    payload={"from": run.status, "to": new_status},
+                )
+            )
             self._conn.commit()
         return new_status
 
@@ -564,8 +687,10 @@ class Store:
     def _row_to_run(self, row: sqlite3.Row) -> Run:
         data = {c: row[c] for c in _RUN_COLS}
         for c in _RUN_JSON:
-            data[c] = json.loads(data[c]) if data[c] else (
-                {} if c in ("prompt_versions", "parameters") else []
+            data[c] = (
+                json.loads(data[c])
+                if data[c]
+                else ({} if c in ("prompt_versions", "parameters") else [])
             )
         return Run(**data)
 
@@ -578,7 +703,9 @@ class Store:
 
     def _row_to_execution(self, row: sqlite3.Row) -> RunExecution:
         data = {col: row[col] for col in _EXEC_COLS}
-        data["summary_json"] = json.loads(data["summary_json"]) if data["summary_json"] else {}
+        data["summary_json"] = (
+            json.loads(data["summary_json"]) if data["summary_json"] else {}
+        )
         return RunExecution(**data)
 
     def _member_row(self, member: RunMember) -> tuple:

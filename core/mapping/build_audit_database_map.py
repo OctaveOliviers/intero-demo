@@ -32,8 +32,9 @@ from pathlib import Path
 from typing import Any
 
 from core.clients import llm
-from core.config import AUDITS_DIR, DATABASES_DIR
-from core.indexing.profile import validate_against_schema
+from core.clients.llm_builder import BuilderValidationError, build_validated
+from core.config import DATABASES_DIR, TEMPLATES_DIR
+from core.contracts import validate_against_schema
 from core.mapping.build_criteria import build_criteria_bindings
 from core.mapping.build_populate_spec import BuildError, fold_executable
 from pydantic import BaseModel, ConfigDict, Field
@@ -41,14 +42,7 @@ from pydantic import BaseModel, ConfigDict, Field
 logger = logging.getLogger(__name__)
 
 _SCHEMA_FILE = "mapping.schema.json"
-_MAX_BUILD_ATTEMPTS = 3
 _VALID_KINDS = {"direct", "interpret"}
-
-
-class BuilderValidationError(RuntimeError):
-    """Raised when the builder's LLM output cannot be made into a valid model
-    after all retries. The caller marks the run failed and no broken model is
-    ever written."""
 
 
 class _MappingLLMOutput(BaseModel):
@@ -143,6 +137,7 @@ Rules:
 
 # --- clean rendered views of the JSON inputs (governing principle §2) ----------
 
+
 def _render_audit_spec(audit: dict[str, Any]) -> str:
     """Render `spec.json` to a clean view for the prompt — never raw braces."""
     lines = [
@@ -153,7 +148,9 @@ def _render_audit_spec(audit: dict[str, Any]) -> str:
         "Fields:",
     ]
     for f in audit.get("fields", []) or []:
-        bits = [f"  - cell {f.get('cell', '?')} — {f.get('name', '')} ({f.get('type', '')})"]
+        bits = [
+            f"  - cell {f.get('cell', '?')} — {f.get('name', '')} ({f.get('type', '')})"
+        ]
         pv = f.get("permitted_values")
         if isinstance(pv, dict) and pv:
             bits.append("permitted: " + ", ".join(f"{k}={v}" for k, v in pv.items()))
@@ -309,13 +306,19 @@ def _clean_identity(raw: Any) -> dict[str, Any] | None:
     return {"anchor": anchor, "grain": grain, "keys": keys, "patient_grain_rule": rule}
 
 
-def _assemble(audit_id: str, database_ids: list[str], prose: dict[str, Any]) -> dict[str, Any]:
+def _assemble(
+    audit_id: str, database_ids: list[str], prose: dict[str, Any]
+) -> dict[str, Any]:
     """Coerce the LLM's A2.1-owned portion into the full `mapping.json` shape.
 
     Injects the deterministic envelope (`schema_version`, `audit`, `databases`) and
     a `criteria_bindings: []` skeleton owned by A6.1 (§3.3)."""
-    regions = [r for r in (_clean_region(x) for x in _as_item_list(prose.get("regions"))) if r]
-    fields = [f for f in (_clean_field(x) for x in _as_item_list(prose.get("fields"))) if f]
+    regions = [
+        r for r in (_clean_region(x) for x in _as_item_list(prose.get("regions"))) if r
+    ]
+    fields = [
+        f for f in (_clean_field(x) for x in _as_item_list(prose.get("fields"))) if f
+    ]
     # Template-specific per-database one-liners for the library chips (doc 9).
     # Only entries for databases actually bound survive; absent/empty entries
     # simply fall back to the model.json summary in the UI (schema: optional).
@@ -345,16 +348,6 @@ def _assemble(audit_id: str, database_ids: list[str], prose: dict[str, Any]) -> 
     return model
 
 
-def _retry_feedback(problems: list[str]) -> str:
-    joined = "\n".join(f"- {p}" for p in problems)
-    return (
-        "\n\nYOUR PREVIOUS OUTPUT WAS REJECTED for these reasons:\n"
-        f"{joined}\n"
-        "Produce a corrected JSON object that fixes every issue. Output only the "
-        "JSON object, starting with `{`."
-    )
-
-
 async def attach_criteria_bindings(
     mapping: dict[str, Any],
     audit: dict[str, Any],
@@ -371,7 +364,9 @@ async def attach_criteria_bindings(
     already be resolved."""
     identity = mapping.get("identity")
     if not isinstance(identity, dict) or not identity:
-        raise BuilderValidationError("mapping.identity must be resolved before binding criteria")
+        raise BuilderValidationError(
+            "mapping.identity must be resolved before binding criteria"
+        )
     blocks = await build_criteria_bindings(audit, databases, identity=identity)
     mapping["criteria_bindings"] = blocks["criteria_bindings"]
     if blocks.get("not_expressible"):
@@ -394,7 +389,7 @@ async def build_audit_database_mapping(
     decides each field's source + `kind` + optional `code` and resolves the cohort
     identity; deterministic code coerces it to the S0 schema, injects the A6.1-owned
     `criteria_bindings: []` skeleton, and validates. Retries on malformed output;
-    raises `BuilderValidationError` after `_MAX_BUILD_ATTEMPTS`."""
+    raises `BuilderValidationError` when the attempts run out."""
     database_ids = [db_id for db_id, _ in databases]
     schema_blocks = "\n\n".join(_render_database_model(model) for _, model in databases)
     user_input = (
@@ -405,9 +400,7 @@ async def build_audit_database_mapping(
         f"{schema_blocks}\n"
     )
 
-    instructions = _PROMPT
-    problems: list[str] = []
-    for attempt in range(1, _MAX_BUILD_ATTEMPTS + 1):
+    async def _attempt(instructions: str) -> tuple[dict[str, Any] | None, list[str]]:
         try:
             prose_typed = await llm.respond_typed(
                 instructions,
@@ -419,53 +412,46 @@ async def build_audit_database_mapping(
             )
             prose = prose_typed.model_dump(mode="python", exclude_none=True)
         except llm.LLMRequestError as exc:
-            problems = [str(exc)]
-        else:
-            model = _assemble(audit_id, database_ids, prose)
-            problems = validate_against_schema(model, _SCHEMA_FILE)
-            if not problems and not model["fields"]:
-                problems = ["no usable fields were produced"]
-            if not problems:
-                # Builder-level requirement (schema keeps the key optional for old
-                # documents): a fresh mapping carries one summary per bound db.
-                missing = [
-                    db for db in database_ids
-                    if not (model.get("database_summaries") or {}).get(db)
+            return None, [str(exc)]
+        model = _assemble(audit_id, database_ids, prose)
+        problems = validate_against_schema(model, _SCHEMA_FILE)
+        if not problems and not model["fields"]:
+            problems = ["no usable fields were produced"]
+        if not problems:
+            # Builder-level requirement (schema keeps the key optional for old
+            # documents): a fresh mapping carries one summary per bound db.
+            missing = [
+                db
+                for db in database_ids
+                if not (model.get("database_summaries") or {}).get(db)
+            ]
+            if missing:
+                problems = [
+                    "database_summaries is missing an entry for: " + ", ".join(missing)
                 ]
-                if missing:
-                    problems = [
-                        "database_summaries is missing an entry for: "
-                        + ", ".join(missing)
-                    ]
-            if not problems:
-                # A6.1 fills the criteria_bindings/not_expressible skeleton via its
-                # own (second) LLM call, linking to the identity just resolved.
-                model = await attach_criteria_bindings(model, audit, databases)
-                # A4 Phase 2: fold the derived Tier-1 executable into the same file
-                # (the match is now complete, so the cohort joins resolve). Pure +
-                # deterministic — never hand-authored. A compile failure here usually
-                # means the match is schema-valid but semantically off (e.g. a source
-                # string the schema accepts as text but that isn't "<db> -> t.c"); fold
-                # the error into `problems` so the match gets another LLM attempt rather
-                # than dying on a fixable mistake.
-                try:
-                    # Thread the measured within-database FK graph + conventions so
-                    # the compiler can emit multi-hop direct JOINs (Phase C) instead
-                    # of demoting non-key-table fields to interpret.
-                    join_graph = {db: m.get("foreign_keys", []) for db, m in databases}
-                    convs = {db: m.get("conventions", {}) for db, m in databases}
-                    return fold_executable(model, join_graph=join_graph, conventions=convs)
-                except BuildError as exc:
-                    problems = [f"the match did not compile into an executable: {exc}"]
-        logger.warning(
-            "mapping failed validation (attempt %d/%d): %s",
-            attempt, _MAX_BUILD_ATTEMPTS, "; ".join(problems),
-        )
-        instructions = _PROMPT + _retry_feedback(problems)
-    raise BuilderValidationError(
-        f"mapping failed validation after {_MAX_BUILD_ATTEMPTS} attempts: "
-        + "; ".join(problems)
-    )
+        if problems:
+            return None, problems
+        # A6.1 fills the criteria_bindings/not_expressible skeleton via its
+        # own (second) LLM call, linking to the identity just resolved.
+        model = await attach_criteria_bindings(model, audit, databases)
+        # A4 Phase 2: fold the derived executable into the same file
+        # (the match is now complete, so the cohort joins resolve). Pure +
+        # deterministic — never hand-authored. A compile failure here usually
+        # means the match is schema-valid but semantically off (e.g. a source
+        # string the schema accepts as text but that isn't "<db> -> t.c"); fold
+        # the error into `problems` so the match gets another LLM attempt rather
+        # than dying on a fixable mistake.
+        try:
+            # Thread the measured within-database FK graph + conventions so
+            # the compiler can emit multi-hop direct JOINs (Phase C) instead
+            # of demoting non-key-table fields to interpret.
+            join_graph = {db: m.get("foreign_keys", []) for db, m in databases}
+            convs = {db: m.get("conventions", {}) for db, m in databases}
+            return fold_executable(model, join_graph=join_graph, conventions=convs), []
+        except BuildError as exc:
+            return None, [f"the match did not compile into an executable: {exc}"]
+
+    return await build_validated(_attempt, prompt=_PROMPT, label="mapping")
 
 
 def _read_json(path: Path) -> dict[str, Any] | None:
@@ -493,7 +479,7 @@ async def ensure_mapping(
         database_ids = [database_ids]
     if not database_ids:
         return None
-    audit = _read_json(AUDITS_DIR / audit_id / "spec.json")
+    audit = _read_json(TEMPLATES_DIR / audit_id / "spec.json")
     if audit is None:
         return None
     databases: list[tuple[str, dict]] = []
@@ -503,7 +489,7 @@ async def ensure_mapping(
             return None
         databases.append((database_id, model))
 
-    mapping_path = AUDITS_DIR / audit_id / "mapping.json"
+    mapping_path = TEMPLATES_DIR / audit_id / "mapping.json"
     cached = _read_json(mapping_path)
     if cached is not None:
         return json.dumps(cached, ensure_ascii=False, indent=2)
@@ -514,7 +500,9 @@ async def ensure_mapping(
         )
     except Exception:
         logger.exception(
-            "Failed to build mapping for audit %r against databases %r", audit_id, database_ids
+            "Failed to build mapping for audit %r against databases %r",
+            audit_id,
+            database_ids,
         )
         return None
 

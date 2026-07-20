@@ -1,7 +1,7 @@
 <script>
   // TrackerDashboard — the live-artifact tracker dashboard (spec §3.3, §5).
   //
-  // It resolves the dashboard for the current audit, lays its trackers out in a
+  // It resolves the dashboard for the current populated table, lays its trackers out in a
   // responsive grid of cards, and composes the existing presentational
   // TrackerChart for each one. It is a "live artifact": self-contained and
   // presentational — it reads mock data and draws; it owns NO run state and has
@@ -12,20 +12,20 @@
   // event with detail `{ trackerId, elementKey }` — the §3.1 selection model
   // that ResultsView uses to enter split view.
   import { createEventDispatcher } from "svelte";
-  import { audits, currentAuditId } from "../stores/audits.js";
+  import { populatedTables, currentPopulatedTableId } from "../stores/populatedTables.js";
   import { CONTENT } from "../lib/mock/content/index.js";
   import TrackerChart from "./TrackerChart.svelte";
 
   const dispatch = createEventDispatcher();
 
   // Resolve the current dashboard reactively, then its trackers (skip any id
-  // that doesn't resolve to a tracker descriptor). Match by the audit's id OR its
-  // templateId so a freshly created audit (uuid id, catalog templateId) maps to
+  // that doesn't resolve to a tracker descriptor). Match by the record's id OR its
+  // templateId so a freshly created record (uuid id, catalog templateId) maps to
   // its dashboard too — not only the seeded records.
-  $: audit = $audits.find((a) => a.id === $currentAuditId) || null;
-  $: dashboard = audit
+  $: populatedTable = $populatedTables.find((a) => a.id === $currentPopulatedTableId) || null;
+  $: dashboard = populatedTable
     ? CONTENT.dashboards.find(
-        (d) => d.auditId === audit.id || d.auditId === audit.templateId,
+        (d) => d.templateId === populatedTable.id || d.templateId === populatedTable.templateId,
       ) || null
     : null;
   $: trackers = dashboard

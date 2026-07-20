@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://melodic.health/contracts/table.schema.json",
+  "title": "Table",
+  "description": "A populated audit table — a first-class, auto-persisted, re-openable entity that wraps table population (Q36; decisions/0004-scope-binds-to-table-not-thread.md). When a table is created, the system PINS this spec (columns/grain + scope) and SPAWNS table population; `table_population_id` back-references it. Background population survives navigation because it is a server-side task writing cells to var/state.db. Persisted as one `tables` row in var/state.db (this schema is the row's payload), validated against this schema before every write. The pinned `dataset_id` scope is FIXED for life (decision 0004); immutability is enforced elsewhere (Issue 3) — this contract only stores it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "title",
+    "source_template",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Minted `table-<uuid4().hex[:12]>`."
+    },
+    "title": {
+      "type": "string",
+      "description": "Clinician-readable table title (often derived from the originating message)."
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional longer description of what the table audits."
+    },
+    "brief": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The Brief — the user-intent text the originating Table request recorded, kept on the pinned table for life: the delegation instruction the Table agent works from when populating (and re-populating) the table. Optional: absent means no brief was recorded (a direct create, or a table predating the Brief) — never an empty string."
+    },
+    "source_template": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A seeded audit/template id whose spec.json + mapping back table population (e.g. `cord-ph`, `npda`), OR the literal `\"ad-hoc\"` for a describe-it table the (template-backed-only) table population cannot yet populate."
+    },
+    "dataset_id": {
+      "type": ["string", "null"],
+      "description": "The PINNED scope — a Dataset id, or null = the whole hospital database. FIXED for life (decision 0004); Issue 3 enforces immutability, this contract only stores it."
+    },
+    "scope_disclosure": {
+      "type": "string",
+      "description": "Clinician-readable disclosure of the pinned scope, e.g. \"the whole hospital database\"."
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The PINNED columns/grain snapshot taken at creation (for a template-backed table, a minimal snapshot derived from the audit's spec.json).",
+      "required": ["columns", "grain"],
+      "properties": {
+        "columns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/column" },
+          "description": "The pinned columns, in order."
+        },
+        "grain": {
+          "type": "string",
+          "description": "The pinned grain, e.g. \"one row per patient record\"."
+        }
+      }
+    },
+    "table_population_id": {
+      "type": ["string", "null"],
+      "description": "The table population this table owns; null until spawned (and for an `ad-hoc` table the template-backed table-population path cannot yet populate)."
+    },
+    "status": {
+      "enum": [
+        "queued",
+        "in_progress",
+        "blocked",
+        "in_verification",
+        "complete",
+        "error"
+      ],
+      "description": "Mirrors the table result status (refreshed from table-population state on read)."
+    },
+    "reporting_period_label": {
+      "type": "string",
+      "description": "Clinician-readable reporting period — from the Dataset's date filter, falling back to the run/creation date."
+    },
+    "thread_id": {
+      "type": ["string", "null"],
+      "description": "Provenance back-ref to the thread that spawned this table (NOT containment; the table is first-class per Q36). null when created directly."
+    },
+    "created_at": {
+      "type": "string",
+      "description": "ISO-8601 (UTC) creation time."
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "ISO-8601 (UTC) last-activity time. Drives recency ordering in the Tables list."
+    }
+  },
+  "$defs": {
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" }
+      }
+    }
+  }
+}

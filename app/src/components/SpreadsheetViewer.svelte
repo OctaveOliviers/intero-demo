@@ -1,7 +1,7 @@
 <script>
   import { onDestroy } from "svelte";
   import { activeCommand, activeWorkbook, runCommand } from "../stores/chat.js";
-  import { updateCurrentAuditWorkbook } from "../stores/audits.js";
+  import { updateCurrentPopulatedTableWorkbook } from "../stores/populatedTables.js";
   import {
     RIGHT_PANEL_MODES,
     openCellEvidence,
@@ -23,6 +23,8 @@
   // background via an inset box-shadow so the status colour stays visible; it
   // never overwrites it. Each new set fully REPLACES the previous one.
   export let highlightRefs = [];
+  export let workbook = null;
+  export let onCellEvidence = null;
 
   // A cell with metadata is clickable (-> evidence panel). No link styling: the
   // value stays plain black text; the cell's STATE is conveyed by its background
@@ -33,7 +35,7 @@
   // status colour underneath stays visible. jspreadsheet's setStyle MERGES
   // properties, so the OFF state must set box-shadow:none by name to truly clear
   // it — otherwise a prior highlight persists and selections accumulate.
-  const HIGHLIGHT_ON = "box-shadow: inset 0 0 0 9999px rgba(37, 99, 235, 0.18);";
+  const HIGHLIGHT_ON = "box-shadow: inset 0 0 0 9999px rgba(37, 99, 235, 0.14), inset 0 0 0 2px var(--color-accent);";
   const HIGHLIGHT_OFF = "box-shadow: none;";
   const STATUS_BACKGROUND = Object.freeze({
     [CELL_VISUAL_STATUS.LEGACY]: "var(--cell-bg-legacy-not-applicable)",
@@ -56,10 +58,10 @@
   });
   const HEADER_ROWS = 1;
   const AUTO_REVIEW_DELAY_MS = 2000;
-  // Render at least this many data rows so the grid fills the viewport and
-  // scrolls like a real worksheet even for a small cohort. cell_update only
-  // ever targets real cohort rows, so the padding rows stay blank.
-  const MIN_DISPLAY_ROWS = 100;
+  // The grid ends where the data ends: trailing blank padding rows read as an
+  // unfinished worksheet, so render exactly the cohort (with a 1-row floor so
+  // an empty sheet still mounts).
+  const MIN_DISPLAY_ROWS = 1;
 
   let container;
   let instance = null;
@@ -91,6 +93,10 @@
     let col = 0;
     for (const ch of m[1]) col = col * 26 + (ch.charCodeAt(0) - 64);
     return { row: parseInt(m[2], 10) - 1, col: col - 1 };
+  }
+
+  function workbookPopulationId(wb) {
+    return wb?.tablePopulationId || null;
   }
 
   function a1WithDisplayOffset(a1, offsetRows) {
@@ -134,10 +140,9 @@
     return asObject(map) || {};
   }
 
-  // The traceable source of a cell: legacy run metadata carries a flat `sql`
-  // (+ database/evidence); spine cell metadata carries `sources` — an array of
-  // {database, query, table_column, row_id?, citations?}. Normalize both into
-  // the {sql, database, evidence, explanation} shape runCommand consumes.
+  // The traceable source of a cell: table-population cell metadata carries
+  // `sources` — an array of {database, query, table_column, row_id?, citations?}.
+  // Normalize it into the {sql, database, evidence, explanation} shape runCommand consumes.
   function getMetaSource(meta) {
     const normalized = normalizeCellMeta(meta);
     if (!normalized) return null;
@@ -198,6 +203,20 @@
     return null;
   }
 
+  function anchorForDisplayCell(col, row) {
+    const ws = getWs();
+    const cell = ws?.getCellFromCoords?.(col, row);
+    const cellRect = cell?.getBoundingClientRect?.();
+    const artifactRect = cell?.closest?.(".artifact-box")?.getBoundingClientRect?.();
+    if (!cellRect || !artifactRect) return null;
+    // Bottom-right of the clicked cell, so the composer never covers the cell
+    // (or earlier-selected cells on the same row) it annotates.
+    return {
+      x: Math.round(cellRect.right - artifactRect.left + 8),
+      y: Math.round(cellRect.bottom - artifactRect.top + 8),
+    };
+  }
+
   // Build initial mount-time style map (A1 -> css) from cell metadata:
   // status background for all metadata cells + clickable treatment for traceable cells.
   function backgroundForMeta(meta) {
@@ -207,7 +226,7 @@
 
   function styleForMeta(meta) {
     let style = STATUS_STYLE[mapCellVisualStatus(meta)] || STATUS_STYLE[CELL_VISUAL_STATUS.REVIEWED];
-    // Any cell carrying metadata is inspectable (a tier touched it: filled,
+    // Any cell carrying metadata is inspectable (population touched it: filled,
     // blocked, etc.), so it opens the evidence panel on click — pointer cursor
     // for all of them, not just the ones with a SQL source.
     if (meta) style += CLICKABLE_STYLE;
@@ -236,7 +255,7 @@
 
   function markCellReviewed(cellRef) {
     let didReview = false;
-    updateCurrentAuditWorkbook((wb) => {
+    updateCurrentPopulatedTableWorkbook((wb) => {
       const cellMetadata = getCellMetadataMap(wb);
       if (!cellMetadata[cellRef]) return wb;
       const currentMeta = normalizeCellMeta(cellMetadata[cellRef]);
@@ -329,7 +348,7 @@
       ],
       onselection: (_inst, x1, y1, x2, y2) => {
         if (x1 !== x2 || y1 !== y2) return;
-        const wb2 = get(activeWorkbook);
+        const wb2 = workbook || get(activeWorkbook);
         if (!wb2) return;
         const sn = wb2.sheets[wb2.currentSheetIndex].name;
         const cellRef = sn + "!" + colToLetters(x1) + (y1 + 1 + HEADER_ROWS);
@@ -340,10 +359,15 @@
           cancelAutoReviewTimer();
           return;
         }
+        const source = getMetaSource(meta);
+        if (onCellEvidence) {
+          const anchor = anchorForDisplayCell(x1, y1);
+          onCellEvidence(cellRef, normalized, source, anchor);
+          return;
+        }
         // Open the panel for ANY cell with metadata, passing its meta so the
         // panel can show the status + (for blocked cells) the blocking reason.
         openCellEvidence(cellRef, normalized);
-        const source = getMetaSource(meta);
         if (source) {
           runCommand(source.sql, source.explanation, source.database, source.evidence);
           scheduleAutoReview(cellRef, normalized);
@@ -369,7 +393,7 @@
       if (ws) ws.setStyle(styles);
     }
 
-    mountedRunId = wb.runId;
+    mountedRunId = workbookPopulationId(wb);
     mountedIndex = sheetIndex;
     lastTick = wb.updateTick ?? 0;
     // Fresh grid carries no highlight yet; drop stale refs so the next
@@ -510,13 +534,14 @@
 
   // Reactive sync: mount on a new workbook/sheet, otherwise apply each batch in
   // place. `container` is referenced so this re-runs once bind:this resolves.
-  $: syncSheet($activeWorkbook, container);
+  $: renderedWorkbook = workbook || $activeWorkbook;
+  $: syncSheet(renderedWorkbook, container);
 
   // Re-apply the row-highlight whenever the refs change or the sheet re-renders
   // (mount/update advances lastTick; a sheet/run swap advances mountedIndex/
   // mountedRunId). Listing those alongside highlightRefs makes this re-run after
   // the grid has been (re)built, so the highlight survives remounts.
-  $: applyHighlight($activeWorkbook, mountedIndex, highlightRefs, lastTick, mountedRunId, container);
+  $: applyHighlight(renderedWorkbook, mountedIndex, highlightRefs, lastTick, mountedRunId, container);
 
   function syncSheet(wb, el) {
     if (!wb) {
@@ -525,7 +550,7 @@
     }
     if (!el) return;
     const idx = wb.currentSheetIndex ?? 0;
-    if (wb.runId !== mountedRunId || idx !== mountedIndex || !instance) {
+    if (workbookPopulationId(wb) !== mountedRunId || idx !== mountedIndex || !instance) {
       mountSheet(wb, idx);
       return;
     }
@@ -553,7 +578,7 @@
   }
 
   function switchSheet(index) {
-    updateCurrentAuditWorkbook((wb) => ({ ...wb, currentSheetIndex: index }));
+    updateCurrentPopulatedTableWorkbook((wb) => ({ ...wb, currentSheetIndex: index }));
   }
 
   onDestroy(() => {
@@ -647,6 +672,22 @@
     overflow: auto;
     max-height: none;
   }
+  /* macOS overlay scrollbars hide until scrolled, so a wide table clips with
+     no cue that more columns exist — keep a thin, always-visible scrollbar. */
+  .spreadsheet-container::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  .spreadsheet-container::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong);
+    border-radius: var(--radius-pill);
+  }
+  .spreadsheet-container::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-faint);
+  }
+  .spreadsheet-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
   .spreadsheet-container :global(.jss_worksheet) {
     font-family: var(--font-sans);
     font-size: var(--text-sm);
@@ -680,9 +721,10 @@
     position: sticky;
     left: 0;
     background: var(--color-surface);
-    /* Match native gridline color/weight from jspreadsheet defaults. */
+    /* Gridline seam + a soft right-edge elevation so partially scrolled
+       columns read as sliding UNDER the frozen column, not as broken slivers. */
     border-right: 1px solid #ccc;
-    box-shadow: 1px 0 0 #ccc;
+    box-shadow: 1px 0 0 #ccc, 8px 0 10px -4px rgba(13, 13, 13, 0.18);
   }
 
   .spreadsheet-container :global(.jss_worksheet tbody td:nth-child(2)) {

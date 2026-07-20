@@ -1,54 +1,31 @@
-"""Minimal MVP role/permission resolver for authenticated API users.
+"""DB-backed route-level permission checks for authenticated API users.
 
-The runtime/state permission contract is enforced at DB role level; this module
-adds route-level permission keys used by API authorization checks.
+The user's role is resolved from ``users.role_id`` upstream (the middleware
+stashes it on ``request.state.user`` as ``role``); this module checks that role
+against the seeded ``role_permissions`` catalog (control-plane contract §3/§4).
+Checks are positive (allow-list) and fail-closed: there is no username-derived
+role and no ``*`` wildcard ([ADR 0003](../../specs/product/decisions/0003-admin-is-a-clinician-superset.md)).
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-RoleName = str
+from server.auth import store
+
 PermissionKey = str
-
-_ROLE_PERMISSIONS: dict[RoleName, frozenset[PermissionKey]] = {
-    "admin": frozenset({"*"}),
-    "clinician": frozenset(
-        {
-            "audit.read",
-            "database.read",
-            "database.query",
-            "mapping.read",
-            # The library audit-detail page is the one place inclusion
-            # criteria are edited (doc 4 / doc 9); read-only items are
-            # guarded per-route.
-            "mapping.edit_criteria",
-            "run.create",
-            "run.read",
-            "run.stop",
-            "run.edit_cells",
-        }
-    ),
-    "agent": frozenset(),
-}
-
-
-def role_for_user(user: dict[str, Any] | None) -> RoleName:
-    if not user:
-        return "agent"
-    username = str(user.get("username") or "").strip().lower()
-    if username == "admin":
-        return "admin"
-    if username == "agent":
-        return "agent"
-    return "clinician"
-
-
-def is_admin(user: dict[str, Any] | None) -> bool:
-    return role_for_user(user) == "admin"
 
 
 def has_permission(user: dict[str, Any] | None, permission: PermissionKey) -> bool:
-    role = role_for_user(user)
-    grants = _ROLE_PERMISSIONS.get(role, frozenset())
-    return "*" in grants or permission in grants
+    """Return whether ``user``'s DB-backed role holds ``permission``.
+
+    Resolves the role from the ``role`` already on the user dict (set from
+    ``users.role_id``) and checks the seeded catalog. Fail-closed: ``False`` when
+    there is no user or no role; never granted via a ``*`` wildcard.
+    """
+    if user is None:
+        return False
+    role = user.get("role")
+    if not role:
+        return False
+    return permission in store.get_role_permission_keys(role)

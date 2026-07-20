@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intero.local/contracts/cell-resolution.schema.json",
+  "title": "Cell resolution (the two population steps)",
+  "description": "The single contract both population steps write. EXTENDS the per-cell metadata of runtime-shapes.md §2 with the resolution fields (resolved_by, hypothesis, attempts[]), a source row_id, and the NOT_LOCATED reason code. `cell` is the row in C1's `cells` table. The same `cell` shape is updated by both steps — prepopulate (the deterministic bulk copy from the template's executable) and the table agent; each updates the cell IN PLACE in the run store, growing attempts[].",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "cell": { "$ref": "#/$defs/cell" }
+  },
+  "required": ["cell"],
+  "$defs": {
+    "source": {
+      "description": "One source a cell value was drawn from — a list entry on a cell (a cell may draw from several databases/rows). The cohort identity is NOT repeated here: it is the cell's `member` (every source of a cell is, by construction, that member's). For a direct copy from a one-row-per-identity table, {database, query, table_column} is enough to re-extract the value. For a one-to-many table (e.g. clinical_notes) or an interpreted value, `row_id` (the evidence row's own primary key) pins the exact source row, and `citations` carries the verbatim passage(s) read from it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["database", "query", "table_column"],
+      "properties": {
+        "database": {
+          "description": "Source database id/slug (e.g. \"cord-ph\"). Required.",
+          "type": "string",
+          "minLength": 1
+        },
+        "query": {
+          "description": "The read-only SQL that produced the value, showing it ALONGSIDE its row identity (never a bare SELECT <value>; traceability-and-evidence.md). Required.",
+          "type": "string",
+          "minLength": 1
+        },
+        "table_column": {
+          "description": "The `table.column` the value came from. Required.",
+          "type": "string",
+          "minLength": 1
+        },
+        "row_id": {
+          "description": "The evidence row's OWN primary key, recorded when the value comes from a one-to-many table (many notes per patient) or was interpreted — the cell's `member` identifies the patient but not which of their rows. Omit for a direct copy from a one-row-per-identity table.",
+          "type": "string",
+          "minLength": 1
+        },
+        "citations": {
+          "description": "Verbatim passage(s) read from THIS source's row — EXACT word-for-word substrings so a highlight lands. Present only when `table_column` is free text (a clinical note); one note can yield several. Omit for a structured-column copy. This is where the old flat cell-level `evidence[]` now lives, linked to the exact row it came from.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        }
+      }
+    },
+    "attempt": {
+      "description": "ONE attempt to fill the cell's value, in resolution order. For a direct cell with an executable, the first entry is the prepopulate pass (an interpret cell's first attempt is always the agent's): the value it read (`value`) and where it read it (`table_column`, plus the narrowed `sql`), with `error` set when that value was not usable (NULL, off-code-map). A later entry is appended each time the agent tries to fill the cell — a query it ran (carries the `sql` and its `result`), or a proposed value that was rejected at write time (carries that `value` and the `error`, e.g. off-code). The cell's `hypothesis` is a note on why the value is hard to place, read by the agent's triage. `sql` is present only when a query was actually involved.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by", "database"],
+      "properties": {
+        "by": {
+          "description": "Which population step made this attempt. Required.",
+          "type": "string",
+          "enum": ["prepopulate", "agent"]
+        },
+        "database": {
+          "description": "Which database this attempt touched (the source db slug). Always present so a reader knows where the attempt looked; the sentinel \"(none)\" is used when no database was involved (e.g. an off-code rejection or the agent's NOT_LOCATED fallback). Required.",
+          "type": "string",
+          "minLength": 1
+        },
+        "sql": {
+          "description": "The read-only SQL involved in this attempt (the narrowed prepopulate query the value was read from, or the SQL the agent ran — validated before running). Optional: a pure value-fill attempt (e.g. a code-drift translation, or a write rejected before any query) carries none.",
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "description": "The value this attempt tried to place in the cell — the raw value the prepopulate pass read (the one that then failed), or the value the agent proposed that was rejected at write time. Optional (absent when the source was simply NULL/empty).",
+          "type": "string"
+        },
+        "table_column": {
+          "description": "The `table.column` this attempt's value was read from — written by prepopulate from the executable's cell_map so the agent need not re-parse the SQL. Optional.",
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "description": "A short rendering of what a query returned (the value, a row count, or a sample). Optional — absent if the query errored or no query ran.",
+          "type": "string"
+        },
+        "error": {
+          "description": "The error this attempt hit — a SQL error (column renamed) or a resolution error (value not in code_set / off-code at write time). Absent on a clean result. A non-empty error is what the cell's `hypothesis` note explains for the agent's triage.",
+          "type": "string"
+        }
+      }
+    },
+    "cell": {
+      "description": "One cell of the run store (C1's `cells` table). Inserted `pending` at run start with sheet/ref/field/member already set, then updated in place by the population steps. A blocked cell has no `value` but still carries `state` + the blocked-only fields.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sheet", "ref", "field", "member", "kind", "state"],
+      "properties": {
+        "sheet": {
+          "description": "The workbook sheet the cell is on. Required.",
+          "type": "string",
+          "minLength": 1
+        },
+        "ref": {
+          "description": "A1 reference within `sheet` (e.g. \"T17\"). Required.",
+          "type": "string",
+          "minLength": 1
+        },
+        "field": {
+          "description": "The audit field id this cell carries (matches spec.json's field identifier). Set at pending-insert time from the mapping's executable block; lets the agent and the FE pivot 'open cells for field X' without parsing ref. Required.",
+          "type": "string",
+          "minLength": 1
+        },
+        "member": {
+          "description": "The cohort-member identity this cell carries (the patient/encounter code). Set at pending-insert time from the resolved cohort; lets the agent pivot 'open cells for member Y' and bind its queries by member without re-parsing sources. Required.",
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "description": "How the value is obtained (carried from mapping.json). Required.",
+          "type": "string",
+          "enum": ["direct", "interpret"]
+        },
+        "state": {
+          "description": "The cell's lifecycle state — the SINGLE non-terminal value plus the three terminal ones (table-population.md §Cell state model). `pending` = inserted at run start, not yet resolved (the 'open set' the next population step acts on); `filled`/`blocked`/`not_applicable` are terminal. A cell stays `pending` until a step settles it — there is NO separate 'error'/'open'/ownership status, because which step is currently on a cell is ephemeral orchestration state recoverable from `attempts[]`, not durable cell state. What was tried lives in `attempts[]`/`hypothesis`. Needs-verification is likewise NOT a state — it is DERIVED (filled + kind interpret + review_state not_reviewed) and never stored. \"unknown\" is NOT a state either — an agent that searched and could not place the value is `blocked` with reason_code NOT_LOCATED. Required.",
+          "type": "string",
+          "enum": ["pending", "filled", "blocked", "not_applicable"]
+        },
+        "value": {
+          "description": "The cell value, as a string. Present when state is filled; absent when blocked/not_applicable.",
+          "type": ["string", "null"]
+        },
+        "confidence": {
+          "description": "The WORD low/medium/high, never a number (drives the heat-map). Required.",
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "resolved_by": {
+          "description": "Which population step produced the terminal result. Required. NEW vs runtime-shapes §2.",
+          "type": "string",
+          "enum": ["prepopulated", "agent"]
+        },
+        "hypothesis": {
+          "description": "A note on why the value is hard to place, read by the agent's triage. null on a clean prepopulate hit. NEW vs runtime-shapes §2.",
+          "type": ["string", "null"]
+        },
+        "attempts": {
+          "description": "Log of actual DB queries, in order — what the agent reads to pick up where prepopulate left off. A clean prepopulate hit is exactly one entry with no error. Required (non-empty). NEW vs runtime-shapes §2.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/attempt" }
+        },
+        "explanation": {
+          "description": "The ONE-sentence plain-language account of how the value was derived: for a direct copy, that it was copied from the source column; for an interpreted value, how the cited passages were combined to infer it. Present for resolved cells.",
+          "type": "string"
+        },
+        "sources": {
+          "description": "One entry per (database, row) the value drew on — the value's full provenance, including any verbatim `citations` per source (the old flat `evidence[]` now lives inside each source). Present for filled cells.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/source" }
+        },
+        "review_state": {
+          "description": "interpret-only: not_reviewed → reviewed (traceability-and-evidence.md). Optional.",
+          "type": "string",
+          "enum": ["not_reviewed", "reviewed"]
+        },
+        "corrected": {
+          "description": "interpret-only: did the user edit it after reviewing? Optional.",
+          "type": "boolean"
+        },
+        "reason_code": {
+          "description": "blocked-only: why the value is absent. The doc-10 taxonomy PLUS NOT_LOCATED (the agent searched and could not place the value — attempts[] is the explanation). Required when state is blocked.",
+          "type": "string",
+          "enum": [
+            "MISSING_SOURCE_RECORD",
+            "AWAITING_DOCUMENT",
+            "PENDING_CODING",
+            "AWAITING_RESULT",
+            "DATA_CONFLICT",
+            "IDENTITY_UNRESOLVED",
+            "AWAITING_SIGNOFF",
+            "NOT_APPLICABLE",
+            "NOT_LOCATED"
+          ]
+        },
+        "reason_detail": {
+          "description": "blocked-only: evidence-grade detail of exactly what is missing and where it was looked for. Required when state is blocked.",
+          "type": "string"
+        },
+        "owner_needed": {
+          "description": "blocked-only: the role/specialty/source to chase. Optional.",
+          "type": "string"
+        },
+        "outstanding_since": {
+          "description": "blocked-only: how long the gap has been open. Optional.",
+          "type": "string"
+        },
+        "prompt_version": {
+          "description": "The prompt version that produced the cell (ties to the run record, auth-and-access.md). Optional.",
+          "type": ["string", "null"]
+        },
+        "extracted_at": {
+          "description": "ISO-8601 timestamp. Optional.",
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "description": "A resolved (terminal) cell carries its provenance; a `pending` cell need not (it has not been settled yet).",
+          "if": {
+            "required": ["state"],
+            "properties": { "state": { "enum": ["filled", "blocked", "not_applicable"] } }
+          },
+          "then": { "required": ["confidence", "resolved_by", "attempts"] }
+        },
+        {
+          "description": "A blocked cell declares why and how long.",
+          "if": { "properties": { "state": { "const": "blocked" } } },
+          "then": { "required": ["reason_code", "reason_detail"] }
+        }
+      ]
+    }
+  }
+}

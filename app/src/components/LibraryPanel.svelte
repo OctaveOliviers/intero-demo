@@ -2,14 +2,17 @@
   import { onMount } from "svelte";
   import { _ } from "svelte-i18n";
   import Icon from "./Icon.svelte";
-  import AuditDetail from "./AuditDetail.svelte";
+  import TemplateDetail from "./TemplateDetail.svelte";
   import DatabaseDetail from "./DatabaseDetail.svelte";
+  import DatasetDetail from "./DatasetDetail.svelte";
+  import ShareModal from "./ShareModal.svelte";
   import {
-    renameAudit,
-    deleteAudit,
-    uploadAudit,
-    reindexAudit,
+    renameTemplate,
+    deleteTemplate,
+    uploadTemplate,
+    reindexTemplate,
     reindexDatabase,
+    listDatasets,
   } from "../lib/api.js";
   import { templates, templatesLoading, refreshTemplates } from "../lib/templates.js";
   import {
@@ -23,6 +26,12 @@
   import { indexingMap, flashing, chipOf, errorOf } from "../stores/indexing.js";
   import { addToast } from "../stores/toasts.js";
   import {
+    pendingDatasetGrantByResourceId,
+    pendingTemplateGrantByResourceId,
+    markSharedGrantProcessed,
+    refreshSharedNotifications,
+  } from "../stores/sharedNotifications.js";
+  import {
     libraryPage,
     openTemplateLibraryDetail,
     openDatabaseLibraryDetail,
@@ -30,13 +39,21 @@
   } from "../stores/navigation.js";
   import { getDeadlineSubtitle } from "../lib/deadlineSubtitle.js";
 
-  // --- Audits ---
+  // --- Templates ---
   let clones = [];
   let cloneSeq = 0;
-  let auditError = "";
-  let auditDragOver = false;
-  let auditFileInput;
-  let auditMenuOpenId = null;
+  let templateError = "";
+  let templateDragOver = false;
+  let templateFileInput;
+  let templateMenuOpenId = null;
+
+  // --- Share dialog (table templates) ---
+  let shareResource = null; // { type, id, title } | null
+
+  function openShareTemplate(a) {
+    templateMenuOpenId = null;
+    shareResource = { type: "template", id: a.id, title: a.name };
+  }
 
   // --- Databases ---
   let dbError = "";
@@ -44,6 +61,11 @@
   let dbFileInput;
   let dbMenuOpenId = null;
   let dbItems = [];
+
+  // --- Datasets (data library) ---
+  let datasets = [];
+  let datasetsLoading = false;
+  let datasetError = "";
 
   const LEVELS = ["National", "Regional", "Local", "Other"];
 
@@ -56,7 +78,7 @@
     return "Other";
   }
 
-  $: auditItems = [...$templates, ...clones].map((t) => {
+  $: templateItems = [...$templates, ...clones].map((t) => {
     const level = normalizeLevel(t.level || "Local");
     return {
       ...t,
@@ -71,13 +93,13 @@
     };
   });
 
-  $: auditGroups = LEVELS.map((level) => ({
+  $: templateGroups = LEVELS.map((level) => ({
     level,
-    items: auditItems.filter((t) => t.level === level),
+    items: templateItems.filter((t) => t.level === level),
   })).filter((g) => g.items.length > 0);
 
-  $: selectedAudit = selectedTemplateId
-    ? auditItems.find((a) => a.id === selectedTemplateId) || null
+  $: selectedTemplate = selectedTemplateId
+    ? templateItems.find((a) => a.id === selectedTemplateId) || null
     : null;
 
   $: dbItems = $databases.map((d) => {
@@ -100,12 +122,28 @@
     : null;
 
   onMount(() => {
-    refreshTemplates().catch((e) => (auditError = e.message || String(e)));
+    refreshTemplates().catch((e) => (templateError = e.message || String(e)));
     refreshDatabases().catch((e) => (dbError = e.message || String(e)));
+    refreshSharedNotifications().catch(() => {});
+    refreshDatasets();
   });
 
-  function openAudit(a) {
-    auditMenuOpenId = null;
+  async function refreshDatasets() {
+    datasetsLoading = true;
+    datasetError = "";
+    try {
+      datasets = await listDatasets();
+    } catch (e) {
+      datasetError = e.message || String(e);
+    } finally {
+      datasetsLoading = false;
+    }
+  }
+
+  function openTemplate(a) {
+    templateMenuOpenId = null;
+    const pendingShareGrantId = $pendingTemplateGrantByResourceId[a.id]?.grant_id || null;
+    if (pendingShareGrantId) markSharedGrantProcessed(pendingShareGrantId);
     openTemplateLibraryDetail(a.id);
   }
 
@@ -114,36 +152,36 @@
     openDatabaseLibraryDetail(d.id);
   }
 
-  // --- Audit handlers ---
-  async function handleAuditFile(file) {
+  // --- Template handlers ---
+  async function handleTemplateFile(file) {
     if (!file) return;
     const ext = "." + file.name.split(".").pop().toLowerCase();
     if (![".xlsx", ".xlsm"].includes(ext)) {
-      auditError = $_("library.errXlsxOnly");
+      templateError = $_("library.errXlsxOnly");
       return;
     }
-    auditError = "";
+    templateError = "";
     try {
-      await uploadAudit(file);
+      await uploadTemplate(file);
       await refreshTemplates();
     } catch (err) {
-      auditError = err.message || String(err);
+      templateError = err.message || String(err);
     }
   }
 
-  function onAuditDrop(e) {
+  function onTemplateDrop(e) {
     e.preventDefault();
-    auditDragOver = false;
-    handleAuditFile(e.dataTransfer.files[0]);
+    templateDragOver = false;
+    handleTemplateFile(e.dataTransfer.files[0]);
   }
 
-  function onAuditPick(e) {
-    handleAuditFile(e.target.files[0]);
+  function onTemplatePick(e) {
+    handleTemplateFile(e.target.files[0]);
     e.target.value = "";
   }
 
-  function handleCloneAudit(a) {
-    auditMenuOpenId = null;
+  function handleCloneTemplate(a) {
+    templateMenuOpenId = null;
     cloneSeq += 1;
     const clone = {
       ...a,
@@ -158,8 +196,8 @@
     addToast({ kind: "success", message: $_("library.cloned", { values: { name: a.name } }) });
   }
 
-  async function handleRenameAudit(a) {
-    auditMenuOpenId = null;
+  async function handleRenameTemplate(a) {
+    templateMenuOpenId = null;
     const next = prompt($_("template.renamePrompt"), a.name);
     if (next == null) return;
     const name = next.trim();
@@ -169,36 +207,36 @@
       return;
     }
     try {
-      await renameAudit(a.id, name);
+      await renameTemplate(a.id, name);
       await refreshTemplates();
     } catch (e) {
-      auditError = e.message || String(e);
+      templateError = e.message || String(e);
     }
   }
 
-  async function handleDeleteAudit(a) {
-    auditMenuOpenId = null;
+  async function handleDeleteTemplate(a) {
+    templateMenuOpenId = null;
     if (!confirm($_("template.deleteConfirm", { values: { name: a.name } }))) return;
     if (a._clone) {
       clones = clones.filter((c) => c.id !== a.id);
       return;
     }
     try {
-      await deleteAudit(a.id);
+      await deleteTemplate(a.id);
       await refreshTemplates();
       if (selectedTemplateId === a.id) backToLibraryList();
     } catch (e) {
-      auditError = e.message || String(e);
+      templateError = e.message || String(e);
     }
   }
 
-  async function handleReindexAudit(a) {
-    auditMenuOpenId = null;
-    auditError = "";
+  async function handleReindexTemplate(a) {
+    templateMenuOpenId = null;
+    templateError = "";
     try {
-      await reindexAudit(a.id);
+      await reindexTemplate(a.id);
     } catch (e) {
-      auditError = e.message || String(e);
+      templateError = e.message || String(e);
     }
   }
 
@@ -265,15 +303,15 @@
 
   function toggleMenu(sectionName, id, e) {
     e.stopPropagation();
-    if (sectionName === "audit") {
-      auditMenuOpenId = auditMenuOpenId === id ? null : id;
+    if (sectionName === "template") {
+      templateMenuOpenId = templateMenuOpenId === id ? null : id;
     } else {
       dbMenuOpenId = dbMenuOpenId === id ? null : id;
     }
   }
 
   function closeMenus() {
-    auditMenuOpenId = null;
+    templateMenuOpenId = null;
     dbMenuOpenId = null;
   }
 </script>
@@ -282,39 +320,57 @@
 
 <div class="library-panel">
   <section class="content">
-    {#if section === "templates"}
-      {#if selectedAudit}
-        <AuditDetail
-          template={selectedAudit}
-          readonly={selectedAudit.readOnly}
+    {#if section === "datasets"}
+      <h2 class="page-title">{$_("library.dataLibraryTitle")}</h2>
+      {#if datasetError}<div class="error">{datasetError}</div>{/if}
+      {#if datasetsLoading && datasets.length === 0}
+        <div class="empty">{$_("library.loadingDatasets")}</div>
+      {:else if datasets.length === 0}
+        <div class="empty">{$_("library.noDatasets")}</div>
+      {/if}
+      <div class="dataset-list">
+        {#each datasets as d (d.id)}
+          <DatasetDetail
+            dataset={d}
+            pendingShareGrant={$pendingDatasetGrantByResourceId[d.id] || null}
+            on:changed={refreshDatasets}
+          />
+        {/each}
+      </div>
+    {:else if section === "templates"}
+      {#if selectedTemplate}
+        <TemplateDetail
+          template={selectedTemplate}
+          readonly={selectedTemplate.readOnly}
           on:back={backToLibraryList}
           on:clone={() => {
-            handleCloneAudit(selectedAudit);
+            handleCloneTemplate(selectedTemplate);
             backToLibraryList();
           }}
         />
       {:else}
         <h2 class="page-title">{$_("library.templatesTitle")}</h2>
-        {#if auditError}<div class="error">{auditError}</div>{/if}
-        {#if $templatesLoading && auditItems.length === 0}
+        {#if templateError}<div class="error">{templateError}</div>{/if}
+        {#if $templatesLoading && templateItems.length === 0}
           <div class="empty">{$_("library.loadingTemplates")}</div>
-        {:else if auditItems.length === 0}
+        {:else if templateItems.length === 0}
           <div class="empty">{$_("library.noTemplates")}</div>
         {/if}
 
-        {#each auditGroups as group (group.level)}
+        {#each templateGroups as group (group.level)}
           <div class="group">
             <h3 class="group-title">{$_("level." + group.level.toLowerCase())}</h3>
             <div class="grid">
               {#each group.items as a (a.id)}
                 {@const chip = chipOf("audit", a.id, $indexingMap, $flashing)}
-                <div class="card-wrap">
+                {@const pendingShareGrant = $pendingTemplateGrantByResourceId[a.id] || null}
+                <div class="card-wrap" class:pending-share={Boolean(pendingShareGrant)}>
                   <div
                     class="card clickable"
                     role="button"
                     tabindex="0"
-                    on:click={() => openAudit(a)}
-                    on:keydown={(e) => (e.key === "Enter" || e.key === " ") && openAudit(a)}
+                    on:click={() => openTemplate(a)}
+                    on:keydown={(e) => (e.key === "Enter" || e.key === " ") && openTemplate(a)}
                   >
                     <div class="card-body">
                       <h3>
@@ -335,28 +391,33 @@
                   </div>
                   <button
                     class="menu-btn"
-                    class:open={auditMenuOpenId === a.id}
-                    on:click={(e) => toggleMenu("audit", a.id, e)}
+                    class:open={templateMenuOpenId === a.id}
+                    on:click={(e) => toggleMenu("template", a.id, e)}
                     aria-label={$_("common.options")}
                   >
                     <Icon name="more" />
                   </button>
-                  {#if auditMenuOpenId === a.id}
+                  {#if templateMenuOpenId === a.id}
                     <div class="menu">
                       {#if chip === "error"}
-                        <button class="menu-item" on:click={() => handleReindexAudit(a)}>
+                        <button class="menu-item" on:click={() => handleReindexTemplate(a)}>
                           <span class="menu-icon-spacer"></span>{$_("common.tryIndexingAgain")}
                         </button>
                       {/if}
                       {#if a.readOnly}
-                        <button class="menu-item" on:click={() => handleCloneAudit(a)}>
+                        <button class="menu-item" on:click={() => handleCloneTemplate(a)}>
                           <span class="menu-icon-spacer"></span>{$_("common.cloneToLocal")}
                         </button>
                       {:else}
-                        <button class="menu-item" on:click={() => handleRenameAudit(a)}>
+                        <button class="menu-item" on:click={() => handleRenameTemplate(a)}>
                           <Icon name="rename" size={16} />{$_("common.rename")}
                         </button>
-                        <button class="menu-item danger" on:click={() => handleDeleteAudit(a)}>
+                      {/if}
+                      {#if !a.readOnly}
+                        <button class="menu-item" on:click={() => openShareTemplate(a)}>
+                          <Icon name="share" size={16} />{$_("sharing.share")}
+                        </button>
+                        <button class="menu-item danger" on:click={() => handleDeleteTemplate(a)}>
                           <Icon name="trash" size={16} />{$_("common.delete")}
                         </button>
                       {/if}
@@ -371,11 +432,11 @@
         <!-- "Add audit template" upload card hidden for now (doc 9 §Design); kept to re-enable later.
         <button
           class="upload-card"
-          class:drag-over={auditDragOver}
-          on:click={() => auditFileInput && auditFileInput.click()}
-          on:drop={onAuditDrop}
-          on:dragover|preventDefault={() => (auditDragOver = true)}
-          on:dragleave={() => (auditDragOver = false)}
+          class:drag-over={templateDragOver}
+          on:click={() => templateFileInput && templateFileInput.click()}
+          on:drop={onTemplateDrop}
+          on:dragover|preventDefault={() => (templateDragOver = true)}
+          on:dragleave={() => (templateDragOver = false)}
         >
           <div class="card-body">
             <h3>Add audit template</h3>
@@ -383,10 +444,10 @@
           </div>
         </button>
         <input
-          bind:this={auditFileInput}
+          bind:this={templateFileInput}
           type="file"
           accept=".xlsx,.xlsm"
-          on:change={onAuditPick}
+          on:change={onTemplatePick}
           style="display:none"
         />
         -->
@@ -480,6 +541,10 @@
   </section>
 </div>
 
+{#if shareResource}
+  <ShareModal resource={shareResource} on:close={() => (shareResource = null)} />
+{/if}
+
 <style>
   .library-panel {
     display: flex;
@@ -493,6 +558,13 @@
     font-size: var(--text-xl);
     font-weight: var(--weight-semibold);
     color: var(--color-text);
+  }
+
+  /* Datasets live inline in the library: one expandable box each, stacked. */
+  .dataset-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
   }
 
   .content {
@@ -557,6 +629,10 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  }
+
+  .card-wrap.pending-share {
+    background: var(--color-accent-weak);
   }
 
   .card-wrap:hover {

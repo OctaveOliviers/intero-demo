@@ -1,0 +1,359 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://melodic.health/contracts/thread.schema.json",
+  "title": "Thread",
+  "description": "The free-ranging, UNSCOPED conversation surface — the only conversation surface in the product (product-flows.md §Threads, tables & outputs). A thread ROAMS: it carries no fixed Dataset; the agent resolves each message's own scope (decisions/0004-scope-binds-to-table-not-thread.md). It persists (recency-ordered by updated_at, searchable, deletable) and does NOT fork. Persisted at var/threads/<id>/thread.json. Each user message is passed to the agent without backend regex/phrase-list pre-routing; it may also carry request attachments for a pinned Dataset/template context. The Answer branch carries the real natural-language answer on the agent message's `content` plus its inline `resolution.citations` when it relies on database values (whole-DB, permission-bounded, fail-closed at the registered read-only hospital DB). If the agent calls `ask_user_question`, the agent message carries `resolution.ask_user_questions` until the composer submits or skips the answers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "title", "created_at", "updated_at", "messages"],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Minted `thread-<uuid4().hex[:12]>`."
+    },
+    "title": {
+      "type": "string",
+      "description": "Derived from the first user message (trimmed to ~60 chars); \"New thread\" if none yet."
+    },
+    "created_at": {
+      "type": "string",
+      "description": "ISO-8601 (UTC) creation time."
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "ISO-8601 (UTC) last-activity time. Drives recency ordering in the Threads list."
+    },
+    "status": {
+      "enum": ["running", "complete"],
+      "description": "Operational lifecycle for the latest agent turn. `running` while a streaming answer is still in progress; `complete` once the agent has answered, asked follow-up questions, spawned a table, failed gracefully, or the thread has no in-flight turn. Optional for older thread files; readers treat absent as `complete`."
+    },
+    "messages": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/message" },
+      "description": "The conversation, in order. A user message is followed by the agent message carrying its routing resolution."
+    },
+    "artifact_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Back-references to first-class tables this thread spawned (table metadata lives as `tables` rows in var/state.db per Q36; a thread only references them for inline inspectors). Empty [] in this issue; Issue 2 appends."
+    }
+  },
+  "$defs": {
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "content", "created_at"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable message id, minted as `msg-<uuid4 hex prefix>`."
+        },
+        "role": { "enum": ["user", "agent"] },
+        "content": { "type": "string" },
+        "created_at": {
+          "type": "string",
+          "description": "ISO-8601 (UTC) time the message was appended."
+        },
+        "resolution": { "$ref": "#/$defs/resolution" },
+        "attachments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/attachment" },
+          "description": "Library items the user pinned to this request. At most one Dataset and one template; a Dataset pins this message's answer scope, and a template gives the agent explicit template context."
+        }
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {
+          "enum": ["dataset", "template"],
+          "description": "The library item kind pinned to the request."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The Dataset id or template id."
+        }
+      }
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The agent result metadata, present on an AGENT message that answers a user request or asks structured follow-up questions.",
+      "required": ["output", "scope"],
+      "properties": {
+        "output": {
+          "enum": ["table", "chat"],
+          "description": "table -> the output is a populated Table (the spawn is owned in tables); chat -> the output is an Answer: natural-language text in `content`, with `citations` when it relies on database values."
+        },
+        "scope": { "$ref": "#/$defs/scope" },
+        "artifact_id": {
+          "type": ["string", "null"],
+          "description": "Set when a table is spawned; null for a chat output."
+        },
+        "seam": {
+          "type": ["string", "null"],
+          "description": "Reserved for a not-yet-built output. Null for both a Table output and an Answer output."
+        },
+        "citations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/citation" },
+          "description": "For an Answer: the inline sources backing database-derived values in `content`, one per `[1]`/`[2]` marker. A source citation re-extracts the cited value next to its identity; an aggregate citation also carries denominator/completeness and covered rows. Absent/empty for a table output."
+        },
+        "activity": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/chat_activity" },
+          "description": "For a streaming Answer: bounded live activity forwarded from the agent session (tool calls / thinking), rendered inline while the answer is streaming."
+        },
+        "ask_user_questions": {
+          "$ref": "#/$defs/ask_user_request",
+          "description": "Present when the agent called the generic ask_user_question tool and the composer must collect answers before the agent can continue."
+        }
+      }
+    },
+    "ask_user_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "questions"],
+      "properties": {
+        "id": { "type": "string" },
+        "status": { "enum": ["pending", "answered", "skipped"] },
+        "questions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ask_user_question" }
+        },
+        "answers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ask_user_answer" }
+        }
+      }
+    },
+    "ask_user_question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "question"],
+      "properties": {
+        "id": { "type": "string" },
+        "question": { "type": "string" },
+        "choices": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ask_user_choice" }
+        },
+        "allow_other": { "type": "boolean" },
+        "required": { "type": "boolean" },
+        "proposal": { "$ref": "#/$defs/resource_change_proposal" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["proposal"]
+          },
+          "then": {
+            "required": ["choices"],
+            "properties": {
+              "allow_other": { "const": false },
+              "choices": {
+                "allOf": [
+                  {
+                    "contains": {
+                      "type": "object",
+                      "required": ["id"],
+                      "properties": { "id": { "const": "accept" } }
+                    }
+                  },
+                  {
+                    "contains": {
+                      "type": "object",
+                      "required": ["id"],
+                      "properties": { "id": { "const": "reject" } }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "resource_change_proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "resource_type",
+        "operation",
+        "resource_id",
+        "summary",
+        "patch"
+      ],
+      "properties": {
+        "type": { "const": "resource_change" },
+        "resource_type": { "enum": ["dataset", "template"] },
+        "operation": { "enum": ["create", "update"] },
+        "resource_id": { "type": ["string", "null"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "patch": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Opaque resource-specific proposal payload. The thread contract intentionally does not define the Dataset or Template patch grammar yet; the write tool that consumes the approved proposal owns validation."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "operation": { "const": "create" } },
+            "required": ["operation"]
+          },
+          "then": {
+            "properties": {
+              "resource_id": { "const": null }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "operation": { "const": "update" } },
+            "required": ["operation"]
+          },
+          "then": {
+            "properties": {
+              "resource_id": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      ]
+    },
+    "ask_user_choice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" }
+      }
+    },
+    "ask_user_answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question_id", "status"],
+      "properties": {
+        "question_id": { "type": "string" },
+        "status": { "enum": ["answered", "skipped"] },
+        "choice_id": { "type": ["string", "null"] },
+        "text": { "type": ["string", "null"] }
+      }
+    },
+    "chat_activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": ["string", "null"] },
+        "headline": { "type": "string" },
+        "label": { "type": ["string", "null"] },
+        "kind": { "type": ["string", "null"] }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One inline source behind an Answer — the evidence source object plus its `[n]` marker. Surfaced as a clickable citation that opens the evidence panel. Aggregate citations additionally open the aggregate query, denominator/completeness, and covered rows.",
+      "required": ["marker", "database", "query", "table_column"],
+      "properties": {
+        "kind": {
+          "enum": ["source", "aggregate"],
+          "description": "source -> direct/source-row evidence; aggregate -> aggregate claim with denominator/completeness and covered rows. Omitted legacy values are treated as source by readers."
+        },
+        "marker": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "The numeric inline marker in the answer, e.g. \"1\" for `[1]`."
+        },
+        "database": {
+          "type": "string",
+          "description": "The registered clinical database slug the value was read from."
+        },
+        "query": {
+          "type": "string",
+          "description": "The SELECT that re-extracts the cited value beside its identity (a chat read: read-only, no cohort injection)."
+        },
+        "table_column": {
+          "type": "string",
+          "description": "`table.column` the value lives in."
+        },
+        "explanation": {
+          "type": "string",
+          "description": "What the value is / how it was computed."
+        },
+        "row_id": {
+          "type": ["string", "null"],
+          "description": "For a free-text source (a note/comment): the cited record's primary key. Free-text only."
+        },
+        "row_key": {
+          "type": ["string", "null"],
+          "description": "For a free-text source: the column the primary key is in. Free-text only."
+        },
+        "citations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "For a free-text source: the verbatim substring(s) of the record that state the value (never a paraphrase)."
+        },
+        "denominator": {
+          "description": "Aggregate citations only: denominator metadata shown in the evidence panel.",
+          "type": ["object", "string", "number", "null"]
+        },
+        "completeness": {
+          "description": "Aggregate citations only: completeness metadata, e.g. recorded/eligible rows.",
+          "type": ["object", "string", "number", "null"]
+        },
+        "covered_rows": {
+          "description": "Aggregate citations only: source citations for the rows behind the aggregate, drillable from the evidence panel.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/coveredRowCitation" }
+        }
+      }
+    },
+    "coveredRowCitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["database", "query", "table_column"],
+      "properties": {
+        "kind": { "enum": ["source"] },
+        "database": { "type": "string" },
+        "query": { "type": "string" },
+        "table_column": { "type": "string" },
+        "explanation": { "type": "string" },
+        "row_id": { "type": ["string", "null"] },
+        "row_key": { "type": ["string", "null"] },
+        "citations": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The slice this message's answer was computed at, plus a clinician-readable disclosure. A thread is unscoped; each message may answer within a named Dataset or across the whole hospital database.",
+      "required": ["kind", "disclosure"],
+      "properties": {
+        "kind": {
+          "enum": ["dataset", "whole_db"],
+          "description": "whole_db -> the whole hospital database; dataset -> a named Dataset."
+        },
+        "dataset_id": {
+          "type": ["string", "null"],
+          "description": "The Dataset id for a `dataset` scope; null for `whole_db`."
+        },
+        "disclosure": {
+          "type": "string",
+          "description": "Clinician-readable one-liner, e.g. \"answered across the whole hospital database\"."
+        }
+      }
+    }
+  }
+}

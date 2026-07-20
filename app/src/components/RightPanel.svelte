@@ -4,14 +4,14 @@
     activeCommand,
     activity,
     reviewSummary,
-    runStatus,
+    tablePopulationStatus,
     runStartedAt,
     runEndedAt,
     runStopping,
     startRefreshFromPanel,
     stopActiveRun,
   } from "../stores/chat.js";
-  import { audits, currentAuditId } from "../stores/audits.js";
+  import { populatedTables, currentPopulatedTableId } from "../stores/populatedTables.js";
   import {
     resultViewUiState,
     RIGHT_PANEL_MODES,
@@ -20,9 +20,7 @@
   } from "../stores/resultViewUi.js";
   import { shouldShowTerminalSummary } from "./resultsViewState.js";
   import Icon from "./Icon.svelte";
-  import SqlDisplay from "./SqlDisplay.svelte";
-  import SqlResultViewer from "./SqlResultViewer.svelte";
-  import NoteEvidenceView from "./NoteEvidenceView.svelte";
+  import CellEvidencePanel from "./CellEvidencePanel.svelte";
   import InputSpec from "./spec/InputSpec.svelte";
   import AgentActivityStream from "./AgentActivityStream.svelte";
   import {
@@ -33,16 +31,13 @@
   import { _ } from "svelte-i18n";
 
   $: panelMode = $resultViewUiState.rightPanelMode;
-  $: currentAudit = $audits.find((a) => a.id === $currentAuditId) || null;
-  $: criteriaCohort = buildReadOnlyCohort(currentAudit);
-  $: hasEvidence = !!($activeCommand && $activeCommand.evidence && $activeCommand.evidence.length);
+  $: currentPopulatedTable = $populatedTables.find((a) => a.id === $currentPopulatedTableId) || null;
+  $: criteriaCohort = buildReadOnlyCohort(currentPopulatedTable);
   // The clicked cell's metadata — drives the Status block (state + the blocking
   // reason for a blocked cell). Every clicked cell has this; only traceable
   // cells additionally have a SQL `$activeCommand`.
   $: selectedCellMeta = $resultViewUiState.selectedCellMeta || null;
-  $: cellStatus = describeCellStatus(selectedCellMeta);
-  $: cellExplanation = $activeCommand?.explanation || selectedCellMeta?.explanation || null;
-  $: showRefreshAction = shouldShowRefreshAction($runStatus, currentAudit?.refreshInFlight);
+  $: showRefreshAction = shouldShowRefreshAction($tablePopulationStatus, currentPopulatedTable?.refreshInFlight);
   // The single flat activity stream the box renders — refresh_summary events
   // are a counts payload (shown in their own block below), not activity lines.
   $: activityEvents = ($activity || []).filter((event) => event?.type !== "refresh_summary");
@@ -59,7 +54,7 @@
   // The review summary is the TERMINAL ENTRY of the feed (doc 11
   // §agent_activity item 3) — its only home; it appears once the run
   // finishes.
-  $: showTerminalSummary = shouldShowTerminalSummary($runStatus, $reviewSummary);
+  $: showTerminalSummary = shouldShowTerminalSummary($tablePopulationStatus, $reviewSummary);
   $: summaryTotals = $reviewSummary?.totals || null;
   $: summaryVerification = $reviewSummary?.verification || null;
   $: blockingReasons = Object.entries($reviewSummary?.blocking?.reason_codes || {}).sort(
@@ -74,49 +69,14 @@
     });
   }
 
-  // Human-readable status for the clicked cell + the blocking reason. A blocked
-  // cell ALWAYS carries reason_code + reason_detail (the DB enforces it), so the
-  // panel can finally explain why a cell is blocked instead of looking empty.
-  function describeCellStatus(meta) {
-    if (!meta || typeof meta !== "object") return null;
-    const state = String(meta.state || "").toLowerCase();
-    const reviewState = String(meta.review_state ?? meta.reviewState ?? "").toLowerCase();
-    const confidence = String(meta.confidence || "").toLowerCase();
-    let label = $_("rightPanel.statusFilled");
-    let tone = "settled";
-    if (state === "blocked") {
-      label = $_("rightPanel.statusBlocked");
-      tone = "blocked";
-    } else if (state === "not_applicable") {
-      label = $_("rightPanel.statusNotApplicable");
-      tone = "muted";
-    } else if (state === "pending") {
-      label = $_("rightPanel.statusPending");
-      tone = "muted";
-    } else if (reviewState === "reviewed") {
-      label = $_("rightPanel.statusReviewed");
-      tone = "settled";
-    } else if (reviewState === "not_reviewed") {
-      label = $_("rightPanel.statusFilledNeedsReview");
-      tone = "review";
-    }
-    return {
-      label,
-      tone,
-      confidence: confidence === "low" || confidence === "medium" ? confidence : null,
-      reasonCode: meta.reason_code || null,
-      reasonDetail: meta.reason_detail || null,
-    };
-  }
-
   function labelFromField(field) {
     if (!field) return $_("rightPanel.criteriaFallback");
     const spaced = String(field).replace(/[_-]+/g, " ").replace(/([A-Z])/g, " $1");
     return spaced.charAt(0).toUpperCase() + spaced.slice(1).trim();
   }
 
-  function buildReadOnlyCohort(audit) {
-    const criteria = audit?.criteria;
+  function buildReadOnlyCohort(populatedTable) {
+    const criteria = populatedTable?.criteria;
     if (Array.isArray(criteria) && criteria.length) {
       return criteria.map((c, i) => ({
         ...c,
@@ -125,7 +85,7 @@
         value: c?.value ?? "",
       }));
     }
-    const filters = audit?.filters || {};
+    const filters = populatedTable?.filters || {};
     return Object.entries(filters)
       .filter(([, value]) => value != null && String(value).trim() !== "")
       .map(([field, value], i) => ({
@@ -159,83 +119,19 @@
   </button>
 
   {#if panelMode === RIGHT_PANEL_MODES.CELL_EVIDENCE}
-    <div class="panel-body">
-      {#if !cellStatus && !$activeCommand}
-        <div class="status">{$_("rightPanel.selectCell")}</div>
-      {/if}
-
-      {#if cellStatus}
-        <section class="block">
-          <div class="block-label">{$_("rightPanel.status")}</div>
-          <div class="cell-status cell-status--{cellStatus.tone}">
-            <span>{cellStatus.label}</span>
-            {#if cellStatus.confidence}
-              <span class="cell-status-confidence">{$_("confidence.suffix", { values: { level: $_("confidence." + cellStatus.confidence) } })}</span>
-            {/if}
-          </div>
-          {#if cellStatus.reasonCode || cellStatus.reasonDetail}
-            <div class="cell-reason">
-              {#if cellStatus.reasonCode}
-                <span class="reason-code">{cellStatus.reasonCode}</span>
-              {/if}
-              {#if cellStatus.reasonDetail}
-                <p class="reason-detail">{cellStatus.reasonDetail}</p>
-              {/if}
-            </div>
-          {/if}
-        </section>
-      {/if}
-
-      {#if cellExplanation}
-        <section class="block">
-          <div class="block-label">{$_("rightPanel.explanation")}</div>
-          <div class="explanation">
-            <p class="explanation-text">{cellExplanation}</p>
-          </div>
-        </section>
-      {/if}
-
-      {#if $activeCommand?.sql}
-        <section class="block">
-          <div class="block-label">{$_("rightPanel.query")}</div>
-          <SqlDisplay sql={$activeCommand.sql} />
-        </section>
-      {/if}
-
-      {#if $activeCommand?.sql}
-        <section class="block">
-          {#if $activeCommand.loading}
-            <div class="status">{$_("rightPanel.runningQuery")}</div>
-          {:else if $activeCommand.error}
-            <div class="error">{$activeCommand.error}</div>
-          {:else if $activeCommand.result}
-            {#if hasEvidence}
-              <div class="block-label">
-                {$activeCommand.result.rowCount !== 1 ? $_("rightPanel.sourceNotes") : $_("rightPanel.sourceNote")}
-              </div>
-              <NoteEvidenceView result={$activeCommand.result} quotes={$activeCommand.evidence} />
-            {:else}
-              <div class="block-label">
-                {$_("rightPanel.result")} · {$_("rightPanel.resultMeta", { values: { rows: $activeCommand.result.rowCount, ms: $activeCommand.result.durationMs } })}
-              </div>
-              <SqlResultViewer result={$activeCommand.result} />
-            {/if}
-          {/if}
-        </section>
-      {/if}
-    </div>
+    <CellEvidencePanel command={$activeCommand} {selectedCellMeta} />
   {:else if panelMode === RIGHT_PANEL_MODES.AGENT_ACTIVITY}
     <div class="panel-body">
       <section class="block">
         <div class="block-label">{$_("rightPanel.agentActivity")}</div>
 
         <!-- The whole live stream lives in ONE collapsible gray box. Keyed on the
-             audit so its fold/scroll state is per-audit, not carried across a
+             populated table so its fold/scroll state is per-record, not carried across a
              sidebar switch (the box is a single reused instance otherwise). -->
-        {#key $currentAuditId}
+        {#key $currentPopulatedTableId}
           <AgentActivityStream
             events={activityEvents}
-            runStatus={$runStatus}
+            tablePopulationStatus={$tablePopulationStatus}
             startedAt={$runStartedAt}
             endedAt={$runEndedAt}
             stopping={$runStopping}
@@ -301,7 +197,7 @@
             type="button"
             class="refresh-action"
             on:click={onCheckForUpdates}
-            disabled={refreshPending || currentAudit?.refreshInFlight}
+            disabled={refreshPending || currentPopulatedTable?.refreshInFlight}
             aria-label={$_("rightPanel.checkForUpdates")}
           >
             <Icon name="loop" size={14} />
@@ -365,20 +261,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-5);
-  }
-
-  .explanation {
-    background: var(--color-surface-muted);
-    border-radius: var(--radius-md);
-    padding: var(--space-3) var(--space-4);
-  }
-  .explanation-text {
-    font-family: var(--font-sans);
-    font-size: var(--text-sm);
-    color: var(--color-text);
-    line-height: 1.5;
-    white-space: pre-wrap;
-    margin: 0;
   }
 
   .block {
@@ -521,63 +403,6 @@
   .refresh-action:disabled {
     opacity: 0.6;
     cursor: default;
-  }
-
-  .cell-status {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    align-self: flex-start;
-    border-radius: var(--radius-pill);
-    padding: 2px 10px;
-    font-size: var(--text-xs);
-    font-weight: var(--weight-semibold);
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
-    color: var(--color-text-secondary);
-  }
-  .cell-status-confidence {
-    white-space: nowrap;
-  }
-  .cell-status--blocked {
-    border-color: var(--color-danger);
-    background: var(--color-danger-weak);
-    color: var(--color-danger);
-  }
-  .cell-status--review {
-    border-color: var(--color-warning);
-    background: var(--color-warning-weak);
-    color: var(--color-warning);
-  }
-  .cell-status--settled {
-    border-color: var(--color-success);
-    background: var(--color-success-weak);
-    color: var(--color-success);
-  }
-  .cell-status--muted {
-    color: var(--color-text-muted);
-  }
-  .cell-reason {
-    margin-top: var(--space-2);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
-  .reason-code {
-    align-self: flex-start;
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: var(--text-xs);
-    color: var(--color-danger);
-    background: var(--color-danger-weak);
-    border-radius: var(--radius-md);
-    padding: 1px 6px;
-  }
-  .reason-detail {
-    margin: 0;
-    font-size: var(--text-sm);
-    color: var(--color-text);
-    line-height: 1.5;
-    white-space: pre-wrap;
   }
 
   .status {

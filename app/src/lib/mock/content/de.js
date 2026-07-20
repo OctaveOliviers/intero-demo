@@ -18,12 +18,516 @@
 //   records          — { cord, chest, npda } the WHOLE record objects (human text translatable; numbers/dates/codes/ids/types not)
 //   codeMaps         — { sex, ethnicity, diabetesType, insulinRegime, cgm, yesNo, smoking, retinal, admissionDka, adhdAsd, yesNo99, leavingReason, otherMed, albuminuriaStage, thyroidTx, mentalHealthAppt, dkaTherapy } — code→label maps (labels translatable; keys/codes not)
 //   labels           — short value labels (N/A, Not recorded, Unavailable, …)
-//   auditDetail      — mock audit-detail localization (database summary + fixed-criteria labels/units)
+//   templateDetail   — mock template-detail localization (database summary + fixed-criteria labels/units)
 //   specValues       — mock parse chip VALUES (cohort defaults/options)
 //   explain          — namespace of FUNCTIONS returning the right-panel explanation strings (preserve ${…} interpolation)
 //   blockedReason    — the blocked-cell reason_detail (CPH009 age-at-discharge)
 //   timeline         — { activities, tools, thinks, summaryWords, email parsing } headline/detail/think strings keyed sensibly
 //   email            — mockSampleEmail body
+
+// German translation of the artifactWorkspace namespace (#358). Mirrors the English
+// pack's shape exactly (same keys, nesting, order, function signatures and ${…}
+// interpolation positions); only human-readable words are translated. Language-
+// invariant tokens (patient ids, ISO dates, numbers, TNM, UICC stage groups, Annexe
+// 55 codes, ECOG scores, biomarker/drug tokens, "Annexe 55") stay byte-identical to
+// en.js. Each `quotes[i]` is a verbatim substring of its sibling translated `body`.
+const artifactWorkspace = {
+  // Matrix column headers (Annexe 55 field names).
+  columns: {
+    patient: "Patient",
+    histology: "Histologie",
+    ecog: "ECOG",
+    tnm: "TNM",
+    stage: "Stadium",
+    pdl1: "PD-L1 TPS",
+    egfr: "EGFR",
+    ngs: "NGS/Molekular",
+    treatment: "Behandlung",
+    mocNotes: "MOC-Notizen",
+  },
+
+  // Coded-value composition: `name (code NN)`. Name localises; the code number is
+  // passed in from logic. The literal word "code" lives here so it can localise.
+  coded: (name, code) => `${name} (Code ${code})`,
+
+  // Histology column names (field 6 · diagnostic histology + behaviour).
+  histology: {
+    adenocarcinoma: "Adenokarzinom",
+    squamousCell: "Plattenepithel-Ca",
+    nsclcNos: "NSCLC, NOS",
+    smallCellSclc: "Kleinzellig (SCLC)",
+  },
+
+  // ECOG labels (field 3 · WHO/ECOG score). Rendered `label (score)`; the score
+  // number is invariant and lives in logic.
+  ecog: {
+    fullyActive: "Voll aktiv",
+    ambulatory: "Gehfähig",
+    selfCareOnly: "Nur Selbstversorgung",
+    scored: (label, score) => `${label} (${score})`,
+  },
+
+  // Stage column: the numbered UICC groups (IVA, IIIB, …) are invariant and stay
+  // in logic; only the SCLC prose descriptor localises.
+  stage: {
+    extensive: "Ausgedehntes Stadium",
+  },
+
+  // Matrix prose values (words, not codes) and mixed-value templates. The code
+  // number / percentage / genomic token is always interpolated from logic.
+  values: {
+    missing: "Fehlt",
+    pending: "Ausstehend",
+    complete: "Vollständig",
+    negative: "Negativ",
+    na: "n.z.",
+    naSquamous: "n.z. (Plattenepithel)",
+    naEarlyStage: "n.z. (frühes Stadium)",
+    naSclc: "n.z. (SCLC)",
+    insufficientTissue: "Unzureichendes Gewebe (Wiederholung angefordert)",
+    completeWith: (marker) => `Vollständig (${marker})`,
+    positiveWith: (variant) => `Positiv (${variant})`,
+    conflicting: (a, b) => `Widersprüchlich (${a} vs ${b})`,
+    // Blocked-cell reason details surfaced in the evidence panel status. The
+    // status matching itself (missing / pending / insufficient tissue / n/a) is
+    // logic that keys off the English value and stays in the demo module.
+    missingReasonDetail: "Kein Quelldokument für dieses Feld gefunden.",
+    insufficientTissueReasonDetail: "Die Probe enthielt unzureichendes Gewebe für diese Untersuchung; eine erneute Biopsie wurde angefordert.",
+  },
+
+  // Treatment column names (field 10 · coded chronology). Each renders through
+  // `coded`; dates inside a name are invariant and interpolated in logic.
+  treatment: {
+    pembrolizumabStarted: "Pembrolizumab, begonnen",
+    concurrentChemoRtCompleted: "Simultane Radiochemotherapie, abgeschlossen",
+    noConsolidationImmunotherapy: "keine Konsolidierungs-Immuntherapie",
+    documented: "dokumentiert",
+    carboPaclitaxelPembrolizumab: "Carbo/paclitaxel + pembrolizumab",
+    osimertinibStarted: "Osimertinib, begonnen",
+    surgeryPlanned: "Operation geplant — chirurgische Planung ausstehend",
+    notYetStarted: "Noch nicht begonnen — Abklärung unvollständig",
+    alectinibStarted: "Alectinib, begonnen",
+    concurrentChemoRtOngoing: "Simultane Radiochemotherapie, laufend",
+    carboEtoposideAtezolizumab: "Carbo/etoposide + atezolizumab",
+  },
+
+  // Clinical note-type labels, shared across interpreted-cell notes, conflict
+  // sources and precedent facts.
+  noteLabels: {
+    oncologyConsult: "Onkologische Konsilnotiz",
+    oncologyTreatment: "Onkologische Behandlungsnotiz",
+    mdtOutcome: "MDT-Ergebnisnotiz",
+    radiationOncologyCompletion: "Strahlentherapie-Abschlussnotiz",
+    thoracicSurgeryClinic: "Thoraxchirurgische Ambulanznotiz",
+    oncologyClinic: "Onkologische Ambulanznotiz",
+    radiationOncologyProgress: "Strahlentherapie-Verlaufsnotiz",
+    oncologyNote: "Onkologische Notiz",
+    oncologyFollowUp: "Onkologische Verlaufsnotiz",
+    radiologyNote: "Radiologische Notiz",
+    pathologyReport: "Pathologiebefund",
+    molecularPathologyReread: "Molekularpathologische Nachbefundung",
+  },
+
+  // Histology-cell evidence: the Annexe 55 provenance block (fields 2, 4, 5, 7).
+  // Coded names render through `coded`; lobe/laterality/differentiation names and
+  // biopsy procedure names localise, the code numbers and dates stay in logic.
+  provenance: {
+    heading: "Annexe 55 Herkunft",
+    oldResult: "Altes Ergebnis",
+    labels: {
+      baseOfDiagnosis: "Diagnosegrundlage",
+      localisationLaterality: "Lokalisation · Lateralität",
+      differentiationGrade: "Differenzierungsgrad",
+      biopsy: "Biopsie",
+      petct: "PET-CT",
+    },
+    baseOfDiagnosis: {
+      histologyOfPrimary: "Histologie des Primärtumors",
+      cytology: "Zytologie",
+    },
+    lobes: {
+      rightUpperLobe: "Rechter Oberlappen",
+      leftUpperLobe: "Linker Oberlappen",
+      leftLowerLobe: "Linker Unterlappen",
+      rightLowerLobe: "Rechter Unterlappen",
+    },
+    laterality: {
+      left: "Links",
+      right: "Rechts",
+    },
+    differentiation: {
+      well: "Gut differenziert",
+      moderately: "Mäßig differenziert",
+      poorly: "Schlecht differenziert",
+      unknown: "Unbekannt",
+    },
+    biopsyProcedures: {
+      ctGuidedLung: "CT-gesteuerte Lunge",
+      bronchoscopy: "Bronchoskopie",
+      pleural: "pleural",
+      vatsWedge: "VATS-Keilresektion",
+    },
+    // `{lobe} · {laterality (code n)}` — the middot is punctuation, from logic.
+    localisation: (lobe, lateralityCoded) => `${lobe} · ${lateralityCoded}`,
+    // `{ISO date} ({procedure})` — the date is invariant, from logic.
+    biopsyValue: (date, procedure) => `${date} (${procedure})`,
+    biopsyAgeDetail: (date, days) => `Biopsie vom ${date} ist ${days} Tage alt — altes Ergebnis.`,
+  },
+
+  // Evidence side panel (both the fixture-built evidence and the component chrome).
+  evidence: {
+    selectedCell: "Ausgewählte Zelle",
+    mocNote: "MOC-Notiz",
+    interpretedExplanation: (columnTitle, rowId, noteLabel, date) =>
+      `Der Wert ${columnTitle} wurde aus dem Freitext in der ${noteLabel} von ${rowId} (${date}) extrahiert.`,
+    directExplanation: (columnTitle, concept, rowId) =>
+      `Der Wert ${columnTitle} wird aus der Quelle ${concept} gelesen, die mit Patient ${rowId} verknüpft ist.`,
+    mocNoteExplanation: (rowId) => `In die MOC-Notizen aus einem Anschlussgespräch über ${rowId} geschrieben.`,
+    conflictResolvedNote: (acceptedValue, acceptedLabel, rejectedValue, rejectedLabel, date) =>
+      `PD-L1-Konflikt gelöst: ${acceptedValue} (${acceptedLabel}) gegenüber ${rejectedValue} (${rejectedLabel}) akzeptiert, bestätigt ${date}.`,
+    // ArtifactEvidence.svelte chrome.
+    conflictHeading: "Widersprüchliche Quellen",
+    conflictHint: "Beide Befunde bleiben aktenkundig. Akzeptieren Sie den für diese Zelle zu verwendenden Wert.",
+    selected: "Ausgewählt",
+    notSelected: "Nicht ausgewählt",
+    use: (value) => `${value} verwenden`,
+    using: (value) => `${value} verwendet`,
+    useFrom: (value, label) => `${value} aus ${label} verwenden`,
+    blockNote: "Notiz",
+    blockReferences: "Referenzen",
+    blockSource: "Quelle",
+    blockQuery: "Abfrage",
+    blockReport: "Bericht",
+    close: "Nachweis schließen",
+  },
+
+  // The DB concept descriptor rendered in the direct-cell explanation ("…read
+  // from the {concept} source…"), keyed by column id. Localises the human-facing
+  // descriptor; the SQL `concept_name` token stays in logic (FIELD_SOURCES), so
+  // the query text is language-invariant while the sentence localises.
+  fieldSourceConcepts: {
+    histology: "Histologie",
+    tnm: "TNM-Klassifikation",
+    pdl1: "PD-L1 TPS",
+    egfr: "EGFR-Mutation",
+    ngs: "NGS-Panel",
+    treatment: "aktuelle Behandlung",
+    mocNotes: "MOC-Besprechungsnotiz",
+  },
+
+  // The two attention-list lines shown in the opening turn. Ids, code numbers,
+  // stage groups, dates and percentages are interpolated from logic.
+  attention: {
+    flagMissing: "Fehlt",
+    flagConflicting: "Widersprüchlich",
+    l3402Label: (id, stage) => `${id} (Stadium ${stage}, nicht resektabel)`,
+    l3402Detail: (chemoCode, rtDate, immunoCode) =>
+      `simultane Radiochemotherapie (Code ${chemoCode}) am ${rtDate} abgeschlossen, aber keine Konsolidierungs-Immuntherapie (Code ${immunoCode}) dokumentiert. Die Durvalumab-Konsolidierung ist die leitliniengerechte Folgetherapie nach Radiochemotherapie und wird für die Kostenerstattung COM-überwacht — es lohnt sich zu prüfen, ob das Zeitfenster verstrichen ist.`,
+    l3404Label: (id, stage) => `${id} (Stadium ${stage})`,
+    l3404Detail: (pathologyValue, rereadValue) =>
+      `PD-L1 TPS widersprüchlich: Pathologiebefund zeigt ${pathologyValue}, molekularpathologische Nachbefundung zeigt ${rereadValue}. Die Behandlungswahl kann davon abhängen, welcher Wert verwendet wird.`,
+  },
+
+  // Source-document bodies + verbatim quote substrings for the L-3404 PD-L1
+  // conflict. Percentages inside the prose are invariant, kept verbatim here.
+  conflict: {
+    pdl1: {
+      pathology: {
+        quotes: ["Tumor Proportion Score 60%"],
+        body: "PD-L1 (22C3 assay): Tumor Proportion Score 60%.",
+      },
+      reread: {
+        quotes: ["Tumor Proportion Score 10%", "Wiederholungstestung empfohlen, falls behandlungsentscheidend"],
+        body: "Nachbefundung der PD-L1-IHC auf Wunsch des Zweitbefunders: Tumor Proportion Score 10%. Heterogene Anfärbung festgestellt; Wiederholungstestung empfohlen, falls behandlungsentscheidend.",
+      },
+    },
+  },
+
+  // Clinical note prose behind every interpreted (yellow) cell, keyed
+  // "rowId:columnId". `quotes` are verbatim substrings of `body`. The note label
+  // and date are held in logic (label -> noteLabels; date invariant).
+  interpretedNotes: {
+    "L-3401:ecog": {
+      quotes: ["ECOG-Performance-Status 1"],
+      body: "Ambulant vor systemischer Therapie beurteilt. ECOG-Performance-Status 1: symptomatisch durch Husten, aber voll gehfähig und selbstversorgend. Geeignet für Immuntherapie.",
+    },
+    "L-3401:stage": {
+      quotes: ["eingestuft als cT2 cN3 cM1b, UICC-Stadium IVA"],
+      body: "Staging-Untersuchungen jetzt abgeschlossen. CT und PET zeigen einen 4.2cm großen Primärtumor im rechten Oberlappen mit mediastinaler Lymphknotenbeteiligung mehrerer Stationen und kontralateraler Lymphknotenbeteiligung sowie eine solitäre Nebennierenmetastase; eingestuft als cT2 cN3 cM1b, UICC-Stadium IVA. Molekulare Ergebnisse mit dem Patienten besprochen; systemische Therapieoptionen erörtert.",
+    },
+    "L-3401:treatment": {
+      quotes: ["Pembrolizumab-Monotherapie heute begonnen"],
+      body: "PD-L1 TPS 80%, kein therapierbarer Treiber im NGS außer KRAS G12C. Pembrolizumab-Monotherapie heute begonnen, Zyklus 1 komplikationslos verabreicht. Plan: Fortführung alle 3 Wochen, Restaging-CT nach Zyklus 3.",
+    },
+    "L-3402:ecog": {
+      quotes: ["ECOG-Performance-Status 1"],
+      body: "Geeignet für radikale simultane Radiochemotherapie: ECOG-Performance-Status 1, gehfähig und in den täglichen Aktivitäten selbstständig, adäquate Organfunktion in der Ausgangslaborkontrolle.",
+    },
+    "L-3402:stage": {
+      quotes: ["Stadium IIIB (cT4 cN2 cM0) und nicht resektabel"],
+      body: "MDT-Beurteilung der Bildgebung und der EBUS-Ergebnisse: ausgedehnte mediastinale Lymphknotenbeteiligung mit kontralateralem Befall. Die thoraxchirurgische Beurteilung kommt zu dem Schluss, dass die Erkrankung Stadium IIIB (cT4 cN2 cM0) und nicht resektabel ist. Konsensplan: simultane Radiochemotherapie in kurativer Absicht.",
+    },
+    "L-3402:treatment": {
+      quotes: ["Simultane Radiochemotherapie heute abgeschlossen", "keine Konsolidierungs-Immuntherapie angeordnet"],
+      body: "Simultane Radiochemotherapie heute abgeschlossen: 60 Gy in 30 Fraktionen mit wöchentlichem carboplatin/paclitaxel, toleriert mit Grad-1-Ösophagitis. PD-L1-Ergebnis bei Abschluss ausstehend; derzeit keine Konsolidierungs-Immuntherapie angeordnet. Zur medizinisch-onkologischen Nachsorge.",
+    },
+    "L-3403:ecog": {
+      quotes: ["Performance-Status ECOG 1"],
+      body: "Pleuraflüssigkeitszytologie bestätigt ein Plattenepithelkarzinom. Performance-Status ECOG 1: symptomatisch mit belastungsabhängiger Atemnot, aber gehfähig und selbstversorgend. Zur systemischen Erstlinientherapie.",
+    },
+    "L-3403:stage": {
+      quotes: ["malignen Pleuraerguss — cM1a-Erkrankung, UICC-Stadium IVA"],
+      body: "Die Pleuraflüssigkeitszytologie aus der Punktion vom 2026-05-28 ist positiv für maligne Zellen vereinbar mit einem Plattenepithelkarzinom und bestätigt einen malignen Pleuraerguss — cM1a-Erkrankung, UICC-Stadium IVA. Performance-Status ECOG 1. Zur systemischen Erstlinientherapie.",
+    },
+    "L-3403:treatment": {
+      quotes: ["carboplatin/paclitaxel mit pembrolizumab"],
+      body: "Zyklus 2 von carboplatin/paclitaxel mit pembrolizumab heute verabreicht. Behandlung wird bis auf eine Grad-1-Fatigue gut vertragen; Pleuraerguss klinisch stabil, keine erneute Flüssigkeitsansammlung, die eine Drainage erfordert.",
+    },
+    "L-3404:ecog": {
+      quotes: ["ECOG-Performance-Status 0"],
+      body: "Trotz ossärer Metastasen bleibt der Patient bei ECOG-Performance-Status 0: voll aktiv, in der Lage, alle Aktivitäten wie vor der Erkrankung ohne Einschränkung fortzuführen. Zur EGFR-gerichteten zielgerichteten Therapie.",
+    },
+    "L-3404:stage": {
+      quotes: ["multiple ossäre Metastasen", "cM1c-Erkrankung, UICC-Stadium IVB"],
+      body: "PET-CT und MRT der Wirbelsäule bestätigen multiple ossäre Metastasen (Wirbelkörper T8, linkes Ilium) zusätzlich zum Lungenprimärtumor: cM1c-Erkrankung, UICC-Stadium IVB. Analgesie begonnen; knochenprotektives Mittel besprochen. EGFR exon 19 deletion positiv — zur zielgerichteten Therapie.",
+    },
+    "L-3404:treatment": {
+      quotes: ["Osimertinib 80mg einmal täglich heute begonnen"],
+      body: "EGFR exon 19 deletion im Gewebe-NGS bestätigt. Osimertinib 80mg einmal täglich heute begonnen nach Ausgangs-EKG und Laborkontrolle. Aufklärung über Hautausschlag, Diarrhö und QTc-Überwachung; erste Ansprechbeurteilung in 6 Wochen.",
+    },
+    "L-3405:ecog": {
+      quotes: ["ECOG-Performance-Status 0"],
+      body: "Gesunder Patient mit einem zufällig entdeckten Rundherd. ECOG-Performance-Status 0: voll aktiv, asymptomatisch, keine funktionelle Einschränkung. Geeignet für Lobektomie.",
+    },
+    "L-3405:stage": {
+      quotes: ["pathologisches Stadium IA (pT1b pN0 cM0), resektable Erkrankung"],
+      body: "Solitärer 2.1cm großer Rundherd im rechten Oberlappen, PET-avid, ohne Lymphknoten- oder Fernmetastasen: pathologisches Stadium IA (pT1b pN0 cM0), resektable Erkrankung. Die Histologie der Keilresektion bestätigt ein Adenokarzinom mit tumorfreien Rändern am diagnostischen Präparat. Überweisung an die Thoraxchirurgie zur definitiven Resektionsplanung.",
+    },
+    "L-3405:treatment": {
+      quotes: ["Wartet derzeit auf die chirurgische Planung"],
+      body: "In der thoraxchirurgischen Ambulanz beurteilt. Lungenfunktion für eine Lobektomie ausreichend (FEV1 92% des Solls). Wartet derzeit auf die chirurgische Planung und die präoperative anästhesiologische Beurteilung; Ziel ist die OP-Anmeldung innerhalb von 4 Wochen.",
+    },
+    "L-3406:ecog": {
+      quotes: ["ECOG-Performance-Status 2"],
+      body: "ECOG-Performance-Status 2: symptomatisch, mehr als die Hälfte des Tages auf den Beinen und zur Selbstversorgung fähig, aber arbeitsunfähig. Die Behandlungsintensität ist im MOC gegen den Performance-Status abzuwägen.",
+    },
+    "L-3406:stage": {
+      quotes: ["Stadium IIIA (cT3 cN2 cM0) und nicht resektabel"],
+      body: "EBUS bestätigt N2-Lymphknotenbeteiligung (Stationen 4R und 7). MDT-Konsens: die Erkrankung ist Stadium IIIA (cT3 cN2 cM0) und nicht resektabel; kein Kandidat für eine Operation. Der Plan hängt von der Eignung der erneuten Biopsie für die molekulare Profilierung ab.",
+    },
+    "L-3406:treatment": {
+      quotes: ["Die Behandlung hat noch nicht begonnen"],
+      body: "Die Behandlung hat noch nicht begonnen. Die initiale Probe enthielt unzureichendes Gewebe für das NGS-Panel; erneute bronchoskopische Biopsie vor Festlegung des systemischen Plans angefordert. PD-L1 und EGFR stehen ebenfalls noch aus. Erneute Besprechung im MOC, sobald die Ergebnisse vorliegen.",
+    },
+    "L-3407:ecog": {
+      quotes: ["ECOG-Performance-Status 1"],
+      body: "Neu diagnostizierte Hirnmetastasen, aber neurologisch intakt. ECOG-Performance-Status 1: gehfähig und selbstversorgend, kein Steroidbedarf. Beginn einer ZNS-gängigen zielgerichteten Therapie.",
+    },
+    "L-3407:stage": {
+      quotes: ["cM1c-Erkrankung, UICC-Stadium IVB, mit Hirnmetastasen"],
+      body: "MRT des Schädels (2026-05-26) zeigt drei kontrastmittelaufnehmende Metastasen, die größte 14mm im rechten Frontallappen: cM1c-Erkrankung, UICC-Stadium IVB, mit Hirnmetastasen. Asymptomatisch, kein Steroidbedarf. ALK-Rearrangement im NGS nachgewiesen — ZNS-gängige zielgerichtete Therapie gegenüber primärer Radiotherapie bevorzugt.",
+    },
+    "L-3407:treatment": {
+      quotes: ["Alectinib 600mg zweimal täglich heute begonnen (2026-05-30)"],
+      body: "ALK-Rearrangement bestätigt. Alectinib 600mg zweimal täglich heute begonnen (2026-05-30), wobei die intrakranielle Erkrankung angesichts der erwarteten ZNS-Aktivität unbestrahlt belassen wurde. Ausgangs-LFTs und CK normal; Überwachungs-MRT des Schädels für Woche 3 und 6 geplant.",
+    },
+    "L-3408:ecog": {
+      quotes: ["ECOG-Performance-Status 1"],
+      body: "ECOG-Performance-Status 1: symptomatisch, aber gehfähig und selbstständig, geeignet für eine radikale simultane Radiochemotherapie. PD-L1 70%; Konsolidierungs-Immuntherapie nach Abschluss zu erwägen.",
+    },
+    "L-3408:stage": {
+      quotes: ["Stadium IIIB (cT4 cN2 cM0), nicht resektabel"],
+      body: "Restaging nach bronchoskopischer Biopsie: die kontralaterale mediastinale Lymphknotenbeteiligung macht dies zu Stadium IIIB (cT4 cN2 cM0), nicht resektabel. Das MDT empfiehlt eine simultane Radiochemotherapie mit nach Abschluss zu erwägender Konsolidierungs-Immuntherapie, PD-L1 70%.",
+    },
+    "L-3408:treatment": {
+      quotes: ["Simultane Radiochemotherapie laufend"],
+      body: "Simultane Radiochemotherapie laufend: Fraktion 18 von 30 mit wöchentlichem carboplatin/paclitaxel appliziert. Grad-1-Ösophagitis mit löslicher Analgesie behandelt; bislang keine Behandlungsunterbrechungen. Voraussichtlicher Abschluss am 2026-07-22.",
+    },
+    "L-3409:ecog": {
+      quotes: ["ECOG-Performance-Status 1"],
+      body: "Kleinzelliges Lungenkarzinom mit rasch fortschreitendem Verlauf. ECOG-Performance-Status 1: symptomatisch, aber gehfähig und selbstversorgend. Zur unverzüglichen Erstlinien-Chemo-Immuntherapie.",
+    },
+    "L-3409:stage": {
+      quotes: ["Erkrankung im ausgedehnten Stadium"],
+      body: "Kleinzelliges Lungenkarzinom durch bronchoskopische Biopsie bestätigt. Staging-CT zeigt Lebermetastasen und kontralaterale hiläre Lymphknoten: Erkrankung im ausgedehnten Stadium. ECOG 1. Zur unverzüglichen Erstlinien-Chemo-Immuntherapie angesichts der Krankheitsdynamik.",
+    },
+    "L-3409:treatment": {
+      quotes: ["carboplatin/etoposide mit atezolizumab"],
+      body: "Zyklus 1 von carboplatin/etoposide mit atezolizumab heute verabreicht. Antiemetika und G-CSF-Unterstützung verordnet. Plan: 4 Zyklen, dann Erhaltungstherapie mit atezolizumab; Ansprech-CT nach Zyklus 2.",
+    },
+  },
+
+  // Follow-up A precedent cases (L-2894, L-3011). Stage groups, ids, day/week
+  // counts are interpolated from logic; source bodies/quotes are verbatim.
+  precedent: {
+    l2894Situation: (stage, refId) =>
+      `Stadium ${stage} nicht resektabel, Radiochemotherapie abgeschlossen, PD-L1 bei RT-Abschluss noch ausstehend (gleiche Situation wie ${refId})`,
+    l3011Situation: (stage) => `Stadium ${stage} nicht resektabel, Radiochemotherapie abgeschlossen`,
+    l2894Action: (days) => `Durvalumab begonnen, sobald PD-L1 vorlag, ${days} Tage nach RT-Abschluss.`,
+    l2894Outcome: (weeks) => `Nach ${weeks} Wochen weiterhin unter durvalumab; keine Progression im jüngsten CT.`,
+    l3011Action: "Konsolidierung mit durvalumab abgelehnt, unter Verweis auf Bedenken wegen Nebenwirkungen.",
+    l3011Outcome: (weeks) => `Überwachungsstrategie; stabile Erkrankung im Verlaufs-CT nach ${weeks} Wochen.`,
+    sources: {
+      l2894Action: {
+        quotes: ["Durvalumab Zyklus 1 heute verabreicht, 18 Tage nach Abschluss der Radiochemotherapie"],
+        body: "Durvalumab Zyklus 1 heute verabreicht, 18 Tage nach Abschluss der Radiochemotherapie. PD-L1 TPS 45% vor Beginn bestätigt.",
+      },
+      l2894Outcome: {
+        quotes: ["Kein Anhalt für eine Progression im jüngsten CT Thorax/Abdomen"],
+        body: "Der Patient setzt die durvalumab-Konsolidierung fort, nun 7 Wochen nach Beginn. Kein Anhalt für eine Progression im jüngsten CT Thorax/Abdomen (2026-06-10). Behandlung wird gut vertragen, keine signifikante Toxizität.",
+      },
+      l3011Action: {
+        quotes: ["der Patient lehnt die Immuntherapie derzeit ab und verweist auf Bedenken wegen Nebenwirkungen"],
+        body: "Konsolidierung mit durvalumab mit dem Patienten besprochen; der Patient lehnt die Immuntherapie derzeit ab und verweist auf Bedenken wegen Nebenwirkungen. Fortführung der Überwachungsbildgebung.",
+      },
+      l3011Outcome: {
+        quotes: ["stabile Erkrankung im Vergleich zur Voruntersuchung"],
+        body: "CT Thorax/Abdomen: stabile Erkrankung im Vergleich zur Voruntersuchung vom 2026-05-10. Keine neuen Läsionen. Posttherapeutische Veränderungen im rechten Oberlappen, unverändert.",
+      },
+    },
+  },
+
+  // Follow-up B brain-MRI series (L-3407). Report label, per-scan labels and the
+  // short date-axis labels (chart ticks) localise; ISO dates, week counts,
+  // measurements and the report bodies/quotes are verbatim.
+  mri: {
+    reportLabel: "MRT des Schädels mit Kontrastmittel",
+    labelBaseline: "Ausgangsbefund",
+    labelInterim: (weeks) => `Zwischenbefund (${weeks} Wochen)`,
+    labelLatest: (weeks) => `Aktueller Befund (${weeks} Wochen)`,
+    scans: {
+      baseline: {
+        short: "26. Mai",
+        quotes: ["Summe der Zielläsionsdurchmesser 31mm", "Drei kontrastmittelaufnehmende Metastasen nachgewiesen"],
+        body: "KLINISCHE ANGABEN: NSCLC, ALK-rearrangiert, neu diagnostiziert, Staging-MRT des Schädels vor Beginn von alectinib.\nBEFUNDE: Drei kontrastmittelaufnehmende Metastasen nachgewiesen. Rechte frontale Läsion misst 14mm. Linke parietale Läsion misst 11mm. Zerebelläre Läsion misst 6mm. Summe der Zielläsionsdurchmesser 31mm. Keine Blutung oder Hydrozephalus.\nBEURTEILUNG: Drei Hirnmetastasen, größte 14mm, vereinbar mit bekanntem NSCLC-Primärtumor.",
+      },
+      interim: {
+        short: "16. Juni",
+        quotes: ["Summe der Zielläsionsdurchmesser 20mm, gegenüber 31mm zum Ausgangswert reduziert (65% des Ausgangswerts)"],
+        body: "KLINISCHE ANGABEN: NSCLC, ALK-rearrangiert, Z. n. 3 Wochen alectinib bei bekannten Hirnmetastasen.\nVERGLEICH: MRT des Schädels 2026-05-26.\nBEFUNDE: Rechte frontale Läsion misst nun 9mm (zuvor 14mm). Linke parietale Läsion misst nun 7mm (zuvor 11mm). Zerebelläre Läsion misst nun 4mm (zuvor 6mm). Summe der Zielläsionsdurchmesser 20mm, gegenüber 31mm zum Ausgangswert reduziert (65% des Ausgangswerts). Keine neuen intrakraniellen Läsionen.\nBEURTEILUNG: Größenabnahme aller drei bekannten Hirnmetastasen im Intervall; keine neuen Läsionen.",
+      },
+      latest: {
+        short: "5. Juli",
+        quotes: ["Summe der Zielläsionsdurchmesser 11mm, gegenüber 31mm zum Ausgangswert reduziert (35% des Ausgangswerts)", "Zerebelläre Läsion, zuvor 4mm messend, ist nicht mehr sichtbar"],
+        body: "KLINISCHE ANGABEN: NSCLC, ALK-rearrangiert, Z. n. 5 Wochen alectinib bei bekannten Hirnmetastasen.\nVERGLEICH: MRT des Schädels 2026-06-16.\nBEFUNDE: Rechte frontale Läsion misst nun 6mm (zuvor 9mm). Linke parietale Läsion misst nun 5mm (zuvor 7mm). Zerebelläre Läsion, zuvor 4mm messend, ist nicht mehr sichtbar. Summe der Zielläsionsdurchmesser 11mm, gegenüber 31mm zum Ausgangswert reduziert (35% des Ausgangswerts). Keine neuen intrakraniellen Läsionen.\nBEURTEILUNG: Fortgesetzte Größenabnahme der zwei verbleibenden Hirnmetastasen im Intervall; zerebelläre Läsion zurückgebildet; keine neuen Läsionen.",
+      },
+    },
+  },
+
+  // Inline chart titles for Follow-up B.
+  charts: {
+    targetLesionBurden: "Zielläsionslast",
+    visibleBrainLesions: "Sichtbare Hirnläsionen",
+  },
+
+  // Scripted follow-up turns. `prompt` is the doctor's question; `reply` the agent
+  // lead-in; `activity` the streamed lines; `noteText` the MOC-notes write-back.
+  // Counts, ids, percentages, day/week values and dates are interpolated from logic.
+  followUps: {
+    a: {
+      prompt: "Gab es früher ähnliche Fälle?",
+      reply: (count) => `${count} ähnliche Fälle in diesem Quartal:`,
+      activity: [
+        "Durchsuche frühere Lungen-MOC-Akten nach nicht resektablen Fällen im Stadium III.",
+        "2 vergleichbare, in diesem Quartal behandelte Patienten gefunden.",
+        "Rufe deren Konsolidierungsentscheidungen und Verlaufsergebnisse ab.",
+      ],
+      noteText: (count, id1, days, weeks1, id2, weeks2) =>
+        `Präzedenzfälle (${count} Fälle): ${id1} — durvalumab an D+${days} begonnen, stabil nach ${weeks1} Wo. ${id2} — abgelehnt, stabil nach ${weeks2} Wo. unter Überwachung.`,
+    },
+    b: {
+      prompt: "Bisheriges Ansprechen?",
+      reply: (count, date) => `${count} Schädel-MRT dokumentiert seit Beginn von Alectinib am ${date}.`,
+      activity: [
+        "Lokalisiere die Schädel-MRT-Serie von L-3407 seit Beginn von Alectinib.",
+        "Vergleiche die Zielläsionsmessungen über die drei Untersuchungen.",
+        "Berechne den Ansprechtrend.",
+      ],
+      noteText: (pctSequence, scanCount, weeks) =>
+        `Schädel-MRT-Ansprechen: ${pctSequence} der Zielläsionslast über ${scanCount} Untersuchungen, ${weeks} Wochen unter Behandlung.`,
+    },
+  },
+  // Fallback activity lines while a follow-up with no scripted activity streams.
+  genericFollowUpActivity: ["Lese die verknüpften Akten.", "Rufe die relevanten Werte ab."],
+
+  // Streamed opening-run activity lines (the store's timed controller). Codes,
+  // ids, percentages and counts are interpolated from logic.
+  run: {
+    template: (templateName) => `Ihre Vorlage ${templateName} erkannt — wird für die morgige Liste wiederverwendet.`,
+    agenda: (patients) => `Lade die ${patients} Patienten der morgigen MOC-Agenda.`,
+    structured: "Lese strukturierte Felder: Histologie, TNM-Klassifikation und Biomarker.",
+    ecog: "Extrahiere den ECOG-Performance-Status aus onkologischen Notizen.",
+    stage: "Leite die UICC-Stadiengruppe aus dem TNM jedes Patienten ab.",
+    treatment: "Extrahiere die aktuelle Behandlung aus Medikationsanordnungen und Notizen.",
+    conflicts: "Prüfe Biomarker-Quellen auf Widersprüche.",
+    flag3404: (pathologyValue, rereadValue) =>
+      `L-3404 markiert — PD-L1-Konflikt (Pathologie ${pathologyValue} vs Nachbefundung ${rereadValue}).`,
+    flag3402: (chemoCode, immunoCode) =>
+      `L-3402 markiert — Radiochemotherapie (Code ${chemoCode}) abgeschlossen, keine Konsolidierungs-Immuntherapie (Code ${immunoCode}) dokumentiert.`,
+    ready: (ready, total) => `Nachweise für ${ready} von ${total} Patienten bereit.`,
+  },
+
+  // Opening turn (ThreadView). "Annexe 55" is the invariant schema name and stays
+  // in logic; the surrounding prose segments localise. Patient/complete counts are
+  // interpolated from logic. `templateName` is the reusable-template display name.
+  templateName: "Lungen-MOC-Vorbereitung",
+  artifactTitle: "Lungen-MOC-Evidenzmatrix",
+  chipPopulating: "wird befüllt…",
+  chipReady: "bereit",
+  opening: {
+    usingYour: "Verwende Ihre Vorlage",
+    templateColumnsAre: "— ihre Spalten sind die",
+    registrationFields: (patients, complete) =>
+      `Registrierungsfelder. ${patients} Patienten auf der morgigen Liste. Die Registerdaten sind für ${complete} von ihnen vollständig. Zwei sollten vor der Besprechung geprüft werden:`,
+  },
+  agentSurfaceHint: "Ich kann jeden Wert dieser Liste aus seiner Quelle anzeigen — wählen Sie eine Zelle in der Matrix und fragen Sie.",
+
+  // Follow-up MOC-notes question (product AskUserQuestion shape) + chips.
+  followUpQuestion: (rowId) => `Dies zu den MOC-Notizen für ${rowId} hinzufügen?`,
+  addToMocNotes: "Zu MOC-Notizen hinzufügen",
+  skip: "Überspringen",
+  followUpAddedConfirm: (rowId) => `Zu MOC-Notizen für ${rowId} hinzugefügt ✓`,
+  followUpSource: "Quelle ↗",
+  followUpSourceAria: (label, date) => `Quelle öffnen: ${label}, ${date}`,
+
+  // Attention list container label.
+  attentionListLabel: "Vor der Besprechung zu prüfen",
+
+  // Chart point aria-label (Follow-up B). Value + point label from logic.
+  chartPointAria: (title, value, pointLabel) => `${title}: ${value} am ${pointLabel} — Quellbericht öffnen`,
+
+  // Cell metadata explanations surfaced by the spreadsheet cell inspector.
+  cellMeta: {
+    direct: (columnTitle, rowId) => `${columnTitle} für ${rowId}.`,
+    interpreted: (columnTitle, rowId) => `${columnTitle} für ${rowId}, aus Freitext-Notizen extrahiert.`,
+  },
+
+  // ArtifactBox.svelte tab & control labels.
+  box: {
+    resizeHandle: "Zum Ändern der Größe ziehen",
+    closeTab: (tabTitle) => `${tabTitle} schließen`,
+    sendContext: (count) => `Ausgewählten Kontext senden (${count})`,
+    addContext: "Artefakt-Kontext hinzufügen",
+    send: "Senden",
+    showChat: "Chat anzeigen",
+    expandArtifact: "Artefakt erweitern",
+    closeArtifact: "Artefakt schließen",
+    contextNote: "Kontextnotiz",
+    askAboutOne: "diese Zelle",
+    askAboutMany: (count) => `diese ${count} Zellen`,
+    askPlaceholder: (target) => `Frage über ${target}…`,
+    addToContext: "Zum Kontext hinzufügen",
+  },
+
+  // ContextChip.svelte pill labels.
+  contextChip: {
+    listLabel: "Angehängter Kontext",
+    detailLabel: "Kontextdetail",
+    remove: "Kontext entfernen",
+    oneCell: "1 Zelle",
+    manyCells: (count) => `${count} Zellen`,
+  },
+};
 
 const blankFilters = () => ({ dateFrom: "", dateTo: "", hospitals: "", cohort: "" });
 
@@ -1855,7 +2359,7 @@ const labels = {
 };
 
 // --- Mock audit-detail strings (criteria + summary) -------------------------
-const auditDetail = {
+const templateDetail = {
   databaseSummary: "Demografie, Aufnahmen und kodierte klinische Ereignisse für den Kohortenabgleich.",
   criteria: {
     age: { label: "Patientenalter", unit: "Jahre" },
@@ -2253,8 +2757,112 @@ const timeline = {
   flowT: {
     reviewingTemplate: { headline: "Reviewing the template…", detail: "Reviewing the **Paediatric major trauma (NMTR)** audit against the **EHR database** and resolving the field mappings." },
   },
+  diabetesWorklist: {
+    creating: { headline: "BPT-Liste erstellen", detail: "Eine fokussierte BPT-Risikoliste aus der Chat-Antwort wurde fixiert." },
+    scoping: { headline: "BPT-Liste eingrenzen", detail: "Nur die pädiatrischen Diabetespatienten auswählen, die bereits in der nachvollziehbaren Chat-Liste identifiziert wurden." },
+    fetchingEvidence: "Quelldaten für letztes HbA1c und Urin-ACR abrufen",
+    readingNotes: { headline: "Ambulanznotizen lesen", detail: "Glukosemanagement-, DKA/Aufnahme- und Review-Nachweise patientenweise prüfen." },
+  },
   // Folded activity-line label for thinking steps.
   thinkingLabel: "Überlegt",
+};
+
+const diabetesWorklist = {
+  tableTitle: "Diabetes-BPT-Nachweisliste",
+  sheetName: "Diabetes-Liste",
+  columns: [
+    { key: "patient", header: "Patient", width: 12 },
+    { key: "hba1c", header: "Letztes HbA1c", width: 14 },
+    { key: "hba1cDate", header: "HbA1c-Datum / Ambulanztermin", width: 30 },
+    { key: "glucoseIntervention", header: "Nachweis Glukosemanagement-Intervention", width: 40 },
+    { key: "acr", header: "Urin-ACR-Ergebnis", width: 20 },
+    { key: "acrDate", header: "Urin-ACR-Datum", width: 22 },
+    { key: "admission", header: "DKA-/Aufnahmenachweis", width: 28 },
+    { key: "lastReview", header: "Letzter Diabetes-Review", width: 26 },
+  ],
+  answer: [
+    "Zusammenfassung: [12]{1} pädiatrische Diabetespatienten sind im Geltungsbereich. 7/12 benötigen vor der BPT-Einreichungsfrist eine Maßnahme: [5]{2} haben ein HbA1c von 70 mmol/mol oder höher, und bei [2]{3} fehlt der Urin-ACR-Nachweis.",
+    "",
+    "---",
+    "",
+    "**Hohes HbA1c - Interventionsnachweis erforderlich**",
+    "",
+    "• Problem: Diese Patienten liegen über dem HbA1c-Schwellenwert; die BPT-Leistung hängt daher davon ab, dass eine Glukosemanagement-Intervention überprüft oder vereinbart dokumentiert ist.",
+    "",
+    "• Patienten: NPD002 HbA1c [74,0 mmol/mol]{4}; NPD003 HbA1c [81,0 mmol/mol]{5} mit [DKA bei Neudiagnose]{6}; NPD005 HbA1c [86,0 mmol/mol]{7}; NPD006 HbA1c [92,0 mmol/mol]{8} mit [kürzlicher DKA-Aufnahme]{9}; NPD008 HbA1c [70,0 mmol/mol]{11}.",
+    "",
+    "• Maßnahme: Überprüfung durch Diabetes-CNS oder Konsiliararzt, anschließend Interventionsplan vor der Einreichung dokumentieren.",
+    "",
+    "---",
+    "",
+    "**Fehlender Urin-ACR-Nachweis - Lücke im Versorgungsprozess**",
+    "",
+    "• Problem: Für diese Patienten ist kein Urin-ACR-Ergebnis dokumentiert; der jährliche Versorgungsprozess-Nachweis ist daher unvollständig.",
+    "",
+    "• Patienten: NPD007 - [kein Urin-ACR-Ergebnis]{10}; NPD010 - [kein Urin-ACR-Ergebnis]{12}.",
+    "",
+    "• Maßnahme: Laborergebnis finden oder Urin-ACR vor der Einreichung buchen und dokumentieren.",
+    "",
+    "---",
+    "",
+    "Soll ich eine Tabelle für die Diabetes-Audit-Leitung erstellen, die die Quelldaten verfolgt?",
+  ].join("\n"),
+  ask: {
+    question: "Tabelle für die Diabetes-Audit-Leitung mit Quelldaten erstellen?",
+    createLabel: "Tabelle erstellen",
+    keepLabel: "Liste behalten",
+  },
+  riskListAsk: {
+    question: "Nachvollziehbare Patientenliste abrufen?",
+    showLabel: "Liste anzeigen",
+    keepLabel: "Zusammenfassung behalten",
+  },
+  messages: {
+    keepRiskSummary: "Ich belasse es bei einer kurzen BPT-Risikozusammenfassung.",
+    buildingTable: "Die Diabetes-BPT-Nachweisliste wird jetzt erstellt. Sie enthält nur die 7 Patienten mit Handlungsbedarf und quellengestützte Nachweise für HbA1c, ACR, Glukosemanagement-Intervention, DKA/Aufnahmen und letzten Review.",
+    keepChatAnswer: "Ich belasse die Diabetes-Melderisiko-Antwort im Chat.",
+  },
+  activities: {
+    genericQuery: { label: "Datenbank abfragen", headline: "Zitierte Datensätze lesen" },
+    initial: [
+      { id: "mock-diabetes-bpt-requirements", label: "BPT-Anforderungen prüfen", headline: "Prüfen, welche pädiatrischen Diabetesmaßnahmen für diese Meldefrist gelten" },
+      { id: "mock-diabetes-cohort", label: "Diabeteskohorte prüfen", headline: "Pädiatrische Diabetespatienten im Berichtsjahr zählen" },
+      { id: "mock-diabetes-evidence-map", label: "Erforderliche Nachweise zuordnen", headline: "Outcome- und Versorgungsprozessfelder für die BPT-Einreichung identifizieren" },
+      { id: "mock-diabetes-care-processes", label: "Patientennachweise abfragen", headline: "HbA1c, Urin-ACR und Ambulanznotizen für die zugeordneten Maßnahmen lesen" },
+      { id: "mock-diabetes-admissions", label: "Aufnahmenotizen prüfen", headline: "DKA-Aufnahmen zu Patienten mit Handlungsbedarf suchen" },
+      { id: "mock-diabetes-bpt-gap", label: "BPT-Lücke bewerten", headline: "Patienten nach fehlendem Nachweis und empfohlener Nachverfolgung gruppieren" },
+    ],
+    riskList: { label: "BPT-Risikonachweise prüfen", headline: "HbA1c-, ACR- und Aufnahmenachweise lesen" },
+    table: [
+      { id: "mock-diabetes-worklist-table", label: "Quellengestützte Tabelle vorbereiten", headline: "Liste für die Diabetes-Audit-Leitung erstellen" },
+      { id: "mock-diabetes-worklist-columns", label: "Nachweisspalten auflösen", headline: "HbA1c, ACR, Glukosemanagement, Aufnahme und Review zuordnen" },
+      { id: "mock-diabetes-worklist-population", label: "Tabellenbefüllung starten", headline: "Live-Befüllung für die 7 Patienten mit Handlungsbedarf starten" },
+    ],
+  },
+  citations: {
+    cohort: { explanation: "Anzahl pädiatrischer Diabetespatienten in der Meldekohorte", denominatorLabel: "Patienten in der Meldekohorte", completenessLabel: "gezählte Patienten" },
+    highHba1c: { explanation: "Anzahl der Diabetespatienten mit HbA1c von mindestens 70 mmol/mol", denominatorLabel: "Patienten mit hohem HbA1c", completenessLabel: "geprüfte HbA1c-Werte" },
+    missingAcr: { explanation: "Anzahl der Diabetespatienten mit fehlendem Urin-ACR-Nachweis", denominatorLabel: "Patienten mit fehlendem ACR", completenessLabel: "geprüfte ACR-Felder" },
+    hba1c: (code) => `letzter HbA1c-Wert für ${code}`,
+    dkaNewDiagnosis: (code) => `Aufnahmenotiz mit DKA bei Neudiagnose für ${code}`,
+    recentDka: (code) => `Aufnahmenotiz mit kürzlicher DKA-Aufnahme für ${code}`,
+    urinaryAcr: (code) => `Urin-ACR-Abfrage für ${code}`,
+  },
+  evidence: {
+    dkaNewDiagnosis: "diabetischer Ketoazidose (DKA) zum Zeitpunkt der Neudiagnose",
+    recentDka: "diabetischer Ketoazidose (DKA) nach einer interkurrenten Erkrankung",
+  },
+  cell: {
+    noneRecorded: "Nicht dokumentiert",
+    patientExplanation: (code) => `${code} ist in dieser Periode Teil der pädiatrischen Diabetes-Meldekohorte.`,
+    hba1cDate: (code) => `Das Ambulanz-Beobachtungspanel dokumentiert das HbA1c-Datum für ${code}.`,
+    glucoseIntervention: (code) => `Die Diabetes-Ambulanznotiz dokumentiert Glukosemanagement-Interventionsnachweis für ${code}.`,
+    acrDate: (code) => `Das Ambulanz-Beobachtungspanel dokumentiert das Urin-ACR-Datum für ${code}.`,
+    acrDateMissing: (code) => `Für ${code} ist kein Urin-ACR-Ergebnis dokumentiert, daher gibt es kein Urin-ACR-Datum.`,
+    dkaAdmission: (code) => `Die Aufnahmenotiz dokumentiert eine diabetesbezogene DKA-Aufnahme für ${code}.`,
+    noAdmission: (code) => `Für ${code} ist in der Aufnahmeabfrage des Auditjahres keine diabetesbezogene Aufnahme dokumentiert.`,
+    lastReview: (code) => `Die Jahresreview-Notiz dokumentiert den letzten Diabetes-Review für ${code}.`,
+  },
 };
 
 // --- Sample doctor's email (Flow B) -----------------------------------------
@@ -2271,13 +2879,13 @@ Dr Mark Alvarez
 Notfallmedizin`;
 
 // --- Tracked-dashboard descriptors (home cards §2.2 + left panel §4) ---------
-// Three paediatric BPT dashboards. Each opens a seeded audit via selectAudit().
+// Three paediatric BPT dashboards. Each opens a seeded audit via selectPopulatedTable().
 // `trackers` lists ids into the `trackers` map below. Numbers/ids/refs/kinds are
 // logic and identical across packs; title/subtitle strings stay English verbatim.
 const dashboards = [
   {
     id: "paediatric-diabetes-bpt",
-    auditId: "npda-lo-audit",
+    templateId: "npda-lo-audit",
     title: "Diabetes BPT",
     logo: "dash-diabetes",
     subtitle: "NPDA · key care processes",
@@ -2286,7 +2894,7 @@ const dashboards = [
   },
   {
     id: "paediatric-epilepsy-bpt",
-    auditId: "epilepsy12-lo-audit",
+    templateId: "epilepsy12-lo-audit",
     title: "Epilepsy BPT",
     logo: "dash-epilepsy",
     subtitle: "Epilepsy12 · service KPIs",
@@ -2295,7 +2903,7 @@ const dashboards = [
   },
   {
     id: "paediatric-trauma-bpt",
-    auditId: "nmtr-trauma-lo-audit",
+    templateId: "nmtr-trauma-lo-audit",
     title: "Major Trauma BPT",
     logo: "dash-trauma",
     subtitle: "NMTR · acute care standards",
@@ -2304,7 +2912,7 @@ const dashboards = [
   },
   {
     id: "cord-ph-bpt",
-    auditId: "cord-ph-lo-audit",
+    templateId: "cord-ph-lo-audit",
     title: "Cord pH Audit",
     logo: "dash-cordph",
     subtitle: "Cord blood gas · quality at birth",
@@ -2738,12 +3346,14 @@ export default {
   records: { cord, chest, npda, epilepsy, trauma },
   codeMaps,
   labels,
-  auditDetail,
+  templateDetail,
   specValues,
   explain,
   blockedReason,
   timeline,
+  diabetesWorklist,
   email,
   dashboards,
   trackers,
+  artifactWorkspace,
 };

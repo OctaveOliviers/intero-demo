@@ -25,6 +25,6 @@ Use these lightweight checks after starting the app (`make dev-seeded` or equiva
 
 1. Open the app with a fresh browser session; confirm login gate appears before data UI.
 2. Login with valid credentials; confirm app shell loads and `/api/auth/me` returns 200.
-3. Open browser devtools Network tab and trigger an authenticated API call (`/api/sql` or `/api/runs`); confirm request carries cookie and succeeds.
+3. Open browser devtools Network tab and trigger an authenticated API call (`/api/sql` or `/api/table-populations`); confirm request carries cookie and succeeds.
 4. Click logout; confirm app returns to login gate.
 5. After logout, retry protected call from devtools; confirm 401 response and no stale app data visible.

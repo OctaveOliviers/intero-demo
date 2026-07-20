@@ -1,19 +1,22 @@
+import json
 import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
 LIBRARY_PANEL = ROOT / "app" / "src" / "components" / "LibraryPanel.svelte"
-AUDIT_DETAIL = ROOT / "app" / "src" / "components" / "AuditDetail.svelte"
+TEMPLATE_DETAIL = ROOT / "app" / "src" / "components" / "TemplateDetail.svelte"
 DATABASE_DETAIL = ROOT / "app" / "src" / "components" / "DatabaseDetail.svelte"
+EN_LOCALE = ROOT / "app" / "src" / "i18n" / "locales" / "en.json"
 
 
 class LibraryUiMetadataRenderingSourceTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.panel = LIBRARY_PANEL.read_text(encoding="utf-8")
-        cls.audit = AUDIT_DETAIL.read_text(encoding="utf-8")
+        cls.template = TEMPLATE_DETAIL.read_text(encoding="utf-8")
         cls.database = DATABASE_DETAIL.read_text(encoding="utf-8")
+        cls.en = json.loads(EN_LOCALE.read_text(encoding="utf-8"))
 
     def test_list_cards_show_only_title_description_deadline(self):
         # Doc 9 §card face (T5): scheme/last-pulled/staleness are NOT rendered
@@ -24,21 +27,31 @@ class LibraryUiMetadataRenderingSourceTest(unittest.TestCase):
         self.assertIn("getDeadlineSubtitle", self.panel)
         self.assertIn("card-deadline", self.panel)
 
-    def test_audit_detail_is_the_three_section_page(self):
+    def test_template_detail_is_the_three_section_page(self):
         # Doc 9 §Card detail (T8): the meta-fallback rows are gone; the page is
         # back-link -> title -> description -> deadline -> three chip sections.
-        self.assertNotIn("User-managed · no published source", self.audit)
-        self.assertNotIn("No pull date", self.audit)
-        self.assertNotIn("No source reference", self.audit)
-        self.assertIn("getDeadlineSubtitle", self.audit)
-        self.assertIn("Inclusion criteria", self.audit)
-        self.assertIn("buildFieldChips", self.audit)
-        self.assertIn("buildDatabaseChips", self.audit)
+        self.assertNotIn("User-managed · no published source", self.template)
+        self.assertNotIn("No pull date", self.template)
+        self.assertNotIn("No source reference", self.template)
+        self.assertIn("getDeadlineSubtitle", self.template)
+        self.assertIn("Inclusion criteria", self.template)
+        self.assertIn("buildFieldChips", self.template)
+        self.assertIn("buildDatabaseChips", self.template)
 
     def test_database_detail_has_consistent_missing_metadata_fallbacks(self):
-        self.assertIn("User-managed · no published source", self.database)
-        self.assertIn("No pull date", self.database)
-        self.assertIn("No source reference", self.database)
+        # DatabaseDetail was migrated to i18n: the missing-metadata fallbacks are
+        # rendered via svelte-i18n keys, and the literal copy now lives in
+        # en.json. Verify the same intent — the panel keeps a consistent
+        # "user-managed / no published source" fallback for missing metadata —
+        # against the migrated component.
+        self.assertIn('$_("database.userManaged")', self.database)
+        self.assertIn('$_("database.noPullDate")', self.database)
+        self.assertIn('$_("database.noSourceRef")', self.database)
+        self.assertEqual(
+            self.en["database"]["userManaged"], "User-managed · no published source"
+        )
+        self.assertEqual(self.en["database"]["noPullDate"], "No pull date")
+        self.assertEqual(self.en["database"]["noSourceRef"], "No source reference")
 
 
 if __name__ == "__main__":

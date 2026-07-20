@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseRefreshRunResponse, parseWorkbookDownloadResponse } from "./apiRunResponses.js";
+import {
+  parseRefreshTablePopulationResponse,
+  parseWorkbookDownloadResponse,
+} from "./apiRunResponses.js";
 
 test("refresh unauthorized uses shared unauthorized handler", async () => {
   let called = 0;
@@ -14,7 +17,10 @@ test("refresh unauthorized uses shared unauthorized handler", async () => {
     statusText: "Unauthorized",
     json: async () => ({ detail: "unauthorized" }),
   };
-  await assert.rejects(parseRefreshRunResponse(res, unauthorized), /AUTH_RESET/);
+  await assert.rejects(
+    parseRefreshTablePopulationResponse(res, unauthorized),
+    /AUTH_RESET/,
+  );
   assert.equal(called, 1);
 });
 
@@ -35,12 +41,12 @@ test("download unauthorized uses shared unauthorized handler", async () => {
 });
 
 test("refresh success returns parsed payload", async () => {
-  const payload = { runId: "r1", executionId: "e1", status: "started" };
+  const payload = { tablePopulationId: "r1", executionId: "e1", status: "started" };
   const res = {
     ok: true,
     json: async () => payload,
   };
-  const out = await parseRefreshRunResponse(res, async () => {});
+  const out = await parseRefreshTablePopulationResponse(res, async () => {});
   assert.deepEqual(out, payload);
 });
 
@@ -61,15 +67,15 @@ test("refresh non-401 error keeps status and conflict code shape", async () => {
     status: 409,
     statusText: "Conflict",
     json: async () => ({
-      detail: { code: "RUN_EXECUTION_ACTIVE", message: "Run execution is already active." },
+      detail: { code: "TABLE_POPULATION_ACTIVE", message: "Table population is already active." },
     }),
   };
   await assert.rejects(
-    parseRefreshRunResponse(res, unauthorized),
+    parseRefreshTablePopulationResponse(res, unauthorized),
     (err) =>
       err instanceof Error &&
       err.message.includes("already active") &&
       err.status === 409 &&
-      err.code === "RUN_EXECUTION_ACTIVE",
+      err.code === "TABLE_POPULATION_ACTIVE",
   );
 });

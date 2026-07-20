@@ -14,13 +14,15 @@ from pathlib import Path
 from scripts.eval_lib import score_audit_spec, score_database_model, score_mapping
 
 ROOT = Path(__file__).resolve().parents[2]
-SPEC = json.loads((ROOT / "seed/audits/cord-ph/spec.json").read_text())
-MAPPING = json.loads((ROOT / "seed/audits/cord-ph/mapping.json").read_text())
-MODEL = json.loads((ROOT / "seed/databases/cord-ph/model.json").read_text())
+SPEC = json.loads((ROOT / "data/seed/templates/cord-ph/spec.json").read_text())
+MAPPING = json.loads((ROOT / "data/seed/templates/cord-ph/mapping.json").read_text())
+MODEL = json.loads((ROOT / "data/seed/databases/cord-ph/model.json").read_text())
 
 
 def _unit_rates(metrics: dict) -> dict:
-    return {k: v for k, v in metrics.items() if isinstance(v, float) and 0.0 <= v <= 1.0}
+    return {
+        k: v for k, v in metrics.items() if isinstance(v, float) and 0.0 <= v <= 1.0
+    }
 
 
 class GoldenSelfScoreTest(unittest.TestCase):
@@ -65,12 +67,16 @@ class PerturbationTest(unittest.TestCase):
         golden = copy.deepcopy(SPEC)
         golden["fields"][0]["permitted_values"] = {"1": "Yes", "2": "No"}
         match = copy.deepcopy(golden)
-        self.assertEqual(score_audit_spec(golden, match)["metrics"]["code_set_match"], 1.0)
+        self.assertEqual(
+            score_audit_spec(golden, match)["metrics"]["code_set_match"], 1.0
+        )
         drifted = copy.deepcopy(golden)
         drifted["fields"][0]["permitted_values"] = {"999": "made up"}
         scored = score_audit_spec(golden, drifted)
         self.assertLess(scored["metrics"]["code_set_match"], 1.0)
-        self.assertTrue(any("permitted_values drift" in m for m in scored["mismatches"]))
+        self.assertTrue(
+            any("permitted_values drift" in m for m in scored["mismatches"])
+        )
 
     def test_criteria_are_matched_at_the_concept_level(self):
         # Criteria are a ~5-item judgment: a suggested 'gestation' recalls the
@@ -84,7 +90,9 @@ class PerturbationTest(unittest.TestCase):
         scored = score_audit_spec(SPEC, cand)
         golden_n = len(SPEC["inclusion_criteria"])
         self.assertEqual(scored["metrics"]["criteria_recall"], round(2 / golden_n, 4))
-        self.assertTrue(any("missing inclusion criterion" in m for m in scored["mismatches"]))
+        self.assertTrue(
+            any("missing inclusion criterion" in m for m in scored["mismatches"])
+        )
 
     def test_filterable_drift_is_detected(self):
         cand = copy.deepcopy(MODEL)

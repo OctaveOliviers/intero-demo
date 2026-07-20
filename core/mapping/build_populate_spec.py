@@ -1,16 +1,16 @@
-"""Phase 2 of A4: compile the executable Tier-1 plan from the match.
+"""Phase 2 of A4: compile the executable prepopulation plan from the match.
 
 Deterministic, **no LLM**. Reads the audit's `mapping.json` match (`fields[]`,
 `identity`, `regions`, `criteria_bindings`) and mechanically projects it into the
-executable Tier-1 plan: a **v2** spec. A4 **folds this into the same `mapping.json`
+executable prepopulation plan: a **v2** spec. A4 **folds this into the same `mapping.json`
 under the `executable` key** (`fold_executable`) — the old standalone `populate.json`
-is retired. `kind` and the Tier-1 code translation are computed HERE and nowhere else,
+is retired. `kind` and the prepopulation code translation are computed HERE and nowhere else,
 killing the old three-places duplication; the executable is a DERIVED build output,
 regenerated on every match change, never hand-authored.
 
 > **Decision A2 (Eng review, 2026-06-04).** Population is precomputed **data**, never
-> generated or executed code. A single fixed, audited executor in `core/running` (Tier 1
-> `try_direct`) reads the `executable`, scopes every region query to the resolved cohort,
+> generated or executed code. A single fixed, audited executor in `core/table_population` (prepopulate
+> `prepopulate`) reads the `executable`, scopes every region query to the resolved cohort,
 > queries each database read-only, joins in Python on the identity keys, translates code
 > sets, and writes cells. Nothing in the spec runs as a program.
 
@@ -22,7 +22,7 @@ regenerated on every match change, never hand-authored.
 > `identity_select` / join path are derived from `mapping.json`'s `identity` +
 > `criteria_bindings`.
 
-The shape is frozen by the W0.3 contract (`docs/mvp/contracts/runtime-shapes.md` §3)
+The shape is frozen by the W0.3 contract (`specs/mvp/contracts/runtime-shapes.md` §3)
 and by `mapping.schema.json`'s `executable` section (A4). `validate_populate_spec`
 checks a spec against the v2 contract (and rejects a v1 `filters[]` / per-region-bind
 spec) so a builder never writes a broken executable and the seed fixture can be
@@ -35,6 +35,8 @@ import json
 import re
 
 from core.slug import slugify as _slug
+from core.source_ref import short_alias as _short_alias
+from core.source_ref import try_parse_source
 
 # Statements a read-only populate query may never contain — the executor enforces
 # read-only at the SQLite level too, but a spec carrying these is malformed.
@@ -44,8 +46,6 @@ _WRITE_KEYWORDS = re.compile(
 )
 # Named bind params, e.g. `:cohort`. SQLite casts (`::`) are not used here.
 _BIND = re.compile(r"(?<!:):([A-Za-z_]\w*)")
-# "<db> -> <table>.<column>" — the canonical source reference used in mapping.json.
-_SOURCE_RE = re.compile(r"^\s*(?P<db>[^>]+?)\s*->\s*(?P<table>[^.]+?)\.(?P<column>.+?)\s*$")
 # A criterion's join path: "<from_table>.<from_col> -> <to_table>.<to_col>".
 _JOIN_RE = re.compile(
     r"^\s*(?P<lt>\w+)\.(?P<lc>\w+)\s*->\s*(?P<rt>\w+)\.(?P<rc>\w+)\s*$"
@@ -64,10 +64,10 @@ class BuildError(ValueError):
 
 
 def _parse_source(source: str) -> tuple[str, str, str]:
-    m = _SOURCE_RE.match(source or "")
-    if not m:
+    parsed = try_parse_source(source)
+    if parsed is None:
         raise BuildError(f"unparseable source reference: {source!r}")
-    return m.group("db").strip(), m.group("table").strip(), m.group("column").strip()
+    return parsed
 
 
 def _build_cohort(mapping: dict) -> tuple[dict, str, str]:
@@ -95,8 +95,8 @@ def _build_cohort(mapping: dict) -> tuple[dict, str, str]:
         # another database cannot compose into this FROM (its join target table does
         # not exist here) — such a criterion resolves via escalation, never via a
         # cross-database join baked into single-database SQL.
-        source_m = _SOURCE_RE.match(binding.get("source") or "")
-        if not source_m or source_m.group("db").strip() != db:
+        parsed_source = try_parse_source(binding.get("source") or "")
+        if parsed_source is None or parsed_source[0] != db:
             continue
         rt, lc, rc = m.group("rt"), m.group("lc"), m.group("rc")
         key = (rt, lc, rc)
@@ -152,7 +152,8 @@ def _identity_plan(
         return key_columns, key_tables, bridges
 
     bridge_candidates = [
-        col for table, col in keys_by_db.get(anchor_db, [])
+        col
+        for table, col in keys_by_db.get(anchor_db, [])
         if table == anchor_table and col != anchor_col
     ]
     if len(bridge_candidates) != 1:
@@ -171,34 +172,24 @@ def _identity_plan(
         f_table, col = keys_by_db[db][0]
         key_columns[db] = col
         key_tables[db] = f_table
-        bridges.append({
-            "database": db,
-            "key_column": col,
-            "via": {
-                "table": anchor_table,
-                "anchor_column": anchor_col,
-                "bridge_column": bridge_col,
-            },
-        })
+        bridges.append(
+            {
+                "database": db,
+                "key_column": col,
+                "via": {
+                    "table": anchor_table,
+                    "anchor_column": anchor_col,
+                    "bridge_column": bridge_col,
+                },
+            }
+        )
     bridges.sort(key=lambda b: b["database"])
     return key_columns, key_tables, bridges
 
 
-def _short_alias(table: str, used: set[str]) -> str:
-    """A stable, collision-free single/short alias for a table (first letter, then 2…)."""
-    base = table[0].lower()
-    alias = base
-    n = 1
-    while alias in used:
-        n += 1
-        alias = f"{base}{n}"
-    used.add(alias)
-    return alias
-
-
 # Within-database multi-hop reach (Phase C): a `direct` field whose column lives in
 # a foreign-database table that is NOT the identity bridge's key table can still be
-# Tier-1-filled when a TO-ONE foreign-key chain reaches it from that key table —
+# prepopulate-filled when a TO-ONE foreign-key chain reaches it from that key table —
 # the join is emitted into the region query, keyed by the bridge key, so the
 # executor stitches and blocks exactly as for a single-table read.
 _FK_HOP_CAP = 4
@@ -208,14 +199,14 @@ def _fk_adjacency(edges: list[dict] | None) -> dict[str, list[tuple[str, str, st
     """Undirected adjacency over TO-ONE FK edges only: ``table -> [(col_here,
     other_table, col_there), …]``. A to-one edge is 1:1 (the FK column is
     all-distinct), so it is safe to traverse in either direction; to-many edges
-    are omitted — Tier 1 COPIES values into the cell by JOINing along this path,
+    are omitted — prepopulate COPIES values into the cell by JOINing along this path,
     and a to-many hop would join one row to many and duplicate the value.
 
     DELIBERATELY NOT IDENTICAL to the agent tool's reachability
     (``core/agent/.opencode/tools/_run_sql._scope_adjacency`` / ``_scope_path``).
     The agent only FILTERS rows via an ``EXISTS`` (it never copies), so it can also
-    DESCEND a to-many FK and reach the child tables Tier 1 must skip. That broader
-    rule is intentional — do NOT "re-sync" the two; see the Tier-1/Tier-3 note in
+    DESCEND a to-many FK and reach the child tables prepopulate must skip. That broader
+    rule is intentional — do NOT "re-sync" the two; see the prepopulate/agent note in
     that module."""
     adj: dict[str, list[tuple[str, str, str]]] = {}
     for e in edges or []:
@@ -230,7 +221,9 @@ def _fk_adjacency(edges: list[dict] | None) -> dict[str, list[tuple[str, str, st
     return adj
 
 
-def _reachable_via_fk(table: str, key_table: str, edges: list[dict] | None) -> list[dict] | None:
+def _reachable_via_fk(
+    table: str, key_table: str, edges: list[dict] | None
+) -> list[dict] | None:
     """The join hops from ``key_table`` to ``table`` over to-one FK edges, or None.
 
     Returns ``[]`` when they are the same table, a list of
@@ -248,8 +241,12 @@ def _reachable_via_fk(table: str, key_table: str, edges: list[dict] | None) -> l
         for col_here, nxt, col_there in adj.get(node, []):
             if nxt in visited:
                 continue
-            hop = {"from_table": node, "from_col": col_here,
-                   "to_table": nxt, "to_col": col_there}
+            hop = {
+                "from_table": node,
+                "from_col": col_here,
+                "to_table": nxt,
+                "to_col": col_there,
+            }
             if nxt == table:
                 paths.append(hops + [hop])
             else:
@@ -263,7 +260,11 @@ def _reachable_via_fk(table: str, key_table: str, edges: list[dict] | None) -> l
     for p in paths:
         if len(p) == shortest:
             canon = tuple(
-                (h["from_table"], h["to_table"], frozenset((h["from_col"], h["to_col"])))
+                (
+                    h["from_table"],
+                    h["to_table"],
+                    frozenset((h["from_col"], h["to_col"])),
+                )
                 for h in p
             )
             distinct[canon] = p
@@ -274,15 +275,51 @@ def _reachable_via_fk(table: str, key_table: str, edges: list[dict] | None) -> l
 
 # SQL keywords/operators that may appear bare in a row-filter predicate and must
 # NOT be alias-qualified (they are not columns).
-_SQL_PRED_KEYWORDS = frozenset({
-    "and", "or", "not", "null", "is", "in", "like", "between", "exists", "true",
-    "false", "collate", "escape", "glob", "regexp", "match", "case", "when",
-    "then", "else", "end", "cast", "as",
-    # SQLite type names (so `CAST(x AS INTEGER)` keeps INTEGER bare, not aliased)
-    "integer", "int", "text", "real", "numeric", "blob", "none", "varchar",
-    "char", "boolean", "date", "datetime", "decimal", "float", "double",
-    "bigint", "smallint",
-})
+_SQL_PRED_KEYWORDS = frozenset(
+    {
+        "and",
+        "or",
+        "not",
+        "null",
+        "is",
+        "in",
+        "like",
+        "between",
+        "exists",
+        "true",
+        "false",
+        "collate",
+        "escape",
+        "glob",
+        "regexp",
+        "match",
+        "case",
+        "when",
+        "then",
+        "else",
+        "end",
+        "cast",
+        "as",
+        # SQLite type names (so `CAST(x AS INTEGER)` keeps INTEGER bare, not aliased)
+        "integer",
+        "int",
+        "text",
+        "real",
+        "numeric",
+        "blob",
+        "none",
+        "varchar",
+        "char",
+        "boolean",
+        "date",
+        "datetime",
+        "decimal",
+        "float",
+        "double",
+        "bigint",
+        "smallint",
+    }
+)
 
 
 def _qualify_predicate(predicate: str, alias: str) -> str:
@@ -300,12 +337,13 @@ def _qualify_predicate(predicate: str, alias: str) -> str:
     def qualify_segment(seg: str) -> str:
         def repl(m: re.Match) -> str:
             ident = m.group(0)
-            after = seg[m.end():].lstrip()
+            after = seg[m.end() :].lstrip()
             if after.startswith(".") or after.startswith("("):
                 return ident  # table qualifier or function name
             if ident.lower() in _SQL_PRED_KEYWORDS:
                 return ident
             return f"{alias}.{ident}"
+
         # identifiers NOT preceded by a word char or '.' (so `x.col` keeps its `col`)
         return re.sub(r"(?<![\w.])[A-Za-z_]\w*", repl, seg)
 
@@ -323,22 +361,26 @@ def _row_filters(conventions: dict | None, db: str) -> dict[str, str]:
     tested so it is correct the day a real-EHR onboarding adds soft-delete /
     effective-dating conventions."""
     rfs = ((conventions or {}).get(db) or {}).get("row_filters") or []
-    return {rf["table"]: rf["predicate"] for rf in rfs if rf.get("table") and rf.get("predicate")}
+    return {
+        rf["table"]: rf["predicate"]
+        for rf in rfs
+        if rf.get("table") and rf.get("predicate")
+    }
 
 
 def _field_kind(field: dict) -> str:
     """The field's effective populate kind.
 
     A field whose value is drawn from **several sources** (multiple columns, several
-    databases, or a one-to-many note relation) is **never a Tier-1 copy** — Tier 1 can
+    databases, or a one-to-many note relation) is **never a prepopulate copy** — prepopulate can
     only copy one column into one cell. Such a field is compiled as `interpret`: its
-    evidence columns are fetched and Tier 2 (`try_llm`) decides the cell value from the
+    evidence columns are fetched and the agent decides the cell value from the
     field's `spec.json` description.
 
     A single-source field keeps its mapping `kind`. `direct` therefore means a confident
     straight copy (optionally code-translated); `interpret` means the value must be
     derived from evidence. NB: a value living in a free-text **note** must already be
-    marked `interpret` at mapping time — otherwise Tier 1 would copy the whole note into
+    marked `interpret` at mapping time — otherwise prepopulate would copy the whole note into
     the cell. The builder cannot detect that from a single source; the mapping must.
     """
     if len(field.get("sources") or []) > 1:
@@ -346,10 +388,10 @@ def _field_kind(field: dict) -> str:
     return field.get("kind")
 
 
-def _tier1_reachable(
+def _prepopulate_reachable(
     db: str, table: str, anchor_db: str | None, key_tables: dict[str, str] | None
 ) -> bool:
-    """Whether Tier 1 can mechanically key this table's rows to the cohort.
+    """Whether prepopulate can mechanically key this table's rows to the cohort.
 
     Anchor-database tables are assumed reachable (they are expected to carry the
     anchor column — the pure compiler cannot verify, and the executor degrades a
@@ -357,7 +399,7 @@ def _tier1_reachable(
     reachable only through its key table: the identity bridge translates anchor
     identities into that one column, so any other foreign table — a different
     grain, an unknown linking column — cannot be keyed without judgment, and its
-    fields are forced to `interpret` for the higher tiers."""
+    fields are forced to `interpret` for the agent."""
     if anchor_db is None or db == anchor_db:
         return True
     return key_tables is not None and key_tables.get(db) == table
@@ -396,7 +438,7 @@ def _build_region(
 
     `direct`: each field copies one source column → one cell (optionally code-translated).
     `interpret`: every source column of each field is fetched as evidence; the cell map
-    names the field so Tier 2/3 can decide the value from its `spec.json` description.
+    names the field so the agent can decide the value from its `spec.json` description.
     """
     # Columns to SELECT per (database, table), in first-seen order.
     table_cols: dict[tuple[str, str], list[str]] = {}
@@ -411,7 +453,7 @@ def _build_region(
         if kind == "direct":
             db, table, col = _parse_source(field["sources"][0])
             _need(db, table, col)
-            # `field` (the audit field id) and `table` are carried so try_direct (A4)
+            # `field` (the audit field id) and `table` are carried so prepopulate (A4)
             # can stamp every cell's required `field` and build the narrowed per-cell
             # query (`SELECT <column> FROM <table> WHERE <identity>=<id>`) without
             # re-parsing the wide region SQL (cell-resolution.schema.json).
@@ -424,7 +466,7 @@ def _build_region(
             if field.get("code"):
                 code_sets[col] = {v: k for k, v in field["code"].items()}
                 entry["translate"] = col
-            # Multi-hop: carry the FK join chain so try_direct can render a VALID
+            # Multi-hop: carry the FK join chain so prepopulate can render a VALID
             # per-cell provenance SQL (the leaf table does not carry the bridge
             # key, so a bare `… FROM <leaf> WHERE <key>=…` would be malformed).
             if join_paths and (db, table) in join_paths:
@@ -433,14 +475,18 @@ def _build_region(
         else:  # interpret — fetch every source column as evidence; the LLM/agent decides
             for src in field["sources"]:
                 db, table, col = _parse_source(src)
-                # Evidence on a table Tier 1 cannot key is not mechanically
-                # fetchable — the higher tiers reach it from the mapping match's
+                # Evidence on a table prepopulate cannot key is not mechanically
+                # fetchable — the agent reaches it from the mapping match's
                 # per-field sources + the schema hint instead.
-                if _tier1_reachable(db, table, anchor_db, key_tables):
+                if _prepopulate_reachable(db, table, anchor_db, key_tables):
                     _need(db, table, col)
             cell_map.append(
-                {"field": _field_slug(sheet, field["header"], multi_sheet=multi_sheet),
-                 "cell_template": _tmpl(field["cell"])}
+                {
+                    "field": _field_slug(
+                        sheet, field["header"], multi_sheet=multi_sheet
+                    ),
+                    "cell_template": _tmpl(field["cell"]),
+                }
             )
 
     queries: list[dict] = []
@@ -466,13 +512,17 @@ def _build_region(
             from_parts = [f"{key_table} {alias_of[key_table]}"]
             where = [f"{alias_of[key_table]}.{key_col} IN (:{COHORT_BIND})"]
             if key_table in row_filters:
-                where.append(_qualify_predicate(row_filters[key_table], alias_of[key_table]))
+                where.append(
+                    _qualify_predicate(row_filters[key_table], alias_of[key_table])
+                )
             for hop in hops:
                 a_to = _short_alias(hop["to_table"], used)
                 alias_of[hop["to_table"]] = a_to
                 on = f"{alias_of[hop['from_table']]}.{hop['from_col']} = {a_to}.{hop['to_col']}"
                 if hop["to_table"] in row_filters:
-                    on += f" AND {_qualify_predicate(row_filters[hop['to_table']], a_to)}"
+                    on += (
+                        f" AND {_qualify_predicate(row_filters[hop['to_table']], a_to)}"
+                    )
                 from_parts.append(f"JOIN {hop['to_table']} {a_to} ON {on}")
             leaf = alias_of[table]
             # Select ALL requested leaf columns: `key_col` lives on the KEY table
@@ -539,13 +589,13 @@ def build_populate_spec(
 
     cohort, anchor_table, anchor_col = _build_cohort(mapping)
 
-    # Identity keys used by Tier 1 row joins. We currently compile one canonical
+    # Identity keys used by prepopulate row joins. We currently compile one canonical
     # key: the anchor column. In multi-database mappings, additional key columns
     # are often database/table-specific and forcing every region query to SELECT
     # every extra key makes executable compilation fail before run time.
     #
     # Keep the executable join key narrow and deterministic (anchor only); higher
-    # tiers still carry full provenance and can escalate unresolved identities.
+    # step still carries full provenance and can escalate unresolved identities.
     identity_cols: list[str] = [anchor_col]
 
     # Cross-database identity plan (A3): the column that keys each database's rows
@@ -562,9 +612,7 @@ def build_populate_spec(
     # Multi-sheet detection: when the mapping spans >1 distinct sheet, every cell
     # FK is sheet-prefixed (`sheet/header`) so same-header cells on different
     # sheets can't collide. Single-sheet mappings keep bare slugs unchanged.
-    multi_sheet = len({
-        r.get("sheet") for r in mapping.get("regions") or []
-    }) > 1
+    multi_sheet = len({r.get("sheet") for r in mapping.get("regions") or []}) > 1
 
     code_sets: dict[str, dict[str, str]] = {}
     regions_out: list[dict] = []
@@ -583,13 +631,17 @@ def build_populate_spec(
             kind = _field_kind(field)
             if kind == "direct":
                 db, table, _col = _parse_source(field["sources"][0])
-                if not _tier1_reachable(db, table, cohort["database"], key_tables):
+                if not _prepopulate_reachable(
+                    db, table, cohort["database"], key_tables
+                ):
                     # A foreign non-key table: keep `direct` only if a to-one FK
                     # chain reaches it from the bridge key table (Phase C);
-                    # otherwise Tier 1 cannot key its rows -> interpret (A3).
+                    # otherwise prepopulate cannot key its rows -> interpret (A3).
                     hops = None
                     if join_graph is not None and key_tables and db in key_tables:
-                        hops = _reachable_via_fk(table, key_tables[db], join_graph.get(db))
+                        hops = _reachable_via_fk(
+                            table, key_tables[db], join_graph.get(db)
+                        )
                     if hops:
                         join_paths[(db, table)] = hops
                     else:
@@ -600,9 +652,16 @@ def build_populate_spec(
             out_id = rid if len(present) == 1 else f"{rid}-{kind}"
             regions_out.append(
                 _build_region(
-                    out_id, sheet, kind, by_kind[kind], anchor_col, code_sets,
-                    multi_sheet=multi_sheet, key_columns=key_columns,
-                    key_tables=key_tables, anchor_db=cohort["database"],
+                    out_id,
+                    sheet,
+                    kind,
+                    by_kind[kind],
+                    anchor_col,
+                    code_sets,
+                    multi_sheet=multi_sheet,
+                    key_columns=key_columns,
+                    key_tables=key_tables,
+                    anchor_db=cohort["database"],
                     join_paths=join_paths if kind == "direct" else None,
                     conventions=conventions,
                 )
@@ -656,7 +715,7 @@ def validate_populate_spec(spec: dict) -> list[str]:
     """Validate a populate spec against the **v2** contract; return a list of errors.
 
     An empty list means the spec is valid. Encodes the frozen v2 `populate.json`
-    contract (`docs/mvp/contracts/runtime-shapes.md` §3): `schema_version "2"`, the
+    contract (`specs/mvp/contracts/runtime-shapes.md` §3): `schema_version "2"`, the
     top-level **cohort block** (`database`, `from`, `identity_select`, `where: []`),
     region queries that are read-only, SELECT the identity keys, and are **cohort-scoped**
     (`:cohort` only — no per-region filter binds), a cell map per region, and resolving
@@ -673,7 +732,9 @@ def validate_populate_spec(spec: dict) -> list[str]:
         errors.append('schema_version must be "2" (v1 specs are rejected)')
     # v1 rejection: filters[] moved to the cohort block in v2.
     if "filters" in spec:
-        errors.append('top-level "filters" is a v1 field; v2 puts conditions on the cohort block')
+        errors.append(
+            'top-level "filters" is a v1 field; v2 puts conditions on the cohort block'
+        )
 
     for field in ("audit_id", "workbook"):
         if not isinstance(spec.get(field), str) or not spec.get(field):
@@ -694,9 +755,7 @@ def validate_populate_spec(spec: dict) -> list[str]:
     if bridges is not None:
         errors += _validate_bridges(bridges, spec.get("cohort"))
         if isinstance(bridges, list):
-            bridge_dbs = {
-                b.get("database") for b in bridges if isinstance(b, dict)
-            }
+            bridge_dbs = {b.get("database") for b in bridges if isinstance(b, dict)}
 
     code_sets = spec.get("code_sets", {})
     if not isinstance(code_sets, dict):
@@ -779,7 +838,7 @@ def _validate_region(
         queries = []
     elif not queries and kind == "direct":
         # An interpret region may carry no queries (its evidence lives on tables
-        # Tier 1 cannot key — higher tiers fetch it); a direct region must.
+        # prepopulate cannot key — the agent fetches it); a direct region must.
         errors.append(f"{tag}: a direct region's queries must be non-empty")
     region_binds: set[str] = set()
     for q in queries:
@@ -827,7 +886,9 @@ def _validate_region(
     # v2 parameterisation: every region (direct copy or interpret evidence fetch) must
     # be cohort-scoped — clinical correctness depends on never reaching outside the cohort.
     if queries and COHORT_BIND not in region_binds:
-        errors.append(f"{tag}: region query is not cohort-scoped (missing :{COHORT_BIND})")
+        errors.append(
+            f"{tag}: region query is not cohort-scoped (missing :{COHORT_BIND})"
+        )
 
     cell_map = r.get("cell_map")
     if not isinstance(cell_map, list) or not cell_map:
@@ -840,7 +901,7 @@ def _validate_region(
         if not isinstance(c.get("cell_template"), str) or not c.get("cell_template"):
             errors.append(f"{tag}: a cell_map entry is missing cell_template")
         # direct: copies one `table.column` into the cell and carries the audit `field`
-        # id (try_direct stamps every cell's required `field`); interpret: only `field`.
+        # id (prepopulate stamps every cell's required `field`); interpret: only `field`.
         required = ("field", "column", "table") if kind == "direct" else ("field",)
         for key in required:
             if not isinstance(c.get(key), str) or not c.get(key):
@@ -859,7 +920,9 @@ def load_and_validate(path) -> list[str]:
     document missing it fails validation cleanly (`validate_populate_spec(None)`)."""
     with open(path, encoding="utf-8") as fh:
         doc = json.load(fh)
-    return validate_populate_spec(doc.get("executable") if isinstance(doc, dict) else None)
+    return validate_populate_spec(
+        doc.get("executable") if isinstance(doc, dict) else None
+    )
 
 
 def _main(argv: list[str]) -> int:

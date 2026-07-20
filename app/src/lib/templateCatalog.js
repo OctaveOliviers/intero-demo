@@ -3,7 +3,7 @@
 // A Template names a deliverable Excel workbook and the columns it will be
 // populated with. `columns` feeds the hover-preview in OutputSpec; `description`
 // is the one-line blurb shown above it. Real local workbooks live under
-// docs/templates/*.xlsx; the National entries are plausible invented audits
+// data/templates/*.xlsx; the National entries are plausible invented audits
 // (NNAP / NHFD / MINAP) used only for the picker + preview.
 //
 // Template = { id, name, category, fileName, description, columns: string[] }
@@ -20,7 +20,7 @@ export const TEMPLATE_CATALOG = CONTENT.catalog;
 let runtimeTemplateGroups = null;
 
 // Optional runtime override used by the real-mode Home flow so template
-// pickers + resolution can point to backend audits (/api/audits). Mock mode
+// pickers + resolution can point to backend templates (/api/templates). Mock mode
 // leaves this unset and continues to use TEMPLATE_CATALOG.
 export function setRuntimeTemplateGroups(groups) {
   runtimeTemplateGroups = Array.isArray(groups) ? groups : null;

@@ -1,0 +1,52 @@
+{
+  "schema_version": "1",
+  "id": "dataset-cordph-term-nicu",
+  "name": "Term babies admitted to NICU",
+  "description": "Babies born at term (>=39 weeks) who were admitted to the NICU.",
+  "databases": [
+    "cord-ph"
+  ],
+  "cohort": {
+    "database": "cord-ph",
+    "from": "cord_ph_birth_records b",
+    "identity_select": "b.patient_code AS patient_code",
+    "identity_keys": [
+      "patient_code"
+    ]
+  },
+  "criteria": [
+    {
+      "criterion_id": "gestation_weeks",
+      "label": "Gestation (weeks)",
+      "type": "number",
+      "source": "cord-ph -> cord_ph_birth_records.gestation_weeks",
+      "predicate": {
+        "op": ">=",
+        "value": 39
+      },
+      "sql": "CAST(b.gestation_weeks AS REAL) >= :c0",
+      "params": {
+        "c0": 39
+      },
+      "display": "Gestation (weeks) ≥ 39"
+    },
+    {
+      "criterion_id": "admitted_to_nicu",
+      "label": "Admitted to NICU",
+      "type": "category",
+      "source": "cord-ph -> cord_ph_birth_records.admitted_to_nicu",
+      "predicate": {
+        "op": "=",
+        "value": "yes"
+      },
+      "sql": "b.admitted_to_nicu = :c1",
+      "params": {
+        "c1": "yes"
+      },
+      "display": "Admitted to NICU = yes"
+    }
+  ],
+  "not_available": [],
+  "cohort_sql": "SELECT DISTINCT b.patient_code AS patient_code FROM cord_ph_birth_records b WHERE (CAST(b.gestation_weeks AS REAL) >= :c0) AND (b.admitted_to_nicu = :c1)",
+  "count": 1
+}

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import HTTPException
 
-from server.routes.audits import _load_json_file as load_audit_json_file
+from server.routes.templates import _load_json_file as load_audit_json_file
 from server.routes.databases import _load_json_file as load_database_json_file
 
 
@@ -46,7 +46,9 @@ class LibraryDetailArtifactErrorsTest(unittest.TestCase):
                 with self.assertRaises(HTTPException) as ctx:
                     loader(array_path, label=label)
                 self.assertEqual(ctx.exception.status_code, 422)
-                self.assertEqual(ctx.exception.detail, f"{label} must be a JSON object.")
+                self.assertEqual(
+                    ctx.exception.detail, f"{label} must be a JSON object."
+                )
 
     def test_valid_object_artifact_loads_for_audits_and_databases(self):
         with tempfile.TemporaryDirectory() as tmpdir:

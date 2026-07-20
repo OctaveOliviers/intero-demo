@@ -6,8 +6,6 @@
   "scripts": {
     "dev": "vite",
     "dev:mock": "VITE_MOCK=true vite",
-    "seed": "cd .. && python3 -m scripts.seed",
-    "dev:seeded": "npm run seed && vite",
     "test": "node --test 'src/**/*.test.js' 'src/**/*.test.mjs'",
     "build": "vite build",
     "preview": "vite preview",

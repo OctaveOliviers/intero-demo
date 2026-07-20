@@ -28,39 +28,79 @@ class StorePersistenceTest(unittest.TestCase):
     def test_run_cells_events_persist_and_reload(self):
         # Write a run + cells + events to a real on-disk DB.
         store = Store(self.db_path)
-        run = store.create_run(Run(
-            id="run_1",
-            audit_id="cord-ph",
-            user_id="alice",
-            request="run the cord pH audit for 2024",
-            template_version="cord-ph@2024-01-01",
-            database_ids=["cord-ph", "synthea-data"],
-            status="in_progress",
-            prompt_versions={"run": "v3"},
-            filters=[{"field": "year", "value": "2024"}],
-            parameters={"model": "opus"},
-        ))
-        store.upsert_cell(Cell(
-            run_id="run_1", ref="Cases!B12", kind="direct", state="filled",
-            value="7.21", confidence="high",
-            sources=[{"database": "cord-ph", "query": "SELECT patient_code, ph FROM results WHERE patient_code='m1'",
-                       "table_column": "results.ph"}],
-        ))
-        store.upsert_cell(Cell(
-            run_id="run_1", ref="Cases!B13", kind="direct", state="blocked",
-            reason_code="IDENTITY_UNRESOLVED", reason_detail="join key missing across DBs",
-            owner_needed="data team",
-        ))
-        store.upsert_cell(Cell(
-            run_id="run_1", ref="Cases!C12", kind="interpret", state="filled",
-            value="Yes", confidence="medium", review_state="not_reviewed", corrected=False,
-            sources=[{"database": "cord-ph",
-                      "query": "SELECT patient_code, note_text FROM notes WHERE patient_code='m1'",
-                      "table_column": "notes.note_text", "row_id": "n1",
-                      "citations": ["cord around neck noted"]}],
-        ))
-        store.append_event(Event(run_id="run_1", type="activity", payload={"headline": "querying"}))
-        store.append_event(Event(run_id="run_1", type="cell_update", payload={"ref": "Cases!B12", "value": "7.21"}))
+        store.create_run(
+            Run(
+                id="run_1",
+                audit_id="cord-ph",
+                user_id="alice",
+                request="run the cord pH audit for 2024",
+                template_version="cord-ph@2024-01-01",
+                database_ids=["cord-ph", "synthea-data"],
+                status="in_progress",
+                prompt_versions={"run": "v3"},
+                filters=[{"field": "year", "value": "2024"}],
+                parameters={"model": "opus"},
+            )
+        )
+        store.upsert_cell(
+            Cell(
+                run_id="run_1",
+                ref="Cases!B12",
+                kind="direct",
+                state="filled",
+                value="7.21",
+                confidence="high",
+                sources=[
+                    {
+                        "database": "cord-ph",
+                        "query": "SELECT patient_code, ph FROM results WHERE patient_code='m1'",
+                        "table_column": "results.ph",
+                    }
+                ],
+            )
+        )
+        store.upsert_cell(
+            Cell(
+                run_id="run_1",
+                ref="Cases!B13",
+                kind="direct",
+                state="blocked",
+                reason_code="IDENTITY_UNRESOLVED",
+                reason_detail="join key missing across DBs",
+                owner_needed="data team",
+            )
+        )
+        store.upsert_cell(
+            Cell(
+                run_id="run_1",
+                ref="Cases!C12",
+                kind="interpret",
+                state="filled",
+                value="Yes",
+                confidence="medium",
+                review_state="not_reviewed",
+                corrected=False,
+                sources=[
+                    {
+                        "database": "cord-ph",
+                        "query": "SELECT patient_code, note_text FROM notes WHERE patient_code='m1'",
+                        "table_column": "notes.note_text",
+                        "row_id": "n1",
+                        "citations": ["cord around neck noted"],
+                    }
+                ],
+            )
+        )
+        store.append_event(
+            Event(run_id="run_1", type="activity", payload={"headline": "querying"})
+        )
+        store.append_event(
+            Event(
+                run_id="run_1",
+                type="cell_update",
+                payload={"ref": "Cases!B12", "value": "7.21"},
+            )
+        )
         store.close()
 
         # Reopen the same file: everything reloads intact.
@@ -96,39 +136,88 @@ class StorePersistenceTest(unittest.TestCase):
 
     def test_status_derives_from_cells(self):
         store = Store(self.db_path)
-        store.create_run(Run(id="r", audit_id="cord-ph", status="in_progress", started_at="2024-01-01T00:00:00+00:00"))
+        store.create_run(
+            Run(
+                id="r",
+                audit_id="cord-ph",
+                status="in_progress",
+                started_at="2024-01-01T00:00:00+00:00",
+            )
+        )
 
         # A blocked cell present → run is blocked.
-        store.upsert_cell(Cell(run_id="r", ref="S!A1", kind="direct", state="blocked", reason_code="AWAITING_RESULT", reason_detail="result not yet back"))
-        store.upsert_cell(Cell(run_id="r", ref="S!A2", kind="direct", state="filled", value="x",
-                               sources=[{"database": "d", "query": "Q", "table_column": "t.c"}]))
+        store.upsert_cell(
+            Cell(
+                run_id="r",
+                ref="S!A1",
+                kind="direct",
+                state="blocked",
+                reason_code="AWAITING_RESULT",
+                reason_detail="result not yet back",
+            )
+        )
+        store.upsert_cell(
+            Cell(
+                run_id="r",
+                ref="S!A2",
+                kind="direct",
+                state="filled",
+                value="x",
+                sources=[{"database": "d", "query": "Q", "table_column": "t.c"}],
+            )
+        )
         self.assertEqual(store.recompute_status("r"), "blocked")
         self.assertEqual(store.get_run("r").status, "blocked")
         # ...and a durable status_change event was recorded.
         self.assertIn("status_change", [e.type for e in store.get_events("r")])
 
         # The block resolves on re-run → in_verification (interpret awaits sign-off).
-        store.upsert_cell(Cell(run_id="r", ref="S!A1", kind="interpret", state="filled", value="y", review_state="not_reviewed",
-                               sources=[{"database": "d", "query": "Q", "table_column": "t.c"}]))
+        store.upsert_cell(
+            Cell(
+                run_id="r",
+                ref="S!A1",
+                kind="interpret",
+                state="filled",
+                value="y",
+                review_state="not_reviewed",
+                sources=[{"database": "d", "query": "Q", "table_column": "t.c"}],
+            )
+        )
         self.assertEqual(store.recompute_status("r"), "in_verification")
 
         # Sign-off completes it → complete.
-        store.upsert_cell(Cell(run_id="r", ref="S!A1", kind="interpret", state="filled", value="y", review_state="reviewed", corrected=False,
-                               sources=[{"database": "d", "query": "Q", "table_column": "t.c"}]))
+        store.upsert_cell(
+            Cell(
+                run_id="r",
+                ref="S!A1",
+                kind="interpret",
+                state="filled",
+                value="y",
+                review_state="reviewed",
+                corrected=False,
+                sources=[{"database": "d", "query": "Q", "table_column": "t.c"}],
+            )
+        )
         self.assertEqual(store.recompute_status("r"), "complete")
         store.close()
 
     def test_derive_status_unit(self):
         self.assertEqual(derive_status([], started=False), "queued")
         self.assertEqual(derive_status([], started=True), "in_progress")
-        self.assertEqual(derive_status([Cell("r", "a", state="not_applicable")]), "complete")
         self.assertEqual(
-            derive_status([Cell("r", "a", state="filled"), Cell("r", "b", state="blocked")]),
+            derive_status([Cell("r", "a", state="not_applicable")]), "complete"
+        )
+        self.assertEqual(
+            derive_status(
+                [Cell("r", "a", state="filled"), Cell("r", "b", state="blocked")]
+            ),
             "blocked",
         )
         # An out-of-enum state must not be treated as "done" — it falls through
         # to in_progress, never silently completing the run.
-        self.assertEqual(derive_status([Cell("r", "a", state="weird")], started=True), "in_progress")
+        self.assertEqual(
+            derive_status([Cell("r", "a", state="weird")], started=True), "in_progress"
+        )
 
     def test_orphan_cell_rejected(self):
         # FK + PRAGMA foreign_keys=ON: a cell with no parent run is rejected,
@@ -185,10 +274,25 @@ class StorePersistenceTest(unittest.TestCase):
     def test_upsert_cell_replaces_in_place(self):
         store = Store(self.db_path)
         store.create_run(Run(id="r", audit_id="a"))
-        store.upsert_cell(Cell(run_id="r", ref="X", state="blocked", value=None,
-                               reason_code="NOT_LOCATED", reason_detail="not found"))
-        store.upsert_cell(Cell(run_id="r", ref="X", state="filled", value="7",
-                               sources=[{"database": "d", "query": "Q", "table_column": "t.c"}]))
+        store.upsert_cell(
+            Cell(
+                run_id="r",
+                ref="X",
+                state="blocked",
+                value=None,
+                reason_code="NOT_LOCATED",
+                reason_detail="not found",
+            )
+        )
+        store.upsert_cell(
+            Cell(
+                run_id="r",
+                ref="X",
+                state="filled",
+                value="7",
+                sources=[{"database": "d", "query": "Q", "table_column": "t.c"}],
+            )
+        )
         cells = store.get_cells("r")
         self.assertEqual(len(cells), 1)
         self.assertEqual((cells[0].state, cells[0].value), ("filled", "7"))
@@ -198,12 +302,26 @@ class StorePersistenceTest(unittest.TestCase):
         # The orchestrator's first write (A0): the full pending grid in one shot.
         store = Store(self.db_path)
         store.create_run(Run(id="r", audit_id="a"))
-        store.insert_pending_cells([
-            Cell(run_id="r", ref="ALL!A2", field="patient_code", member="P1",
-                 kind="direct", state="pending"),
-            Cell(run_id="r", ref="ALL!B2", field="gestation_weeks", member="P1",
-                 kind="direct", state="pending"),
-        ])
+        store.insert_pending_cells(
+            [
+                Cell(
+                    run_id="r",
+                    ref="ALL!A2",
+                    field="patient_code",
+                    member="P1",
+                    kind="direct",
+                    state="pending",
+                ),
+                Cell(
+                    run_id="r",
+                    ref="ALL!B2",
+                    field="gestation_weeks",
+                    member="P1",
+                    kind="direct",
+                    state="pending",
+                ),
+            ]
+        )
         cells = store.get_cells("r")
         self.assertEqual(len(cells), 2)
         self.assertTrue(all(c.state == "pending" and c.value is None for c in cells))
@@ -216,23 +334,45 @@ class StorePersistenceTest(unittest.TestCase):
         # A tier's in-place write: patch only the named columns, leave the rest.
         store = Store(self.db_path)
         store.create_run(Run(id="r", audit_id="a"))
-        store.insert_pending_cells([
-            Cell(run_id="r", ref="ALL!A2", field="delivery", member="P1",
-                 kind="direct", state="pending"),
-        ])
+        store.insert_pending_cells(
+            [
+                Cell(
+                    run_id="r",
+                    ref="ALL!A2",
+                    field="delivery",
+                    member="P1",
+                    kind="direct",
+                    state="pending",
+                ),
+            ]
+        )
         out = store.update_cell(
-            "r", "ALL!A2", state="filled", value="1", resolved_by="direct",
-            attempts=[{"tier": "direct", "database": "d", "sql": "SELECT delivery ...",
-                       "result": "1"}],
+            "r",
+            "ALL!A2",
+            state="filled",
+            value="1",
+            resolved_by="direct",
+            attempts=[
+                {
+                    "tier": "direct",
+                    "database": "d",
+                    "sql": "SELECT delivery ...",
+                    "result": "1",
+                }
+            ],
             sources=[{"database": "d", "query": "Q", "table_column": "t.c"}],
         )
-        self.assertEqual((out.state, out.value, out.resolved_by), ("filled", "1", "direct"))
-        self.assertEqual(out.attempts[0]["result"], "1")          # json column round-trips
-        self.assertEqual((out.field, out.member, out.kind), ("delivery", "P1", "direct"))  # untouched
+        self.assertEqual(
+            (out.state, out.value, out.resolved_by), ("filled", "1", "direct")
+        )
+        self.assertEqual(out.attempts[0]["result"], "1")  # json column round-trips
+        self.assertEqual(
+            (out.field, out.member, out.kind), ("delivery", "P1", "direct")
+        )  # untouched
         with self.assertRaises(KeyError):
-            store.update_cell("r", "ALL!A2", bogus_col="x")       # unknown column
+            store.update_cell("r", "ALL!A2", bogus_col="x")  # unknown column
         with self.assertRaises(KeyError):
-            store.update_cell("r", "ALL!ZZ99", state="filled")    # missing cell
+            store.update_cell("r", "ALL!ZZ99", state="filled")  # missing cell
         store.close()
 
     def test_filling_interpret_cell_auto_flags_not_reviewed(self):
@@ -243,18 +383,40 @@ class StorePersistenceTest(unittest.TestCase):
         # needs review, so its review_state stays NULL.
         store = Store(self.db_path)
         store.create_run(Run(id="r", audit_id="a"))
-        store.insert_pending_cells([
-            Cell(run_id="r", ref="ALL!A2", field="dcc", member="P1",
-                 kind="interpret", state="pending"),
-            Cell(run_id="r", ref="ALL!B2", field="age", member="P1",
-                 kind="direct", state="pending"),
-        ])
+        store.insert_pending_cells(
+            [
+                Cell(
+                    run_id="r",
+                    ref="ALL!A2",
+                    field="dcc",
+                    member="P1",
+                    kind="interpret",
+                    state="pending",
+                ),
+                Cell(
+                    run_id="r",
+                    ref="ALL!B2",
+                    field="age",
+                    member="P1",
+                    kind="direct",
+                    state="pending",
+                ),
+            ]
+        )
         store.update_cell(
-            "r", "ALL!A2", state="filled", value="Yes", resolved_by="agent",
+            "r",
+            "ALL!A2",
+            state="filled",
+            value="Yes",
+            resolved_by="agent",
             sources=[{"database": "d", "query": "Q", "table_column": "t.c"}],
         )
         store.update_cell(
-            "r", "ALL!B2", state="filled", value="40", resolved_by="direct",
+            "r",
+            "ALL!B2",
+            state="filled",
+            value="40",
+            resolved_by="direct",
             sources=[{"database": "d", "query": "Q", "table_column": "t.c"}],
         )
         self.assertEqual(store.get_cell("r", "ALL!A2").review_state, "not_reviewed")
@@ -264,9 +426,23 @@ class StorePersistenceTest(unittest.TestCase):
     def test_status_change_event_atomic_with_status(self):
         # The persisted status and its status_change event always agree.
         store = Store(self.db_path)
-        store.create_run(Run(id="r", audit_id="a", status="in_progress",
-                             started_at="2024-01-01T00:00:00+00:00"))
-        store.upsert_cell(Cell(run_id="r", ref="X", state="blocked", reason_code="AWAITING_RESULT", reason_detail="result not yet back"))
+        store.create_run(
+            Run(
+                id="r",
+                audit_id="a",
+                status="in_progress",
+                started_at="2024-01-01T00:00:00+00:00",
+            )
+        )
+        store.upsert_cell(
+            Cell(
+                run_id="r",
+                ref="X",
+                state="blocked",
+                reason_code="AWAITING_RESULT",
+                reason_detail="result not yet back",
+            )
+        )
         store.recompute_status("r")
         changes = [e for e in store.get_events("r") if e.type == "status_change"]
         self.assertEqual(len(changes), 1)
@@ -298,19 +474,25 @@ class StorePersistenceTest(unittest.TestCase):
             payload TEXT
         );
         """)
-        conn.execute("INSERT INTO runs (id, audit_id, status) VALUES (?, ?, ?)", ("r", "a", "queued"))
+        conn.execute(
+            "INSERT INTO runs (id, audit_id, status) VALUES (?, ?, ?)",
+            ("r", "a", "queued"),
+        )
         conn.execute(
             "INSERT INTO events (run_id, ts, type, payload) VALUES (?, ?, ?, ?)",
-            ("r", "2024-01-01T00:00:00+00:00", "activity", "{\"hello\": \"world\"}"),
+            ("r", "2024-01-01T00:00:00+00:00", "activity", '{"hello": "world"}'),
         )
         conn.commit()
         conn.close()
 
         store = Store(self.db_path)
-        event_cols = {r["name"] for r in store._conn.execute("PRAGMA table_info(events)")}
+        event_cols = {
+            r["name"] for r in store._conn.execute("PRAGMA table_info(events)")
+        }
         self.assertIn("execution_id", event_cols)
         table_names = {
-            r["name"] for r in store._conn.execute(
+            r["name"]
+            for r in store._conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
             )
         }
@@ -338,11 +520,11 @@ class StorePersistenceTest(unittest.TestCase):
         completed = store.update_execution_status(
             "e1",
             "completed",
-            summary_json={"run_status": "complete"},
+            summary_json={"result_status": "complete"},
         )
         self.assertEqual(completed.status, "completed")
         self.assertIsNotNone(completed.ended_at)
-        self.assertEqual(completed.summary_json["run_status"], "complete")
+        self.assertEqual(completed.summary_json["result_status"], "complete")
 
         with self.assertRaises(ValueError):
             store.update_execution_status("e1", "running")
@@ -360,7 +542,9 @@ class StorePersistenceTest(unittest.TestCase):
         store = Store(self.db_path)
         store.create_run(Run(id="r", audit_id="a"))
         store.create_execution(RunExecution(id="e-123", run_id="r"))
-        store.append_event(Event(run_id="r", type="activity", payload={"headline": "first"}))
+        store.append_event(
+            Event(run_id="r", type="activity", payload={"headline": "first"})
+        )
         store.append_event(
             Event(
                 run_id="r",
@@ -479,8 +663,12 @@ class StorePersistenceTest(unittest.TestCase):
         store = Store(self.db_path)
         run_cols = [r["name"] for r in store._conn.execute("PRAGMA table_info(runs)")]
         cell_cols = [r["name"] for r in store._conn.execute("PRAGMA table_info(cells)")]
-        exec_cols = [r["name"] for r in store._conn.execute("PRAGMA table_info(run_executions)")]
-        member_cols = [r["name"] for r in store._conn.execute("PRAGMA table_info(run_members)")]
+        exec_cols = [
+            r["name"] for r in store._conn.execute("PRAGMA table_info(run_executions)")
+        ]
+        member_cols = [
+            r["name"] for r in store._conn.execute("PRAGMA table_info(run_members)")
+        ]
         self.assertEqual(list(_RUN_COLS), run_cols)
         self.assertEqual(list(_CELL_COLS), cell_cols)
         self.assertEqual(list(_EXEC_COLS), exec_cols)
@@ -508,9 +696,18 @@ class StorePersistenceTest(unittest.TestCase):
     def test_clinician_role_denies_provenance_write_columns(self):
         seed = Store(self.db_path)
         seed.create_run(Run(id="r", audit_id="a", status="in_progress"))
-        seed.insert_pending_cells([
-            Cell(run_id="r", ref="ALL!A2", field="f", member="m", kind="interpret", state="pending")
-        ])
+        seed.insert_pending_cells(
+            [
+                Cell(
+                    run_id="r",
+                    ref="ALL!A2",
+                    field="f",
+                    member="m",
+                    kind="interpret",
+                    state="pending",
+                )
+            ]
+        )
         seed.close()
 
         store = Store(self.db_path, runtime_role="clinician_editor_runtime")
@@ -520,7 +717,9 @@ class StorePersistenceTest(unittest.TestCase):
             store.update_cell("r", "ALL!A2")
         with self.assertRaises(PermissionError):
             store.update_cell("r", "ALL!MISSING")
-        out = store.update_cell("r", "ALL!A2", review_state="reviewed", corrected=True, value="yes")
+        out = store.update_cell(
+            "r", "ALL!A2", review_state="reviewed", corrected=True, value="yes"
+        )
         self.assertEqual(out.review_state, "reviewed")
         self.assertTrue(out.corrected)
         store.close()
@@ -528,13 +727,24 @@ class StorePersistenceTest(unittest.TestCase):
     def test_orchestrator_role_allows_runtime_run_and_cell_writes(self):
         seed = Store(self.db_path)
         seed.create_run(Run(id="r", audit_id="a", status="queued"))
-        seed.insert_pending_cells([
-            Cell(run_id="r", ref="ALL!A2", field="f", member="m", kind="direct", state="pending")
-        ])
+        seed.insert_pending_cells(
+            [
+                Cell(
+                    run_id="r",
+                    ref="ALL!A2",
+                    field="f",
+                    member="m",
+                    kind="direct",
+                    state="pending",
+                )
+            ]
+        )
         seed.close()
 
         store = Store(self.db_path, runtime_role="orchestrator_runtime")
-        store.update_run("r", status="in_progress", started_at="2026-01-01T00:00:00+00:00")
+        store.update_run(
+            "r", status="in_progress", started_at="2026-01-01T00:00:00+00:00"
+        )
         out = store.update_cell(
             "r",
             "ALL!A2",
@@ -546,7 +756,9 @@ class StorePersistenceTest(unittest.TestCase):
             attempts=[{"tier": "direct"}],
         )
         self.assertEqual((out.state, out.value), ("filled", "1"))
-        store.append_event(Event(run_id="r", type="status_change", payload={"to": "in_progress"}))
+        store.append_event(
+            Event(run_id="r", type="status_change", payload={"to": "in_progress"})
+        )
         self.assertEqual(len(store.get_events("r")), 1)
         store.close()
 
@@ -573,6 +785,147 @@ class StorePersistenceTest(unittest.TestCase):
         with self.assertRaises(PermissionError):
             store.update_run("r", status="in_progress")
         store.close()
+
+
+class PopulationLifecycleStatusTest(unittest.TestCase):
+    """The table-population PROCESS-status record on the run row (issue #326).
+
+    ``record_population_status`` is the state-store mirror of the run dir's
+    status.json payload — the population lifecycle (queued/running/stopped/
+    error/completed), DISTINCT from the cell-derived ``runs.status``."""
+
+    def setUp(self):
+        self._dir = tempfile.TemporaryDirectory()
+        self.db_path = Path(self._dir.name) / "state.db"
+
+    def tearDown(self):
+        self._dir.cleanup()
+
+    def test_record_and_read_back_every_lifecycle_value(self):
+        store = Store(self.db_path)
+        store.create_run(Run(id="r", audit_id="a", status="in_progress"))
+        # A run row starts with NO lifecycle record (mirrors: no status.json).
+        self.assertIsNone(store.get_run("r").population_status)
+        for status in ("queued", "running", "completed", "error", "stopped"):
+            self.assertTrue(store.record_population_status("r", status))
+            self.assertEqual(store.get_run("r").population_status, status)
+        store.close()
+
+    def test_status_and_detail_replace_but_result_status_is_preserved(self):
+        # status + detail are replaced on every transition (a bare 'running'
+        # after an 'error' clears the stale detail). But result_status is
+        # PRESERVED across a transition that supplies none (COALESCE, #330):
+        # starting a refresh ('running') must NOT null the prior completed
+        # run's durable result snapshot — a refresh that then crashes leaves
+        # the last-known-good result visible, not destroyed. Only a terminal
+        # transition that supplies a new snapshot overwrites it.
+        store = Store(self.db_path)
+        store.create_run(Run(id="r", audit_id="a", status="in_progress"))
+        # First run completes and records its result snapshot.
+        store.record_population_status("r", "completed", result_status="complete")
+        # A refresh starts: 'running' with no snapshot — the prior one survives.
+        store.record_population_status("r", "running")
+        run = store.get_run("r")
+        self.assertEqual(
+            (
+                run.population_status,
+                run.population_status_detail,
+                run.population_result_status,
+            ),
+            ("running", None, "complete"),
+        )
+        # A non-terminal transition still replaces detail and preserves result.
+        store.record_population_status("r", "error", detail="boom")
+        run = store.get_run("r")
+        self.assertEqual(
+            (
+                run.population_status,
+                run.population_status_detail,
+                run.population_result_status,
+            ),
+            ("error", "boom", "complete"),
+        )
+        # A new terminal snapshot overwrites the preserved one.
+        store.record_population_status("r", "completed", result_status="review")
+        run = store.get_run("r")
+        self.assertEqual(
+            (run.population_status, run.population_result_status),
+            ("completed", "review"),
+        )
+        # The lifecycle record never touches the cell-derived result status.
+        self.assertEqual(run.status, "in_progress")
+        store.close()
+
+    def test_record_rejects_off_vocabulary_status(self):
+        store = Store(self.db_path)
+        store.create_run(Run(id="r", audit_id="a"))
+        with self.assertRaises(ValueError):
+            store.record_population_status("r", "paused")
+        store.close()
+
+    def test_record_on_missing_run_returns_false(self):
+        # A FRESH population's open_session dual-writes 'running' BEFORE the
+        # session executor creates the run row: the record has nowhere to land
+        # and reports False (the executor compensates by creating the row with
+        # population_status='running').
+        store = Store(self.db_path)
+        self.assertFalse(store.record_population_status("nope", "running"))
+        store.close()
+
+    def test_pre_326_state_db_gains_the_lifecycle_columns(self):
+        # A runs table from before issue #326 is migrated on open (ALTER TABLE
+        # in _migrate_schema) and existing rows read back with NO lifecycle
+        # record — exactly like a run dir with no status.json.
+        conn = sqlite3.connect(self.db_path)
+        conn.executescript(
+            """
+            CREATE TABLE runs (
+                id               TEXT PRIMARY KEY,
+                audit_id         TEXT NOT NULL,
+                user_id          TEXT,
+                request          TEXT,
+                template_version TEXT,
+                database_ids     TEXT,
+                status           TEXT NOT NULL DEFAULT 'queued',
+                prompt_versions  TEXT,
+                filters          TEXT,
+                parameters       TEXT,
+                started_at       TEXT,
+                ended_at         TEXT
+            );
+            """
+        )
+        conn.execute(
+            "INSERT INTO runs (id, audit_id, status) VALUES ('r', 'a', 'queued')"
+        )
+        conn.commit()
+        conn.close()
+
+        store = Store(self.db_path)
+        run = store.get_run("r")
+        self.assertIsNone(run.population_status)
+        self.assertTrue(store.record_population_status("r", "running"))
+        self.assertEqual(store.get_run("r").population_status, "running")
+        store.close()
+
+    def test_lifecycle_record_is_api_app_only(self):
+        # Mirrors how status.json is owned: the server/session-transport layer
+        # (api_app) writes it; the orchestrator, the agent, and the clinician
+        # editor are denied.
+        seed = Store(self.db_path)
+        seed.create_run(Run(id="r", audit_id="a", status="in_progress"))
+        seed.record_population_status("r", "running")
+        for role in (
+            "orchestrator_runtime",
+            "agent_runtime_writer",
+            "clinician_editor_runtime",
+        ):
+            role_store = seed.with_runtime_role(role)
+            with self.assertRaises(PermissionError):
+                role_store.record_population_status("r", "completed")
+            role_store.close()
+        self.assertEqual(seed.get_run("r").population_status, "running")
+        seed.close()
 
 
 if __name__ == "__main__":
@@ -617,3 +970,4 @@ class LegacyStateMigrationTest(unittest.TestCase):
             self.assertEqual(cells[0].review_state, "not_reviewed")
             # The run derives in_verification from the migrated row.
             self.assertEqual(derive_status(cells, started=True), "in_verification")
+            store.close()

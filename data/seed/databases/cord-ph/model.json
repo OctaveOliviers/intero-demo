@@ -1,0 +1,1930 @@
+{
+  "schema_version": "1",
+  "database": "cord-ph",
+  "title": "Cord pH EMR",
+  "description": "Clinical database capturing birth events and early neonatal care at a maternity/neonatal hospital, centered on umbilical cord blood gas results and outcomes for babies at risk of hypoxic-ischaemic injury. The primary entities are the baby (and linked mother) and the birth encounter; cord_ph_birth_records holds the structured intrapartum/delivery dataset and nicu_admissions holds the neonatal unit course, while encounters, conditions, procedures, medications, devices and observations carry the standard EMR longitudinal record. Patients, providers, organizations and payers give demographics, staffing and billing context. Free-text narrative lives in clinical_notes.text (birth summaries, NICU admission and progress notes); short free-text also appears in maternal_comorbidities_other, sentinel_event_detail, mri_injury and the data_quality_flag fields.",
+  "tables": [
+    {
+      "name": "clinical_notes",
+      "description": "Free-text clinical narrative authored by clinicians during the birth admission and NICU stay (birth summaries, NICU admission notes, progress notes).",
+      "columns": [
+        {
+          "name": "_row_id",
+          "type": "integer",
+          "description": "Internal row identifier for the note.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "note_id",
+          "type": "text",
+          "description": "Identifier of the individual clinical note.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "date",
+          "type": "text",
+          "description": "Date and time the note was authored or pertains to.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-02T04:00:00Z",
+            "max": "2026-04-27T23:00:00Z"
+          }
+        },
+        {
+          "name": "patient",
+          "type": "text",
+          "description": "Patient (typically the baby) the note documents.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "encounter",
+          "type": "text",
+          "description": "Clinical encounter (birth admission or NICU stay) the note belongs to.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "author",
+          "type": "text",
+          "description": "Clinician who wrote the note, referenced by provider code.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "cph-prov-001",
+            "cph-prov-003",
+            "cph-prov-004",
+            "cph-prov-005"
+          ]
+        },
+        {
+          "name": "note_type",
+          "type": "text",
+          "description": "Kind of clinical note, distinguishing birth summary, NICU admission and ongoing NICU progress notes.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "birth_summary",
+            "nicu_admission",
+            "nicu_progress"
+          ],
+          "codes": {
+            "birth_summary": "Summary of the birth event",
+            "nicu_admission": "Admission note for the neonatal intensive care unit",
+            "nicu_progress": "Ongoing progress note during NICU stay"
+          }
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "description": "Free-text body of the clinical note.",
+          "filterable": false,
+          "reason": "free-text"
+        }
+      ],
+      "row_count": 14,
+      "grain": "one row per entity",
+      "fingerprint": "bb688b589ae1f30f"
+    },
+    {
+      "name": "conditions",
+      "description": "Diagnoses and clinical problems recorded against patients during the birth or neonatal admission (maternal obstetric conditions and neonatal diagnoses such as encephalopathy or seizure).",
+      "columns": [
+        {
+          "name": "_row_id",
+          "type": "integer",
+          "description": "Internal row identifier.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "start",
+          "type": "text",
+          "description": "Date and time the condition was first recorded or began.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-02T03:12:00Z",
+            "max": "2026-04-27T21:18:00Z"
+          }
+        },
+        {
+          "name": "stop",
+          "type": "text",
+          "description": "Date and time the condition resolved or was closed, if applicable.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "patient",
+          "type": "text",
+          "description": "Patient (mother or baby) the condition applies to.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "encounter",
+          "type": "text",
+          "description": "Encounter during which the condition was recorded.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "description": "Clinical terminology code (e.g. SNOMED) identifying the condition.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "description": "Human-readable name of the diagnosed condition (e.g. chorioamnionitis, neonatal encephalopathy).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Chorioamnionitis",
+            "Liveborn singleton delivered vaginally",
+            "Meconium in amniotic fluid",
+            "Neonatal encephalopathy",
+            "Neonatal seizure",
+            "Placental abruption",
+            "Prolonged rupture of membranes",
+            "Reduced fetal movements",
+            "Respiratory distress of newborn",
+            "Shoulder dystocia",
+            "Uterine rupture"
+          ]
+        }
+      ],
+      "row_count": 16,
+      "grain": "many rows per entity",
+      "fingerprint": "bd27d3eb16dbfd0b"
+    },
+    {
+      "name": "cord_ph_birth_records",
+      "description": "Structured per-birth record capturing the antenatal background, intrapartum events, delivery, umbilical cord blood gas results, neonatal resuscitation and immediate postnatal course — the core dataset of the Cord pH study.",
+      "columns": [
+        {
+          "name": "_row_id",
+          "type": "integer",
+          "description": "Internal row identifier.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "record_id",
+          "type": "text",
+          "description": "Identifier of the birth record within this database.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "source_system",
+          "type": "text",
+          "description": "Source EHR system the record was extracted from.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Northbank Maternity EHR"
+          ]
+        },
+        {
+          "name": "source_record_id",
+          "type": "text",
+          "description": "Identifier of the record in the source EHR.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "extracted_at",
+          "type": "text",
+          "description": "Timestamp at which the record was extracted from the source system.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-05-01T09:00:00Z",
+            "max": "2026-05-01T09:00:00Z"
+          }
+        },
+        {
+          "name": "patient_code",
+          "type": "text",
+          "description": "Local identifier used by the source system to refer to the baby/birth.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "baby_patient",
+          "type": "text",
+          "description": "Reference to the baby's patient record.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "mother_patient",
+          "type": "text",
+          "description": "Reference to the mother's patient record.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "encounter",
+          "type": "text",
+          "description": "Birth encounter the record relates to.",
+          "filterable": false,
+          "reason": "reference"
+        }
+      ],
+      "row_count": 10,
+      "grain": "one row per entity",
+      "fingerprint": "daad993f6108dc02"
+    },
+    {
+      "name": "devices",
+      "description": "Medical devices applied to the baby during the birth or neonatal admission (e.g. CPAP, endotracheal tube, aEEG monitor) with the period of use.",
+      "columns": [
+        {
+          "name": "_row_id",
+          "type": "integer",
+          "description": "Internal row identifier.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "start",
+          "type": "text",
+          "description": "Date and time the device began being used on the patient.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-04T18:49:00Z",
+            "max": "2026-04-23T10:15:00Z"
+          }
+        },
+        {
+          "name": "stop",
+          "type": "text",
+          "description": "Date and time the device was removed or use ended.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-04T19:06:00Z",
+            "max": "2026-04-25T18:00:00Z"
+          }
+        },
+        {
+          "name": "patient",
+          "type": "text",
+          "description": "Patient the device was used on.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "encounter",
+          "type": "text",
+          "description": "Encounter during which the device was used.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "description": "Coded identifier of the device type.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "description": "Human-readable device name (e.g. CPAP device, endotracheal tube, aEEG monitor).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Amplitude integrated EEG monitor",
+            "Continuous positive airway pressure device",
+            "Endotracheal tube"
+          ]
+        },
+        {
+          "name": "udi",
+          "type": "text",
+          "description": "Unique Device Identifier for the specific physical device used.",
+          "filterable": false,
+          "reason": "identifier"
+        }
+      ],
+      "row_count": 7,
+      "grain": "one row per entity",
+      "fingerprint": "dffa383216fe3761"
+    },
+    {
+      "name": "encounters",
+      "description": "Clinical encounters (hospital admissions and visits), primarily inpatient birth admissions and NICU admissions, with billing and reason information.",
+      "columns": [
+        {
+          "name": "_row_id",
+          "type": "integer",
+          "description": "Internal row identifier.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "id",
+          "type": "text",
+          "description": "Identifier of the encounter.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "start",
+          "type": "text",
+          "description": "Start date and time of the encounter.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-02T03:12:00Z",
+            "max": "2026-04-27T21:18:00Z"
+          }
+        },
+        {
+          "name": "stop",
+          "type": "text",
+          "description": "End date and time of the encounter (discharge).",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-04T11:00:00Z",
+            "max": "2026-05-02T13:45:00Z"
+          }
+        },
+        {
+          "name": "patient",
+          "type": "text",
+          "description": "Patient seen in the encounter.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "description": "Healthcare organisation providing the encounter.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "description": "Lead provider/clinician for the encounter.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "payer",
+          "type": "text",
+          "description": "Insurance payer responsible for the encounter.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "encounterclass",
+          "type": "text",
+          "description": "Class of encounter such as inpatient or outpatient.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "inpatient"
+          ],
+          "codes": {
+            "inpatient": "Inpatient hospital admission"
+          }
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "description": "Coded reason/type for the encounter.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "description": "Human-readable encounter type (e.g. liveborn infant born in hospital, NICU admission).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Admission to neonatal intensive care unit",
+            "Liveborn infant born in hospital"
+          ]
+        },
+        {
+          "name": "base_encounter_cost",
+          "type": "text",
+          "description": "Base cost of the encounter itself, before claim line items.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 1450,
+            "max": 3800
+          }
+        },
+        {
+          "name": "total_claim_cost",
+          "type": "text",
+          "description": "Total billed cost across the entire encounter claim.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 1840,
+            "max": 14150
+          }
+        },
+        {
+          "name": "payer_coverage",
+          "type": "text",
+          "description": "Portion of the total claim covered by the insurance payer.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 1840,
+            "max": 13925
+          }
+        },
+        {
+          "name": "reasoncode",
+          "type": "text",
+          "description": "Coded clinical reason for the encounter (e.g. SNOMED code for birth or encephalopathy).",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 77206006,
+            "max": 386661006
+          }
+        },
+        {
+          "name": "reasondescription",
+          "type": "text",
+          "description": "Human-readable clinical reason for the encounter.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Birth",
+            "Neonatal encephalopathy",
+            "Respiratory distress of newborn"
+          ]
+        }
+      ],
+      "row_count": 14,
+      "grain": "one row per entity",
+      "fingerprint": "4a6033db25fe014c"
+    },
+    {
+      "name": "medications",
+      "description": "Medications administered or prescribed to mother or baby during the birth/neonatal admission, such as intrapartum antibiotics or neonatal resuscitation adrenaline.",
+      "columns": [
+        {
+          "name": "_row_id",
+          "type": "integer",
+          "description": "Internal row identifier.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "start",
+          "type": "text",
+          "description": "Date and time the medication was started or administered.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-04T18:52:00Z",
+            "max": "2026-04-23T09:43:00Z"
+          }
+        },
+        {
+          "name": "stop",
+          "type": "text",
+          "description": "Date and time the medication was stopped or completed.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-04T18:53:00Z",
+            "max": "2026-04-23T09:44:00Z"
+          }
+        },
+        {
+          "name": "patient",
+          "type": "text",
+          "description": "Patient who received the medication.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "payer",
+          "type": "text",
+          "description": "Insurance payer billed for the medication.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "encounter",
+          "type": "text",
+          "description": "Encounter during which the medication was given.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "description": "Coded identifier of the medication.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "description": "Human-readable medication name and indication.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Broad spectrum intrapartum antibiotics",
+            "Epinephrine neonatal resuscitation dose"
+          ]
+        },
+        {
+          "name": "base_cost",
+          "type": "text",
+          "description": "Base unit cost of the medication.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 18,
+            "max": 42
+          }
+        },
+        {
+          "name": "payer_coverage",
+          "type": "text",
+          "description": "Portion of the medication cost covered by the payer.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 18,
+            "max": 42
+          }
+        },
+        {
+          "name": "dispenses",
+          "type": "text",
+          "description": "Number of dispenses/administrations recorded for this medication line.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 1,
+            "max": 2
+          }
+        },
+        {
+          "name": "totalcost",
+          "type": "text",
+          "description": "Total cost across all dispenses for this medication line.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 18,
+            "max": 42
+          }
+        },
+        {
+          "name": "reasoncode",
+          "type": "text",
+          "description": "Coded clinical reason the medication was given.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 12867002,
+            "max": 230690007
+          }
+        },
+        {
+          "name": "reasondescription",
+          "type": "text",
+          "description": "Human-readable clinical reason the medication was given.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Chorioamnionitis",
+            "Neonatal encephalopathy",
+            "Neonatal seizure"
+          ]
+        }
+      ],
+      "row_count": 4,
+      "grain": "one row per entity",
+      "fingerprint": "3c9a2109ebafbbe0"
+    },
+    {
+      "name": "nicu_admissions",
+      "description": "Per-baby neonatal intensive care unit admission record capturing therapeutic hypothermia, neurological monitoring and seizures, MRI findings and discharge outcomes.",
+      "columns": [
+        {
+          "name": "_row_id",
+          "type": "integer",
+          "description": "Internal row identifier.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "nicu_record_id",
+          "type": "text",
+          "description": "Identifier of this NICU record.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "source_system",
+          "type": "text",
+          "description": "Source neonatal EHR the record was extracted from.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Northbank Neonatal EHR"
+          ]
+        },
+        {
+          "name": "source_record_id",
+          "type": "text",
+          "description": "Identifier of the record in the source neonatal EHR.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "extracted_at",
+          "type": "text",
+          "description": "Timestamp at which the record was extracted from the source system.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-05-01T09:15:00Z",
+            "max": "2026-05-01T09:15:00Z"
+          }
+        },
+        {
+          "name": "patient_code",
+          "type": "text",
+          "description": "Local identifier used by the source system to refer to the baby.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "baby_patient",
+          "type": "text",
+          "description": "Reference to the baby's patient record.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "nicu_encounter",
+          "type": "text",
+          "description": "Encounter representing the NICU admission.",
+          "filterable": false,
+          "reason": "reference"
+        }
+      ],
+      "row_count": 4,
+      "grain": "one row per entity",
+      "fingerprint": "fabe7e311aa22809"
+    },
+    {
+      "name": "observations",
+      "description": "Discrete clinical observations and laboratory results recorded against patients (e.g. Apgar scores, birth weight, gestational age, repeat blood gas pH), with value, units and observation type.",
+      "columns": [
+        {
+          "name": "_row_id",
+          "type": "integer",
+          "description": "Internal row identifier.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "date",
+          "type": "text",
+          "description": "Date and time the observation was recorded.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-02T03:12:00Z",
+            "max": "2026-04-27T21:20:00Z"
+          }
+        },
+        {
+          "name": "patient",
+          "type": "text",
+          "description": "Patient the observation applies to.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "encounter",
+          "type": "text",
+          "description": "Encounter during which the observation was recorded.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "description": "High-level category of the observation, distinguishing vital signs from laboratory results.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "laboratory",
+            "vital-signs"
+          ],
+          "codes": {
+            "laboratory": "Laboratory result",
+            "vital-signs": "Vital sign or bedside measurement"
+          }
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "description": "Coded identifier of the observation (e.g. LOINC/SNOMED).",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "description": "Human-readable name of the observation (e.g. Apgar score 5 minutes, birth weight, repeat blood gas pH).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Apgar score 1 minute",
+            "Apgar score 10 minutes",
+            "Apgar score 5 minutes",
+            "Birth weight",
+            "Gestational age at birth",
+            "Repeat blood gas pH",
+            "Umbilical artery base excess",
+            "Umbilical artery blood pH",
+            "Umbilical artery lactate"
+          ]
+        },
+        {
+          "name": "value",
+          "type": "text",
+          "description": "Numeric or coded value of the observation.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": -21.4,
+            "max": 3180
+          }
+        },
+        {
+          "name": "units",
+          "type": "text",
+          "description": "Units of measurement for the observation value (e.g. g, mmol/L, pH, score, weeks).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "g",
+            "mmol/L",
+            "pH",
+            "score",
+            "weeks"
+          ]
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "description": "Whether the observation has a numeric value or is missing.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "missing",
+            "numeric"
+          ],
+          "codes": {
+            "numeric": "Numeric value recorded",
+            "missing": "Value missing"
+          }
+        }
+      ],
+      "row_count": 36,
+      "grain": "one row per entity",
+      "fingerprint": "b0fd01eb01962162"
+    },
+    {
+      "name": "organizations",
+      "description": "Healthcare organisations providing the care, primarily the maternity hospital and its neonatal network.",
+      "columns": [
+        {
+          "name": "_row_id",
+          "type": "integer",
+          "description": "Internal row identifier.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "id",
+          "type": "text",
+          "description": "Identifier of the organisation.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "description": "Name of the healthcare organisation.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Northbank Neonatal Network",
+            "Northbank Women and Children's Hospital"
+          ]
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "description": "Street address of the organisation.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "100 River Road",
+            "102 River Road"
+          ]
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "description": "City where the organisation is located.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Cambridge"
+          ]
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "description": "State where the organisation is located.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Massachusetts"
+          ]
+        },
+        {
+          "name": "zip",
+          "type": "text",
+          "description": "Postal/ZIP code of the organisation's address.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 2139,
+            "max": 2139
+          }
+        },
+        {
+          "name": "lat",
+          "type": "text",
+          "description": "Latitude of the organisation's location.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 42.366,
+            "max": 42.367
+          }
+        },
+        {
+          "name": "lon",
+          "type": "text",
+          "description": "Longitude of the organisation's location.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": -71.105,
+            "max": -71.104
+          }
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "description": "Main contact telephone number of the organisation.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "555-410-1000",
+            "555-410-2000"
+          ]
+        },
+        {
+          "name": "revenue",
+          "type": "text",
+          "description": "Reported annual revenue of the organisation.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 6800000,
+            "max": 12500000
+          }
+        },
+        {
+          "name": "utilization",
+          "type": "text",
+          "description": "Utilisation metric (e.g. number of encounters) for the organisation.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 520,
+            "max": 1420
+          }
+        }
+      ],
+      "row_count": 2,
+      "grain": "many rows per entity",
+      "fingerprint": "762fbaa71894df8d"
+    },
+    {
+      "name": "patients",
+      "description": "Patient demographics and contact information for mothers and babies in the cohort.",
+      "columns": [
+        {
+          "name": "_row_id",
+          "type": "integer",
+          "description": "Internal row identifier.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "id",
+          "type": "text",
+          "description": "Identifier of the patient.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "birthdate",
+          "type": "text",
+          "description": "Date of birth of the patient (mother's DOB or baby's birth date).",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "1984-07-09",
+            "max": "2026-04-27"
+          }
+        },
+        {
+          "name": "deathdate",
+          "type": "text",
+          "description": "Date of death of the patient, if applicable.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "ssn",
+          "type": "text",
+          "description": "Social security number of the patient.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "drivers",
+          "type": "text",
+          "description": "Driver's licence number of the patient, if any.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "passport",
+          "type": "text",
+          "description": "Passport number of the patient, if any.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "prefix",
+          "type": "text",
+          "description": "Name prefix or salutation (e.g. Ms., Baby).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Baby",
+            "Ms."
+          ]
+        },
+        {
+          "name": "first",
+          "type": "text",
+          "description": "Patient's first/given name.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "last",
+          "type": "text",
+          "description": "Patient's last/family name.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Bennett",
+            "Ellis",
+            "Harris",
+            "Kim",
+            "Mbatha",
+            "Nguyen",
+            "O'Connor",
+            "Patel",
+            "Rivera",
+            "Walker"
+          ]
+        },
+        {
+          "name": "suffix",
+          "type": "text",
+          "description": "Name suffix (e.g. Jr.) if applicable.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "maiden",
+          "type": "text",
+          "description": "Maiden name of the patient, if applicable.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "marital",
+          "type": "text",
+          "description": "Marital status of the patient.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "M",
+            "S"
+          ],
+          "codes": {
+            "M": "Married",
+            "S": "Single"
+          }
+        },
+        {
+          "name": "race",
+          "type": "text",
+          "description": "Self-reported race of the patient.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "asian",
+            "black",
+            "white"
+          ],
+          "codes": {
+            "white": "White",
+            "black": "Black or African descent",
+            "asian": "Asian"
+          }
+        },
+        {
+          "name": "ethnicity",
+          "type": "text",
+          "description": "Self-reported ethnicity of the patient (Hispanic/non-Hispanic).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "hispanic",
+            "nonhispanic"
+          ],
+          "codes": {
+            "hispanic": "Hispanic or Latino",
+            "nonhispanic": "Not Hispanic or Latino"
+          }
+        },
+        {
+          "name": "gender",
+          "type": "text",
+          "description": "Administrative sex/gender of the patient.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "F",
+            "M"
+          ],
+          "codes": {
+            "F": "Female",
+            "M": "Male"
+          }
+        },
+        {
+          "name": "birthplace",
+          "type": "text",
+          "description": "Place where the patient was born.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Arlington Massachusetts US",
+            "Boston Massachusetts US",
+            "Cambridge Massachusetts US",
+            "Malden Massachusetts US",
+            "Medford Massachusetts US",
+            "Newton Massachusetts US",
+            "Quincy Massachusetts US",
+            "Somerville Massachusetts US",
+            "Waltham Massachusetts US"
+          ]
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "description": "Patient's residential street address.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "21 Cedar Street",
+            "22 Cedar Street",
+            "23 Cedar Street",
+            "24 Cedar Street",
+            "25 Cedar Street",
+            "26 Cedar Street",
+            "27 Cedar Street",
+            "28 Cedar Street",
+            "29 Cedar Street",
+            "30 Cedar Street"
+          ]
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "description": "City of the patient's residence.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Arlington",
+            "Boston",
+            "Cambridge",
+            "Malden",
+            "Medford",
+            "Newton",
+            "Quincy",
+            "Somerville",
+            "Waltham"
+          ]
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "description": "State of the patient's residence.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Massachusetts"
+          ]
+        },
+        {
+          "name": "county",
+          "type": "text",
+          "description": "County of the patient's residence.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Middlesex County",
+            "Norfolk County",
+            "Suffolk County"
+          ]
+        },
+        {
+          "name": "zip",
+          "type": "text",
+          "description": "Postal/ZIP code of the patient's residence.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 2118,
+            "max": 2474
+          }
+        },
+        {
+          "name": "lat",
+          "type": "text",
+          "description": "Latitude of the patient's residence.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 42.252,
+            "max": 42.426
+          }
+        },
+        {
+          "name": "lon",
+          "type": "text",
+          "description": "Longitude of the patient's residence.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": -71.236,
+            "max": -71.002
+          }
+        },
+        {
+          "name": "healthcare_expenses",
+          "type": "text",
+          "description": "Total healthcare expenses incurred by the patient.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 1840,
+            "max": 14150
+          }
+        },
+        {
+          "name": "healthcare_coverage",
+          "type": "text",
+          "description": "Total healthcare expenses covered by insurance for the patient.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 1840,
+            "max": 13925
+          }
+        }
+      ],
+      "row_count": 20,
+      "grain": "one row per entity",
+      "fingerprint": "e87d895cc6d4940a"
+    },
+    {
+      "name": "payers",
+      "description": "Insurance payer organisations covering encounters and claims in the cohort, with aggregate coverage and utilisation statistics.",
+      "columns": [
+        {
+          "name": "_row_id",
+          "type": "integer",
+          "description": "Internal row identifier.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "id",
+          "type": "text",
+          "description": "Identifier of the payer.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "description": "Name of the insurance payer.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Northbank Health Plan"
+          ]
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "description": "Street address of the payer.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "1 Benefit Plaza"
+          ]
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "description": "City of the payer's headquarters.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Boston"
+          ]
+        },
+        {
+          "name": "state_headquartered",
+          "type": "text",
+          "description": "State in which the payer is headquartered.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Massachusetts"
+          ]
+        },
+        {
+          "name": "zip",
+          "type": "text",
+          "description": "Postal/ZIP code of the payer's address.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 2108,
+            "max": 2108
+          }
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "description": "Contact telephone number for the payer.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "555-420-1000"
+          ]
+        },
+        {
+          "name": "amount_covered",
+          "type": "text",
+          "description": "Total monetary amount covered by the payer across all claims.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 2500000,
+            "max": 2500000
+          }
+        },
+        {
+          "name": "amount_uncovered",
+          "type": "text",
+          "description": "Total monetary amount left uncovered by the payer (patient responsibility).",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 112500,
+            "max": 112500
+          }
+        },
+        {
+          "name": "revenue",
+          "type": "text",
+          "description": "Reported revenue of the payer.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 520000,
+            "max": 520000
+          }
+        },
+        {
+          "name": "covered_encounters",
+          "type": "text",
+          "description": "Number of encounters covered by the payer.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 44,
+            "max": 44
+          }
+        },
+        {
+          "name": "uncovered_encounters",
+          "type": "text",
+          "description": "Number of encounters not covered by the payer.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 1,
+            "max": 1
+          }
+        },
+        {
+          "name": "covered_medications",
+          "type": "text",
+          "description": "Number of medication claims covered by the payer.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 8,
+            "max": 8
+          }
+        },
+        {
+          "name": "uncovered_medications",
+          "type": "text",
+          "description": "Number of medication claims not covered.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 0,
+            "max": 0
+          }
+        },
+        {
+          "name": "covered_procedures",
+          "type": "text",
+          "description": "Number of procedure claims covered by the payer.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 38,
+            "max": 38
+          }
+        },
+        {
+          "name": "uncovered_procedures",
+          "type": "text",
+          "description": "Number of procedure claims not covered.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 0,
+            "max": 0
+          }
+        },
+        {
+          "name": "covered_immunizations",
+          "type": "text",
+          "description": "Number of immunisation claims covered by the payer.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 0,
+            "max": 0
+          }
+        },
+        {
+          "name": "uncovered_immunizations",
+          "type": "text",
+          "description": "Number of immunisation claims not covered.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 0,
+            "max": 0
+          }
+        },
+        {
+          "name": "unique_customers",
+          "type": "text",
+          "description": "Number of unique patient members covered by the payer.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 20,
+            "max": 20
+          }
+        },
+        {
+          "name": "qols_avg",
+          "type": "text",
+          "description": "Average quality-of-life score across the payer's covered members.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 0.82,
+            "max": 0.82
+          }
+        },
+        {
+          "name": "member_months",
+          "type": "text",
+          "description": "Total member-months of coverage provided by the payer.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 240,
+            "max": 240
+          }
+        }
+      ],
+      "row_count": 1,
+      "grain": "many rows per entity",
+      "fingerprint": "3b39acc568249169"
+    },
+    {
+      "name": "procedures",
+      "description": "Procedures performed on mother or baby during the birth and neonatal admission, including mode of delivery procedures, cord gas sampling, CFM monitoring and therapeutic hypothermia.",
+      "columns": [
+        {
+          "name": "_row_id",
+          "type": "integer",
+          "description": "Internal row identifier.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "start",
+          "type": "text",
+          "description": "Date and time the procedure began.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-02T03:12:00Z",
+            "max": "2026-04-27T21:19:00Z"
+          }
+        },
+        {
+          "name": "stop",
+          "type": "text",
+          "description": "Date and time the procedure ended.",
+          "filterable": true,
+          "filter_type": "date",
+          "range": {
+            "min": "2026-04-02T03:14:00Z",
+            "max": "2026-04-27T21:25:00Z"
+          }
+        },
+        {
+          "name": "patient",
+          "type": "text",
+          "description": "Patient on whom the procedure was performed.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "encounter",
+          "type": "text",
+          "description": "Encounter during which the procedure was performed.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "description": "Coded identifier of the procedure.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "description": "Human-readable name of the procedure (e.g. emergency caesarean section, umbilical artery blood gas sampling, therapeutic hypothermia).",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Continuous function monitoring",
+            "Emergency caesarean section",
+            "Forceps delivery",
+            "Spontaneous vaginal delivery",
+            "Therapeutic hypothermia",
+            "Umbilical artery blood gas sampling",
+            "Vacuum extraction delivery"
+          ]
+        },
+        {
+          "name": "base_cost",
+          "type": "text",
+          "description": "Base cost of the procedure.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 46,
+            "max": 4200
+          }
+        },
+        {
+          "name": "reasoncode",
+          "type": "text",
+          "description": "Coded clinical reason for performing the procedure.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 11612004,
+            "max": 386661006
+          }
+        },
+        {
+          "name": "reasondescription",
+          "type": "text",
+          "description": "Human-readable clinical reason for performing the procedure.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Birth",
+            "Chorioamnionitis",
+            "Meconium in amniotic fluid",
+            "Neonatal encephalopathy",
+            "Placental abruption",
+            "Prolonged rupture of membranes",
+            "Reduced fetal movements",
+            "Shoulder dystocia",
+            "Uterine rupture"
+          ]
+        }
+      ],
+      "row_count": 20,
+      "grain": "one row per entity",
+      "fingerprint": "9c0930d1dbee396f"
+    },
+    {
+      "name": "providers",
+      "description": "Clinicians delivering care in the cohort (midwives, obstetricians, neonatologists, paediatricians) with their organisational and contact details.",
+      "columns": [
+        {
+          "name": "_row_id",
+          "type": "integer",
+          "description": "Internal row identifier.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "id",
+          "type": "text",
+          "description": "Identifier of the provider/clinician.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "description": "Organisation the provider works for.",
+          "filterable": false,
+          "reason": "reference"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "description": "Provider's full name.",
+          "filterable": false,
+          "reason": "identifier"
+        },
+        {
+          "name": "gender",
+          "type": "text",
+          "description": "Administrative sex/gender of the provider.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "F",
+            "M"
+          ],
+          "codes": {
+            "F": "Female",
+            "M": "Male"
+          }
+        },
+        {
+          "name": "speciality",
+          "type": "text",
+          "description": "Clinical specialty of the provider.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Midwifery",
+            "Neonatology",
+            "Obstetrics",
+            "Paediatrics"
+          ],
+          "codes": {
+            "Midwifery": "Midwifery",
+            "Obstetrics": "Obstetrics",
+            "Neonatology": "Neonatology",
+            "Paediatrics": "Paediatrics"
+          }
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "description": "Work address of the provider.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "100 River Road",
+            "102 River Road"
+          ]
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "description": "City of the provider's work location.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Cambridge"
+          ]
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "description": "State of the provider's work location.",
+          "filterable": true,
+          "filter_type": "category",
+          "values": [
+            "Massachusetts"
+          ]
+        },
+        {
+          "name": "zip",
+          "type": "text",
+          "description": "Postal/ZIP code of the provider's work address.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 2139,
+            "max": 2139
+          }
+        },
+        {
+          "name": "lat",
+          "type": "text",
+          "description": "Latitude of the provider's work location.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 42.366,
+            "max": 42.367
+          }
+        },
+        {
+          "name": "lon",
+          "type": "text",
+          "description": "Longitude of the provider's work location.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": -71.105,
+            "max": -71.104
+          }
+        },
+        {
+          "name": "utilization",
+          "type": "text",
+          "description": "Utilisation metric (e.g. number of encounters) for the provider.",
+          "filterable": true,
+          "filter_type": "number",
+          "range": {
+            "min": 128,
+            "max": 242
+          }
+        }
+      ],
+      "row_count": 5,
+      "grain": "one row per entity",
+      "fingerprint": "adf1f143f6bc190a"
+    }
+  ],
+  "foreign_keys": [
+    {
+      "column": "clinical_notes.encounter",
+      "target": "encounters.id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "14/14 sampled values found in target"
+    },
+    {
+      "column": "clinical_notes.patient",
+      "target": "cord_ph_birth_records.baby_patient",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "clinical_notes.patient",
+      "target": "patients.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "conditions.encounter",
+      "target": "clinical_notes.encounter",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "14/14 sampled values found in target"
+    },
+    {
+      "column": "conditions.encounter",
+      "target": "encounters.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "14/14 sampled values found in target"
+    },
+    {
+      "column": "conditions.patient",
+      "target": "cord_ph_birth_records.baby_patient",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "conditions.patient",
+      "target": "patients.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "cord_ph_birth_records.baby_patient",
+      "target": "patients.id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "cord_ph_birth_records.encounter",
+      "target": "clinical_notes.encounter",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "cord_ph_birth_records.encounter",
+      "target": "encounters.id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "cord_ph_birth_records.mother_patient",
+      "target": "patients.id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "devices.encounter",
+      "target": "clinical_notes.encounter",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "7/7 sampled values found in target"
+    },
+    {
+      "column": "devices.encounter",
+      "target": "encounters.id",
+      "cardinality": "to-one",
+      "declared": false,
+      "evidence": "7/7 sampled values found in target"
+    },
+    {
+      "column": "encounters.patient",
+      "target": "cord_ph_birth_records.baby_patient",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "encounters.patient",
+      "target": "patients.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "encounters.provider",
+      "target": "providers.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "5/5 sampled values found in target"
+    },
+    {
+      "column": "observations.encounter",
+      "target": "clinical_notes.encounter",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "12/12 sampled values found in target"
+    },
+    {
+      "column": "observations.encounter",
+      "target": "encounters.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "12/12 sampled values found in target"
+    },
+    {
+      "column": "observations.patient",
+      "target": "cord_ph_birth_records.baby_patient",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "observations.patient",
+      "target": "patients.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "procedures.encounter",
+      "target": "clinical_notes.encounter",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "13/13 sampled values found in target"
+    },
+    {
+      "column": "procedures.encounter",
+      "target": "encounters.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "13/13 sampled values found in target"
+    },
+    {
+      "column": "procedures.patient",
+      "target": "cord_ph_birth_records.baby_patient",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    },
+    {
+      "column": "procedures.patient",
+      "target": "patients.id",
+      "cardinality": "to-many",
+      "declared": false,
+      "evidence": "10/10 sampled values found in target"
+    }
+  ],
+  "schema_fingerprint": "42378dfa6de9129b"
+}

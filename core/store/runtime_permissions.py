@@ -56,90 +56,140 @@ def _rule(actions: Mapping[RuntimeAction, frozenset[str] | None]) -> TableRule:
     )
 
 
-# Canonical column sets, aligned with docs/mvp/contracts/control-plane-schema-and-permissions.md.
-RUNS_UPDATE_COLUMNS = frozenset({"status", "started_at", "ended_at", "parameters", "prompt_versions"})
-RUNS_INSERT_COLUMNS = frozenset(
+def _insert_update_columns(
+    *,
+    insert: Iterable[str],
+    immutable: Iterable[str],
+) -> tuple[frozenset[str], frozenset[str]]:
+    """Define insert + update column sets from one source of truth."""
+    insert_cols = frozenset(insert)
+    immutable_cols = frozenset(immutable)
+    return insert_cols, frozenset(
+        col for col in insert_cols if col not in immutable_cols
+    )
+
+
+# Canonical column sets, aligned with specs/mvp/contracts/control-plane-schema-and-permissions.md.
+RUNS_UPDATE_COLUMNS = frozenset(
+    {"status", "started_at", "ended_at", "parameters", "prompt_versions"}
+)
+# The table-population PROCESS-status record (issue #326) — the ONLY
+# population lifecycle record. Writable by `api_app` ONLY (below, via
+# RUNS_INSERT_COLUMNS): the lifecycle is owned by the server/session-transport
+# layer. The orchestrator's runs surface (RUNS_UPDATE_COLUMNS) and the
+# agent/clinician roles stay denied.
+RUNS_POPULATION_LIFECYCLE_COLUMNS = frozenset(
+    {"population_status", "population_status_detail", "population_result_status"}
+)
+RUNS_INSERT_COLUMNS = (
+    frozenset(
+        {
+            "id",
+            "audit_id",
+            "user_id",
+            "request",
+            "template_version",
+            "database_ids",
+            "status",
+            "prompt_versions",
+            "filters",
+            "parameters",
+            "started_at",
+            "ended_at",
+        }
+    )
+    | RUNS_POPULATION_LIFECYCLE_COLUMNS
+)
+CELLS_RUNTIME_UPDATE_COLUMNS = frozenset(
     {
-        "id",
-        "audit_id",
-        "user_id",
-        "request",
-        "template_version",
-        "database_ids",
-        "status",
-        "prompt_versions",
-        "filters",
-        "parameters",
-        "started_at",
-        "ended_at",
+        "state",
+        "value",
+        "confidence",
+        "resolved_by",
+        "hypothesis",
+        "attempts",
+        "sources",
+        "explanation",
+        "prompt_version",
+        "extracted_at",
+        "reason_code",
+        "reason_detail",
+        "owner_needed",
+        "outstanding_since",
     }
 )
-CELLS_RUNTIME_UPDATE_COLUMNS = frozenset({
-    "state",
-    "value",
-    "confidence",
-    "resolved_by",
-    "hypothesis",
-    "attempts",
-    "sources",
-    "explanation",
-    "prompt_version",
-    "extracted_at",
-    "reason_code",
-    "reason_detail",
-    "owner_needed",
-    "outstanding_since",
-})
-CELLS_ORCHESTRATOR_UPDATE_COLUMNS = CELLS_RUNTIME_UPDATE_COLUMNS | frozenset({"review_state", "corrected"})
+CELLS_ORCHESTRATOR_UPDATE_COLUMNS = CELLS_RUNTIME_UPDATE_COLUMNS | frozenset(
+    {"review_state", "corrected"}
+)
 CELLS_AGENT_UPDATE_COLUMNS = CELLS_RUNTIME_UPDATE_COLUMNS
 CELLS_CLINICIAN_UPDATE_COLUMNS = frozenset({"review_state", "corrected", "value"})
 
-CELLS_INSERT_COLUMNS = frozenset({
-    "run_id",
-    "ref",
-    "field",
-    "member",
-    "kind",
-    "state",
-    "value",
-    "confidence",
-    "resolved_by",
-    "hypothesis",
-    "attempts",
-    "review_state",
-    "corrected",
-    "explanation",
-    "sources",
-    "prompt_version",
-    "extracted_at",
-    "reason_code",
-    "reason_detail",
-    "owner_needed",
-    "outstanding_since",
-})
-CELLS_UPSERT_UPDATE_COLUMNS = frozenset(
-    c for c in CELLS_INSERT_COLUMNS if c not in {"run_id", "ref"}
+CELLS_INSERT_COLUMNS, CELLS_UPSERT_UPDATE_COLUMNS = _insert_update_columns(
+    insert={
+        "run_id",
+        "ref",
+        "field",
+        "member",
+        "kind",
+        "state",
+        "value",
+        "confidence",
+        "resolved_by",
+        "hypothesis",
+        "attempts",
+        "review_state",
+        "corrected",
+        "explanation",
+        "sources",
+        "prompt_version",
+        "extracted_at",
+        "reason_code",
+        "reason_detail",
+        "owner_needed",
+        "outstanding_since",
+    },
+    immutable={"run_id", "ref"},
 )
 EVENTS_INSERT_COLUMNS = frozenset({"run_id", "ts", "type", "payload", "execution_id"})
-RUN_EXECUTIONS_INSERT_COLUMNS = frozenset(
-    {"id", "run_id", "status", "started_at", "ended_at", "summary_json"}
+RUN_EXECUTIONS_INSERT_COLUMNS, RUN_EXECUTIONS_UPDATE_COLUMNS = _insert_update_columns(
+    insert={"id", "run_id", "status", "started_at", "ended_at", "summary_json"},
+    immutable={"id", "run_id"},
 )
-RUN_EXECUTIONS_UPDATE_COLUMNS = frozenset({"status", "started_at", "ended_at", "summary_json"})
-RUN_MEMBERS_INSERT_COLUMNS = frozenset(
-    {"run_id", "member", "row_index", "active", "first_seen_execution_id", "last_seen_execution_id"}
+RUN_MEMBERS_INSERT_COLUMNS, RUN_MEMBERS_UPDATE_COLUMNS = _insert_update_columns(
+    insert={
+        "run_id",
+        "member",
+        "row_index",
+        "active",
+        "first_seen_execution_id",
+        "last_seen_execution_id",
+    },
+    immutable={"run_id", "member", "row_index", "first_seen_execution_id"},
 )
-RUN_MEMBERS_UPDATE_COLUMNS = frozenset({"active", "last_seen_execution_id"})
 FIELD_CODES_COLUMNS = frozenset({"run_id", "field", "code", "meaning"})
 
 EVENTS_TABLE_RULE = _rule({"select": None, "insert": EVENTS_INSERT_COLUMNS})
 RUN_EXECUTIONS_TABLE_RULE = _rule(
-    {"select": None, "insert": RUN_EXECUTIONS_INSERT_COLUMNS, "update": RUN_EXECUTIONS_UPDATE_COLUMNS}
+    {
+        "select": None,
+        "insert": RUN_EXECUTIONS_INSERT_COLUMNS,
+        "update": RUN_EXECUTIONS_UPDATE_COLUMNS,
+    }
 )
 RUN_MEMBERS_TABLE_RULE = _rule(
-    {"select": None, "insert": RUN_MEMBERS_INSERT_COLUMNS, "update": RUN_MEMBERS_UPDATE_COLUMNS}
+    {
+        "select": None,
+        "insert": RUN_MEMBERS_INSERT_COLUMNS,
+        "update": RUN_MEMBERS_UPDATE_COLUMNS,
+    }
 )
 FIELD_CODES_TABLE_RULE = _rule(
-    {"select": None, "insert": FIELD_CODES_COLUMNS, "update": FIELD_CODES_COLUMNS, "delete": None}
+    {
+        "select": None,
+        "insert": FIELD_CODES_COLUMNS,
+        "update": FIELD_CODES_COLUMNS,
+        "delete": None,
+    }
 )
 RUNTIME_CORE_TABLE_RULES = {
     "events": EVENTS_TABLE_RULE,
@@ -151,13 +201,32 @@ RUNTIME_CORE_TABLE_RULES = {
 
 _POLICY: dict[RuntimeRole, dict[RuntimeTable, TableRule]] = {
     "api_app": {
-        "runs": _rule({"select": None, "insert": RUNS_INSERT_COLUMNS, "update": RUNS_INSERT_COLUMNS, "delete": None}),
-        "cells": _rule({"select": None, "insert": CELLS_INSERT_COLUMNS, "update": CELLS_UPSERT_UPDATE_COLUMNS}),
+        "runs": _rule(
+            {
+                "select": None,
+                "insert": RUNS_INSERT_COLUMNS,
+                "update": RUNS_INSERT_COLUMNS,
+                "delete": None,
+            }
+        ),
+        "cells": _rule(
+            {
+                "select": None,
+                "insert": CELLS_INSERT_COLUMNS,
+                "update": CELLS_UPSERT_UPDATE_COLUMNS,
+            }
+        ),
         **RUNTIME_CORE_TABLE_RULES,
     },
     "orchestrator_runtime": {
         "runs": _rule({"select": None, "update": RUNS_UPDATE_COLUMNS}),
-        "cells": _rule({"select": None, "insert": CELLS_INSERT_COLUMNS, "update": CELLS_ORCHESTRATOR_UPDATE_COLUMNS}),
+        "cells": _rule(
+            {
+                "select": None,
+                "insert": CELLS_INSERT_COLUMNS,
+                "update": CELLS_ORCHESTRATOR_UPDATE_COLUMNS,
+            }
+        ),
         **RUNTIME_CORE_TABLE_RULES,
     },
     "agent_runtime_writer": {
@@ -219,7 +288,9 @@ def require_runtime_db_action(
     columns: Iterable[str] | None = None,
 ) -> None:
     """Raise ``PermissionError`` unless the runtime DB action is allowed."""
-    if is_runtime_db_action_allowed(role=role, table=table, action=action, columns=columns):
+    if is_runtime_db_action_allowed(
+        role=role, table=table, action=action, columns=columns
+    ):
         return
     cols = tuple(columns) if columns is not None else None
     raise RuntimePermissionDenied(

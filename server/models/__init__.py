@@ -2,35 +2,64 @@
 of which submodule X lives in. Add new models to the right submodule, then list
 them here."""
 
-from server.models.audits import (
-    AuditDetailResponse,
-    AuditInfo,
-    AuditMappingPatchRequest,
-    AuditMappingPatchResponse,
-    AuditRenameRequest,
-    AuditUploadResponse,
+from server.models.auth import (
+    ClinicianResponse,
+    IamUserResponse,
+    LoginRequest,
+    QueryHistoryItem,
+    SetPasswordRequest,
+    TablePopulationHistoryItem,
+    UserResponse,
 )
-from server.models.auth import LoginRequest, RunHistoryItem, UserResponse
 from server.models.databases import (
     DatabaseDetailResponse,
     DatabaseInfo,
     DatabaseRenameRequest,
     DatabaseUploadResponse,
 )
+from server.models.datasets import (
+    DatasetCreateRequest,
+    DatasetFilterRequest,
+    DatasetPatchRequest,
+    DatasetSummary,
+)
 from server.models.generate import GenerateRequest
 from server.models.health import HealthResponse
 from server.models.indexing import IndexingStatus
-from server.models.runs import (
+from server.models.table_populations import (
     ChipMessage,
-    RunCellEditRequest,
-    RunCellEditResponse,
-    RunCreateFromAuditRequest,
-    RunCreateResponse,
-    RunRefreshResponse,
-    RunStateResponse,
+    TablePopulationCellEditRequest,
+    TablePopulationCellEditResponse,
+    TablePopulationCreateFromAuditRequest,
+    TablePopulationCreateResponse,
+    TablePopulationRefreshResponse,
+    TablePopulationStateResponse,
     TextMessage,
 )
-from server.models.sql import SqlQuery, SqlResponse
+from server.models.sql import ChatCitationEvidenceRequest, SqlQuery, SqlResponse
+from server.models.tables import (
+    TableColumn,
+    TableCreateRequest,
+    TableRenameRequest,
+    TableSpec,
+    TableSummary,
+)
+from server.models.templates import (
+    TemplateDetailResponse,
+    TemplateInfo,
+    TemplateMappingPatchRequest,
+    TemplateMappingPatchResponse,
+    TemplateRenameRequest,
+    TemplateUploadResponse,
+)
+from server.models.threads import (
+    ThreadAttachment,
+    ThreadCreateRequest,
+    ThreadMessageRequest,
+    ThreadQuestionAnswersRequest,
+    ThreadRenameRequest,
+    ThreadSummary,
+)
 from server.models.workbook import (
     SheetColumnMeta,
     SheetData,
@@ -39,32 +68,54 @@ from server.models.workbook import (
 )
 
 __all__ = [
-    "AuditInfo",
-    "AuditDetailResponse",
-    "AuditRenameRequest",
-    "AuditUploadResponse",
     "ChipMessage",
+    "ChatCitationEvidenceRequest",
+    "ClinicianResponse",
     "DatabaseInfo",
     "DatabaseDetailResponse",
     "DatabaseRenameRequest",
     "DatabaseUploadResponse",
+    "DatasetCreateRequest",
+    "DatasetFilterRequest",
+    "DatasetPatchRequest",
+    "DatasetSummary",
     "GenerateRequest",
     "HealthResponse",
+    "IamUserResponse",
     "IndexingStatus",
     "LoginRequest",
-    "RunCreateFromAuditRequest",
-    "RunCreateResponse",
-    "RunRefreshResponse",
-    "RunCellEditRequest",
-    "RunCellEditResponse",
-    "RunHistoryItem",
-    "RunStateResponse",
+    "TablePopulationCreateFromAuditRequest",
+    "TablePopulationCreateResponse",
+    "TablePopulationRefreshResponse",
+    "TablePopulationCellEditRequest",
+    "TablePopulationCellEditResponse",
+    "QueryHistoryItem",
+    "TablePopulationHistoryItem",
+    "TablePopulationStateResponse",
+    "SetPasswordRequest",
     "SheetColumnMeta",
     "SheetData",
     "SheetMeta",
     "SqlQuery",
     "SqlResponse",
+    "TableColumn",
+    "TableCreateRequest",
+    "TableRenameRequest",
+    "TableSpec",
+    "TableSummary",
+    "TemplateInfo",
+    "TemplateDetailResponse",
+    "TemplateMappingPatchRequest",
+    "TemplateMappingPatchResponse",
+    "TemplateRenameRequest",
+    "TemplateUploadResponse",
     "TextMessage",
+    "ThreadAttachment",
+    "ThreadCreateRequest",
+    "ThreadMessageRequest",
+    "ThreadQuestionAnswersRequest",
+    "ThreadRenameRequest",
+    "ThreadSummary",
     "UserResponse",
     "WorkbookResponse",
 ]

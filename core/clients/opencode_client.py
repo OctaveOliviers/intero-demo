@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import AsyncIterator, Optional
+from typing import Optional
 
 import httpx
 
@@ -88,7 +88,9 @@ class OpenCodeClient:
         )
         r.raise_for_status()
 
-    async def abort_session(self, session_id: str, directory: Optional[str] = None) -> None:
+    async def abort_session(
+        self, session_id: str, directory: Optional[str] = None
+    ) -> None:
         try:
             await self._http.post(
                 f"/session/{session_id}/abort",
@@ -97,10 +99,13 @@ class OpenCodeClient:
         except httpx.HTTPError as exc:
             logger.warning("abort_session failed for %s: %s", session_id, exc)
 
-    async def delete_session(self, session_id: str, directory: Optional[str] = None) -> None:
+    async def delete_session(
+        self, session_id: str, directory: Optional[str] = None
+    ) -> None:
         try:
             await self._http.delete(
-                f"/session/{session_id}", params={"directory": directory or self._directory}
+                f"/session/{session_id}",
+                params={"directory": directory or self._directory},
             )
         except httpx.HTTPError as exc:
             logger.warning("delete_session failed for %s: %s", session_id, exc)
@@ -142,14 +147,20 @@ class OpenCodeClient:
                             frame = json.loads(data)
                         except json.JSONDecodeError:
                             continue
-                        event = frame.get("payload") if isinstance(frame, dict) else None
+                        event = (
+                            frame.get("payload") if isinstance(frame, dict) else None
+                        )
                         if not isinstance(event, dict) or event.get("type") == "sync":
                             continue
                         await self._dispatch(event)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                logger.warning("opencode event stream dropped (%s); reconnecting in %.1fs", exc, backoff)
+                logger.warning(
+                    "opencode event stream dropped (%s); reconnecting in %.1fs",
+                    exc,
+                    backoff,
+                )
                 self._pump_ready.clear()
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 10.0)

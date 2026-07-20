@@ -26,6 +26,14 @@ class Run:
     parameters: dict = dc_field(default_factory=dict)
     started_at: str | None = None
     ended_at: str | None = None
+    # Table-population PROCESS status (issue #326): the ONLY population
+    # lifecycle record — queued | running | stopped | error | completed.
+    # DISTINCT from ``status`` above (the cell-derived RESULT status).
+    # ``population_result_status`` snapshots the result status at the terminal
+    # transition. None means no lifecycle transition has been recorded.
+    population_status: str | None = None
+    population_status_detail: str | None = None
+    population_result_status: str | None = None
 
 
 @dataclass

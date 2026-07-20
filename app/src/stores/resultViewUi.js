@@ -104,6 +104,14 @@ export function openCellEvidence(cellRef, cellMeta) {
   }));
 }
 
+export function clearCellEvidenceSelection() {
+  resultViewUiState.update((state) => ({
+    ...state,
+    selectedCellRef: null,
+    selectedCellMeta: null,
+  }));
+}
+
 // Keep the right-panel status in sync when the selected cell's metadata changes
 // in-place (for example, dwell auto-review flips review_state to reviewed).
 export function patchSelectedCellMeta(cellRef, patch) {
@@ -130,8 +138,8 @@ export function setActivityVisualState(state) {
   }));
 }
 
-export function initializeActivityVisualState({ runStatus } = {}) {
-  if (runStatus === "running") {
+export function initializeActivityVisualState({ tablePopulationStatus } = {}) {
+  if (tablePopulationStatus === "running") {
     setActivityVisualState(ACTIVITY_VISUAL_STATES.RUNNING);
     return;
   }

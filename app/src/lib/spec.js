@@ -272,7 +272,7 @@ export async function parseRequest(text, { templates = null } = {}) {
   const t = (text || "").toLowerCase();
   const cohort = [];
   const templatePool = Array.isArray(templates) && templates.length ? templates : allTemplatesFlat();
-  const realMode = !isMockMode("audits");
+  const realMode = !isMockMode("templates");
 
   // Condition + the template/specialty it implies.
   let templateId = "cord-ph-lo-audit";
@@ -316,8 +316,8 @@ export async function parseRequest(text, { templates = null } = {}) {
   }
 
   // Resolve the output template against the active catalog source. In real
-  // mode the Home flow points this catalog at backend audits, so `templateId`
-  // becomes a backend audit id (never a frontend-only static id).
+  // mode the Home flow points this catalog at backend templates, so `templateId`
+  // becomes a backend template id (never a frontend-only static id).
   const findByName = (fn) => templatePool.find((x) => fn((x.name || "").toLowerCase()));
   let chosen = getTemplateById(templateId);
   if (!chosen) {

@@ -1,11 +1,11 @@
-"""A client reconnecting to a run must never block on an empty queue.
+"""A client reconnecting to table population must never block on an empty queue.
 
-When the frontend reopens an in-flight run after a page reload it re-attaches an
-SSE stream. If the run already finished (and the original consumer drained its
-events) the broker has a terminal `_RunState` with an empty queue — a naive
-`await queue.get()` would hang forever. `stream_events` synthesizes the terminal
+When the frontend reopens in-flight table population after a page reload it
+re-attaches an SSE stream. If the population already finished (and the original consumer drained its
+events) the relay has a terminal `_SessionState` with an empty queue — a naive
+`await queue.get()` would hang forever. `stream_session_events` synthesizes the terminal
 event in that case so the client stops cleanly and keeps its fetched snapshot,
-while still draining a buffered fast-finish and streaming a live run.
+while still draining a buffered fast-finish and streaming live population.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core.running.stream_runner import SpineRunBroker
+from core import table_population
 
 
 async def _collect(agen, timeout: float = 2.0) -> list[str]:
@@ -35,44 +35,44 @@ async def _collect(agen, timeout: float = 2.0) -> list[str]:
 class StreamReconnectTest(unittest.IsolatedAsyncioTestCase):
     async def test_reconnect_to_drained_finished_run_does_not_hang(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            broker = SpineRunBroker()
-            broker.reserve("r", Path(tmp))
-            await broker.publish("r", {"type": "review_summary"})
-            await broker.publish("r", {"type": "done"})
+            broker = table_population.TablePopulationSessionRelay()
+            broker.open_session("r", Path(tmp))
+            await broker.publish_session_event("r", {"type": "review_summary"})
+            await broker.publish_session_event("r", {"type": "done"})
 
-            first = await _collect(broker.stream_events("r"))
+            first = await _collect(broker.stream_session_events("r"))
             self.assertEqual(first, ["review_summary", "done"])
 
             # Reconnect after the queue was drained: must synthesize `done`.
-            again = await _collect(broker.stream_events("r"))
+            again = await _collect(broker.stream_session_events("r"))
             self.assertEqual(again, ["done"])
 
     async def test_first_connect_after_done_drains_buffered_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            broker = SpineRunBroker()
-            broker.reserve("r", Path(tmp))
-            await broker.publish("r", {"type": "review_summary"})
-            await broker.publish("r", {"type": "done"})
+            broker = table_population.TablePopulationSessionRelay()
+            broker.open_session("r", Path(tmp))
+            await broker.publish_session_event("r", {"type": "review_summary"})
+            await broker.publish_session_event("r", {"type": "done"})
             # First (and only) consumer connects after done — gets everything.
-            got = await _collect(broker.stream_events("r"))
+            got = await _collect(broker.stream_session_events("r"))
             self.assertEqual(got, ["review_summary", "done"])
 
     async def test_unknown_run_errors_immediately(self) -> None:
-        broker = SpineRunBroker()
-        got = await _collect(broker.stream_events("nope"))
+        broker = table_population.TablePopulationSessionRelay()
+        got = await _collect(broker.stream_session_events("nope"))
         self.assertEqual(got, ["error"])
 
     async def test_live_run_streams_future_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            broker = SpineRunBroker()
-            broker.reserve("r", Path(tmp))
-            agen = broker.stream_events("r")
+            broker = table_population.TablePopulationSessionRelay()
+            broker.open_session("r", Path(tmp))
+            agen = broker.stream_session_events("r")
 
             async def feed():
                 await asyncio.sleep(0.05)
-                await broker.publish("r", {"type": "cell_update"})
-                await broker.publish("r", {"type": "review_summary"})
-                await broker.publish("r", {"type": "done"})
+                await broker.publish_session_event("r", {"type": "cell_update"})
+                await broker.publish_session_event("r", {"type": "review_summary"})
+                await broker.publish_session_event("r", {"type": "done"})
 
             task = asyncio.create_task(feed())
             got = await _collect(agen)

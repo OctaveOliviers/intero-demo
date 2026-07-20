@@ -3,14 +3,14 @@
   import { createEventDispatcher } from "svelte";
   import Icon from "./Icon.svelte";
   import {
-    renameAudit,
-    deleteAudit,
-    reindexAudit,
-    createRunFromAudit,
+    renameTemplate,
+    deleteTemplate,
+    reindexTemplate,
+    createTablePopulationFromAudit,
   } from "../lib/api.js";
   import { refreshTemplates } from "../lib/templates.js";
   import { isSubmitting, addMessage, startRunStream } from "../stores/chat.js";
-  import { startAudit, setAuditRunId, setAuditStatus, activeStream } from "../stores/audits.js";
+  import { startTablePopulation, setPopulatedTablePopulationId, setPopulatedTableStatus, activeStream } from "../stores/populatedTables.js";
   import { goToResults } from "../stores/navigation.js";
   import { indexingMap, flashing, chipOf, errorOf } from "../stores/indexing.js";
   import { databases } from "../stores/databases.js";
@@ -72,11 +72,11 @@
     return $_("template.filterPlaceholder." + key);
   }
 
-  function buildUserMessage(audit, activeFilters) {
+  function buildUserMessage(template, activeFilters) {
     const lines = Object.entries(activeFilters)
       .filter(([, v]) => v && v.trim())
       .map(([k, v]) => `• ${labelFromKey(k)}: ${v}`);
-    return [audit.name, ...lines].join("\n");
+    return [template.name, ...lines].join("\n");
   }
 
   function toggleMenu(e) {
@@ -97,7 +97,7 @@
     if (!name || name === template.name) return;
     busy = true;
     try {
-      await renameAudit(template.id, name);
+      await renameTemplate(template.id, name);
       await refreshTemplates();
     } catch (err) {
       window.alert($_("template.renameFailed", { values: { error: err.message } }));
@@ -112,7 +112,7 @@
     if (!window.confirm($_("template.deleteConfirm", { values: { name: template.name } }))) return;
     busy = true;
     try {
-      await deleteAudit(template.id);
+      await deleteTemplate(template.id);
       await refreshTemplates();
     } catch (err) {
       window.alert($_("template.deleteFailed", { values: { error: err.message } }));
@@ -127,7 +127,7 @@
     busy = true;
     // Status updates arrive over the indexing SSE stream; no reload needed.
     try {
-      await reindexAudit(template.id);
+      await reindexTemplate(template.id);
     } catch (err) {
       window.alert($_("template.retryFailed", { values: { error: err.message } }));
     } finally {
@@ -157,19 +157,23 @@
         submissionDeadline: template.submissionDeadline || null,
       };
 
-      histId = startAudit(runTarget, activeFilters);
+      histId = startTablePopulation(runTarget, activeFilters);
       goToResults();
       addMessage({
         role: "user",
         type: "text",
         content: buildUserMessage(runTarget, activeFilters),
       });
-      const data = await createRunFromAudit(runTarget.id, activeFilters, selectedDatabase);
-      setAuditRunId(histId, data.runId);
-      startRunStream(data.runId, histId);
+      const data = await createTablePopulationFromAudit(
+        runTarget.id,
+        activeFilters,
+        selectedDatabase,
+      );
+      setPopulatedTablePopulationId(histId, data.tablePopulationId);
+      startRunStream(data.tablePopulationId, histId);
     } catch (err) {
-      addMessage({ role: "assistant", type: "text", content: "Run failed: " + err.message });
-      if (histId) setAuditStatus(histId, "error");
+      addMessage({ role: "assistant", type: "text", content: "Table population failed: " + err.message });
+      if (histId) setPopulatedTableStatus(histId, "error");
       activeStream.set(null);
       isSubmitting.set(false);
     }
@@ -199,7 +203,7 @@
     </div>
   </button>
 
-  <button class="menu-btn" on:click={toggleMenu} aria-label="Audit options">
+  <button class="menu-btn" on:click={toggleMenu} aria-label="Template options">
     <Icon name="more" size={18} />
   </button>
   {#if menuOpen}

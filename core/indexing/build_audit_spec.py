@@ -33,7 +33,6 @@ writes a broken file.
 from __future__ import annotations
 
 import json
-import logging
 import re
 import warnings
 from datetime import date, datetime
@@ -44,25 +43,21 @@ from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
 from core.clients import llm
-from core.indexing.profile import validate_against_schema
+from core.clients.llm_builder import (
+    BuilderValidationError,
+    build_validated,
+    parse_json_object,
+)
+from core.contracts import validate_against_schema
 from core.slug import slugify
 
-logger = logging.getLogger(__name__)
-
 _SCHEMA_FILE = "audit-spec.schema.json"
-_MAX_BUILD_ATTEMPTS = 3
 _VALID_TYPES = {"category", "number", "date", "text", "boolean"}
 
 # "<column letters><row number>" — structural row matching (the old string
 # suffix test was bug #2: ref.endswith("1") matched A11, A21, A101…).
 _CELL_REF = re.compile(r"^([A-Z]+)(\d+)$")
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-
-
-class BuilderValidationError(RuntimeError):
-    """Raised when the builder's LLM output cannot be made into a valid model
-    after all retries. The caller (service.run_indexing) marks the entity
-    `status: error` and no broken model is ever written."""
 
 
 _PROMPT = """\
@@ -269,18 +264,6 @@ def extract_field_skeleton(
 
 # --- assembly + state preservation --------------------------------------------
 
-def _parse_json(raw: str) -> dict[str, Any]:
-    """Parse the model's JSON, tolerating ```json fences and stray prose."""
-    text = raw.strip()
-    if text.startswith("```"):
-        text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
-        text = re.sub(r"\n?```$", "", text.strip())
-    start, end = text.find("{"), text.rfind("}")
-    if start != -1 and end != -1:
-        text = text[start : end + 1]
-    return json.loads(text)
-
-
 def _prose_by_number(raw: Any) -> dict[int, dict[str, Any]]:
     """Index the LLM's per-field prose records by their `number` join key."""
     out: dict[int, dict[str, Any]] = {}
@@ -440,7 +423,7 @@ async def build_audit_spec(
     judgment + audit-level prose + suggested inclusion criteria; deterministic
     code merges them (structure always wins), merges preserved user state
     (`previous`), and validates against the S0 schema. Retries on malformed LLM
-    output; raises `BuilderValidationError` after `_MAX_BUILD_ATTEMPTS`."""
+    output; raises `BuilderValidationError` when the attempts run out."""
     sheets = extract_layout(workbook_path)
     skeleton, sheet_names = extract_field_skeleton(sheets)
     if not skeleton:
@@ -455,9 +438,7 @@ async def build_audit_spec(
         + json.dumps({"sheets": sheets}, ensure_ascii=False, indent=2)
     )
 
-    instructions = _PROMPT
-    problems: list[str] = []
-    for attempt in range(1, _MAX_BUILD_ATTEMPTS + 1):
+    async def _attempt(instructions: str) -> tuple[dict[str, Any] | None, list[str]]:
         # The prose pass dominates output size — every field gets a type +
         # note (+ permitted_values for coded fields), ~80 tokens each. 12k
         # carries ~150 fields comfortably.
@@ -466,46 +447,25 @@ async def build_audit_spec(
             max_output_tokens=12000, temperature=0.0, stage="index_audit",
         )
         try:
-            prose = _parse_json(raw)
-            if not isinstance(prose, dict):
-                raise ValueError("top-level JSON is not an object")
-        except (json.JSONDecodeError, ValueError) as exc:
-            problems = [f"LLM output was not parseable JSON: {exc}"]
-        else:
-            model = merge_preserved_state(
-                _assemble(audit_id, skeleton, sheet_names, prose), previous
-            )
-            problems = validate_against_schema(model, _SCHEMA_FILE)
-            if not problems:
-                # The structure cannot be wrong (it is mechanical); hold the LLM
-                # to its one job instead: every field annotated.
-                unannotated = [
-                    f["number"] for f in model["fields"]
-                    if f["number"] not in _prose_by_number(prose.get("fields"))
-                ]
-                if unannotated:
-                    problems = [
-                        "fields missing an annotation record (join by `number`): "
-                        + ", ".join(str(n) for n in unannotated)
-                    ]
-            if not problems:
-                return model
-        logger.warning(
-            "audit spec failed validation (attempt %d/%d): %s",
-            attempt, _MAX_BUILD_ATTEMPTS, "; ".join(problems),
+            prose = parse_json_object(raw)
+        except ValueError as exc:
+            return None, [f"LLM output was not parseable JSON: {exc}"]
+        model = merge_preserved_state(
+            _assemble(audit_id, skeleton, sheet_names, prose), previous
         )
-        instructions = _PROMPT + _retry_feedback(problems)
-    raise BuilderValidationError(
-        f"audit spec failed validation after {_MAX_BUILD_ATTEMPTS} attempts: "
-        + "; ".join(problems)
-    )
+        problems = validate_against_schema(model, _SCHEMA_FILE)
+        if not problems:
+            # The structure cannot be wrong (it is mechanical); hold the LLM
+            # to its one job instead: every field annotated.
+            unannotated = [
+                f["number"] for f in model["fields"]
+                if f["number"] not in _prose_by_number(prose.get("fields"))
+            ]
+            if unannotated:
+                problems = [
+                    "fields missing an annotation record (join by `number`): "
+                    + ", ".join(str(n) for n in unannotated)
+                ]
+        return model, problems
 
-
-def _retry_feedback(problems: list[str]) -> str:
-    joined = "\n".join(f"- {p}" for p in problems)
-    return (
-        "\n\nYOUR PREVIOUS OUTPUT WAS REJECTED for these reasons:\n"
-        f"{joined}\n"
-        "Produce a corrected JSON object that fixes every issue. Output only the "
-        "JSON object, starting with `{`."
-    )
+    return await build_validated(_attempt, prompt=_PROMPT, label="audit spec")

@@ -3,12 +3,14 @@ import io
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from openpyxl import load_workbook
 from starlette.responses import StreamingResponse
 
 from core.store import Cell, Run, RunMember, Store
+from server.auth import store as auth_store
 from server.routes import workbook as workbook_route
 
 
@@ -27,9 +29,24 @@ class WorkbookDownloadPolicyTest(unittest.TestCase):
         # No spec on disk -> headers fall back to the field slug. There is no
         # result.xlsx anywhere: the grid is built purely from state.db cells.
         self.audits_dir = self.base / "audits"
+        self.auth_db = self.base / "auth.sqlite"
+        self.legacy_auth_db = self.base / "legacy-auth.sqlite"
+        self._orig_auth_db = auth_store.AUTH_DB_PATH
+        self._orig_legacy_auth_db = auth_store.LEGACY_AUTH_DB_PATH
+        auth_store.AUTH_DB_PATH = self.auth_db
+        auth_store.LEGACY_AUTH_DB_PATH = self.legacy_auth_db
+        auth_store.init_store()
+        self.user = {"id": "u_owner", "username": "owner", "role": "clinician"}
 
         store = Store(self.db_path)
-        store.create_run(Run(id="run-1", audit_id="npda", status="completed"))
+        store.create_run(
+            Run(
+                id="run-1",
+                audit_id="npda",
+                user_id=self.user["id"],
+                status="completed",
+            )
+        )
         store.upsert_run_member(
             RunMember(run_id="run-1", member="A", row_index=0, active=True)
         )
@@ -47,25 +64,74 @@ class WorkbookDownloadPolicyTest(unittest.TestCase):
         }
         src = [{"database": "db", "query": "SELECT 1", "table_column": "t.c"}]
         for (member, row), (val, detail) in seed.items():
-            store.upsert_cell(Cell(run_id="run-1", ref="ALL!A%d" % row, field="member",
-                                   member=member, kind="direct", state="filled", value=member, sources=src))
-            store.upsert_cell(Cell(run_id="run-1", ref="ALL!B%d" % row, field="value",
-                                   member=member, kind="direct", state="filled", value=str(val), sources=src))
-            store.upsert_cell(Cell(run_id="run-1", ref="DETAIL!A%d" % row, field="member",
-                                   member=member, kind="direct", state="filled", value=member, sources=src))
-            store.upsert_cell(Cell(run_id="run-1", ref="DETAIL!B%d" % row, field="detail",
-                                   member=member, kind="direct", state="filled", value=detail, sources=src))
+            store.upsert_cell(
+                Cell(
+                    run_id="run-1",
+                    ref="ALL!A%d" % row,
+                    field="member",
+                    member=member,
+                    kind="direct",
+                    state="filled",
+                    value=member,
+                    sources=src,
+                )
+            )
+            store.upsert_cell(
+                Cell(
+                    run_id="run-1",
+                    ref="ALL!B%d" % row,
+                    field="value",
+                    member=member,
+                    kind="direct",
+                    state="filled",
+                    value=str(val),
+                    sources=src,
+                )
+            )
+            store.upsert_cell(
+                Cell(
+                    run_id="run-1",
+                    ref="DETAIL!A%d" % row,
+                    field="member",
+                    member=member,
+                    kind="direct",
+                    state="filled",
+                    value=member,
+                    sources=src,
+                )
+            )
+            store.upsert_cell(
+                Cell(
+                    run_id="run-1",
+                    ref="DETAIL!B%d" % row,
+                    field="detail",
+                    member=member,
+                    kind="direct",
+                    state="filled",
+                    value=detail,
+                    sources=src,
+                )
+            )
         store.close()
 
     def tearDown(self):
+        auth_store.AUTH_DB_PATH = self._orig_auth_db
+        auth_store.LEGACY_AUTH_DB_PATH = self._orig_legacy_auth_db
         self._tmp.cleanup()
+
+    def _request(self):
+        return SimpleNamespace(
+            state=SimpleNamespace(user=self.user, user_id=self.user["id"])
+        )
 
     def test_download_excludes_inactive_members_but_keeps_history(self):
         with (
-            patch.object(workbook_route, "AUDITS_DIR", self.audits_dir),
+            patch.object(workbook_route, "TEMPLATES_DIR", self.audits_dir),
             patch.object(workbook_route, "Store", lambda: Store(self.db_path)),
         ):
-            response = asyncio.run(workbook_route.download_workbook("run-1"))
+            response = asyncio.run(
+                workbook_route.download_workbook("run-1", self._request())
+            )
 
         self.assertIsInstance(response, StreamingResponse)
         payload = asyncio.run(_read_streaming_body(response))
@@ -79,16 +145,22 @@ class WorkbookDownloadPolicyTest(unittest.TestCase):
         # Values come from the state DB (built entirely from cells) and are kept
         # verbatim as strings — no numeric coercion. The header row is present and
         # inactive member B's row is dropped.
-        self.assertEqual(rows, [
-            ("member", "value"),
-            ("A", "10"),
-            ("C", "30"),
-        ])
-        self.assertEqual(rows2, [
-            ("member", "detail"),
-            ("A", "alpha"),
-            ("C", "gamma"),
-        ])
+        self.assertEqual(
+            rows,
+            [
+                ("member", "value"),
+                ("A", "10"),
+                ("C", "30"),
+            ],
+        )
+        self.assertEqual(
+            rows2,
+            [
+                ("member", "detail"),
+                ("A", "alpha"),
+                ("C", "gamma"),
+            ],
+        )
 
         store = Store(self.db_path)
         try:
@@ -100,10 +172,10 @@ class WorkbookDownloadPolicyTest(unittest.TestCase):
 
     def test_get_workbook_builds_full_grid_from_cells(self):
         with (
-            patch.object(workbook_route, "AUDITS_DIR", self.audits_dir),
+            patch.object(workbook_route, "TEMPLATES_DIR", self.audits_dir),
             patch.object(workbook_route, "Store", lambda: Store(self.db_path)),
         ):
-            resp = asyncio.run(workbook_route.get_workbook("run-1"))
+            resp = asyncio.run(workbook_route.get_workbook("run-1", self._request()))
 
         by_name = {s.name: s for s in resp.sheets}
         # Reload builds the same populated grid as the download — values from the
@@ -113,16 +185,17 @@ class WorkbookDownloadPolicyTest(unittest.TestCase):
         self.assertEqual(by_name["ALL"].data[1][:2], ["A", "10"])
         self.assertEqual(by_name["ALL"].data[2][:2], ["B", "20"])
         self.assertEqual(by_name["ALL"].data[3][:2], ["C", "30"])
-        self.assertEqual(resp.runStatus, "completed")
+        self.assertEqual(resp.resultStatus, "completed")
 
     def test_download_404_when_run_missing(self):
         from fastapi import HTTPException
+
         with (
-            patch.object(workbook_route, "AUDITS_DIR", self.audits_dir),
+            patch.object(workbook_route, "TEMPLATES_DIR", self.audits_dir),
             patch.object(workbook_route, "Store", lambda: Store(self.db_path)),
         ):
             with self.assertRaises(HTTPException) as ctx:
-                asyncio.run(workbook_route.download_workbook("nope"))
+                asyncio.run(workbook_route.download_workbook("nope", self._request()))
         self.assertEqual(ctx.exception.status_code, 404)
 
 

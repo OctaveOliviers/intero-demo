@@ -1,26 +1,20 @@
-"""Read-only value profiling for database indexing + S0 schema validation.
+"""Read-only value profiling for database indexing.
 
-Two indexing utilities live here:
+The **read-only value profiler** (`readonly_connection` / `profile_column` /
+`classify_column`) — salvaged from the superseded per-DB filter catalog
+(closed PR #155, `core/mapping/build_criteria.py`) and trimmed to what database
+indexing needs. It belongs at DB indexing, not at mapping: the filterable
+surface is a property of the *database*, computed once. `classify_column`
+turns a live column profile into the per-column annotation `model.json`
+carries — `filterable` + `filter_type` + `values`/`range`, or
+`filterable: false` + a `reason` (identifier / free-text / reference)
+(mapping-artifact-redesign.md §3.2).
 
-1. The **read-only value profiler** (`readonly_connection` / `profile_column` /
-   `classify_column`) — salvaged from the superseded per-DB filter catalog
-   (closed PR #155, `core/mapping/build_criteria.py`) and trimmed to what database
-   indexing needs. It belongs at DB indexing, not at mapping: the filterable
-   surface is a property of the *database*, computed once. `classify_column`
-   turns a live column profile into the per-column annotation `model.json`
-   carries — `filterable` + `filter_type` + `values`/`range`, or
-   `filterable: false` + a `reason` (identifier / free-text / reference)
-   (mapping-artifact-redesign.md §3.2).
-
-2. A thin **JSON Schema validator** (`validate_against_schema`) the builders and
-   the service use to validate every emitted model against the S0 contracts
-   (`docs/mvp/contracts/*.schema.json`) before writing — malformed output is
-   never persisted.
+Schema validation against the S0 contracts lives in `core.contracts`.
 """
 
 from __future__ import annotations
 
-import functools
 import hashlib
 import json
 import logging
@@ -29,19 +23,15 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-import jsonschema
-
-from core.config import ROOT
-
 logger = logging.getLogger(__name__)
 
 # --- Read-only value profiling (salvaged from PR #155 / PR #152) --------------
 
 # Bounds on the read-only profiling reads.
-_DISTINCT_CAP = 200          # hard cap on a SELECT DISTINCT
-_CATEGORY_MAX = 40           # above "a few dozen" distinct values it is not enumerable
-_FREETEXT_LEN = 80           # any value longer than this marks the column free-text
-_IDENTIFIER_MIN_ROWS = 3     # below this an all-distinct column is too small to call an id
+_DISTINCT_CAP = 200  # hard cap on a SELECT DISTINCT
+_CATEGORY_MAX = 40  # above "a few dozen" distinct values it is not enumerable
+_FREETEXT_LEN = 80  # any value longer than this marks the column free-text
+_IDENTIFIER_MIN_ROWS = 3  # below this an all-distinct column is too small to call an id
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}([T ].*)?$")
 _NUMBER_RE = re.compile(r"^-?\d+(\.\d+)?$")
@@ -51,8 +41,15 @@ _NUMBER_RE = re.compile(r"^-?\d+(\.\d+)?$")
 # `reason: reference` regardless of their value distribution. Detected by name
 # because the cord-ph fixtures (Synthea export) carry no declared FKs.
 _REFERENCE_NAMES = {
-    "patient", "encounter", "organization", "provider", "payer", "code",
-    "baby_patient", "mother_patient", "nicu_encounter",
+    "patient",
+    "encounter",
+    "organization",
+    "provider",
+    "payer",
+    "code",
+    "baby_patient",
+    "mother_patient",
+    "nicu_encounter",
 }
 _REFERENCE_SUFFIXES = ("_patient", "_encounter")
 
@@ -108,7 +105,10 @@ def _is_identifier_name(name: str) -> bool:
 def _number_range(values: list[Any]) -> dict[str, Any]:
     nums = [float(v) for v in values]
     lo, hi = min(nums), max(nums)
-    to_int = lambda x: int(x) if x == int(x) else x
+
+    def to_int(x: float) -> float | int:
+        return int(x) if x == int(x) else x
+
     return {"min": to_int(lo), "max": to_int(hi)}
 
 
@@ -158,7 +158,11 @@ def classify_column(
             "range": {"min": str_values[0], "max": str_values[-1]},
         }
     if all(_NUMBER_RE.match(v) for v in str_values):
-        return {"filterable": True, "filter_type": "number", "range": _number_range(values)}
+        return {
+            "filterable": True,
+            "filter_type": "number",
+            "range": _number_range(values),
+        }
 
     # Non-numeric/non-date: an all-distinct column (or an id-named one) is an
     # identifier, never an enumerable category.
@@ -188,8 +192,8 @@ def classify_column(
 # the Synthea-style exports (`build_emr_db` creates a `_row_id` rowid alias and
 # no `FOREIGN KEY`), so they are measured the same way as cross-database links.
 
-_LINK_MIN_DISTINCT = 5    # below this, containment is meaningless (code sets collide)
-_LINK_THRESHOLD = 0.95    # containment ratio that proves a shared identity space
+_LINK_MIN_DISTINCT = 5  # below this, containment is meaningless (code sets collide)
+_LINK_THRESHOLD = 0.95  # containment ratio that proves a shared identity space
 _LINK_TARGET_CAP = 50000  # bound on a target column's distinct values read
 
 
@@ -312,14 +316,16 @@ def discover_identity_links(
                     for (tname, cname), values in samples.items():
                         matched = sum(1 for v in values if v in target_values)
                         if matched / len(values) >= _LINK_THRESHOLD:
-                            links.append({
-                                "column": f"{tname}.{cname}",
-                                "target": f"{sib_id} -> {s_table}.{s_col}",
-                                "evidence": (
-                                    f"{matched}/{len(values)} sampled values "
-                                    f"found in target"
-                                ),
-                            })
+                            links.append(
+                                {
+                                    "column": f"{tname}.{cname}",
+                                    "target": f"{sib_id} -> {s_table}.{s_col}",
+                                    "evidence": (
+                                        f"{matched}/{len(values)} sampled values "
+                                        f"found in target"
+                                    ),
+                                }
+                            )
         finally:
             sib_conn.close()
     links.sort(key=lambda link: (link["column"], link["target"]))
@@ -397,7 +403,8 @@ def discover_foreign_keys(
             key = (table, col)
             if key not in card_cache:
                 card_cache[key] = (
-                    "to-one" if _all_distinct_key(profile_column(conn, table, col))
+                    "to-one"
+                    if _all_distinct_key(profile_column(conn, table, col))
                     else "to-many"
                 )
             return card_cache[key]
@@ -412,10 +419,14 @@ def discover_foreign_keys(
             if (column, target) in seen:
                 continue
             seen.add((column, target))
-            edges.append({
-                "column": column, "target": target,
-                "cardinality": cardinality(ft, fc), "declared": True,
-            })
+            edges.append(
+                {
+                    "column": column,
+                    "target": target,
+                    "cardinality": cardinality(ft, fc),
+                    "declared": True,
+                }
+            )
 
         # 2. Measured edges. Build target key columns and source candidates once.
         targets: dict[tuple[str, str], set[str]] = {}
@@ -455,7 +466,7 @@ def discover_foreign_keys(
         # deterministic across runs.
         for (s_table, s_col), values in sorted(sources.items()):
             column = f"{s_table}.{s_col}"
-            for (t_table, t_col) in sorted(targets):
+            for t_table, t_col in sorted(targets):
                 if s_table == t_table:  # skip same-table (incl. trivial self)
                     continue
                 target = f"{t_table}.{t_col}"
@@ -473,14 +484,17 @@ def discover_foreign_keys(
                 matched = sum(1 for v in values if v in targets[(t_table, t_col)])
                 if matched / len(values) >= _LINK_THRESHOLD:
                     seen.add((column, target))
-                    edges.append({
-                        "column": column, "target": target,
-                        "cardinality": cardinality(s_table, s_col),
-                        "declared": False,
-                        "evidence": (
-                            f"{matched}/{len(values)} sampled values found in target"
-                        ),
-                    })
+                    edges.append(
+                        {
+                            "column": column,
+                            "target": target,
+                            "cardinality": cardinality(s_table, s_col),
+                            "declared": False,
+                            "evidence": (
+                                f"{matched}/{len(values)} sampled values found in target"
+                            ),
+                        }
+                    )
     finally:
         conn.close()
     edges.sort(key=lambda e: (e["column"], e["target"]))
@@ -508,7 +522,9 @@ def grain_signal(db_path: Path, schema: dict[str, Any]) -> dict[str, str]:
                 if _all_distinct_key(profile_column(conn, tname, col["name"])):
                     has_entity_key = True
                     break
-            out[tname] = "one row per entity" if has_entity_key else "many rows per entity"
+            out[tname] = (
+                "one row per entity" if has_entity_key else "many rows per entity"
+            )
     finally:
         conn.close()
     return out
@@ -523,7 +539,10 @@ def grain_cardinality_warnings(
     warnings: list[str] = []
     for fk in foreign_keys:
         src_table = fk["column"].split(".", 1)[0]
-        if grain.get(src_table) == "one row per entity" and fk["cardinality"] == "to-many":
+        if (
+            grain.get(src_table) == "one row per entity"
+            and fk["cardinality"] == "to-many"
+        ):
             warnings.append(
                 f"{fk['column']} -> {fk['target']} is to-many but {src_table!r} grain "
                 f"is one-row-per-entity"
@@ -557,10 +576,14 @@ def _edges_touching(table_name: str, foreign_keys: list[dict[str, Any]]) -> list
 def table_fingerprint(table: dict[str, Any], foreign_keys: list[dict[str, Any]]) -> str:
     """Hash of one table's structure: its column names+types and the FK edges
     touching it."""
-    return _stable_hash({
-        "columns": [{"name": c["name"], "type": c.get("type", "")} for c in table["columns"]],
-        "fks": _edges_touching(table["name"], foreign_keys),
-    })
+    return _stable_hash(
+        {
+            "columns": [
+                {"name": c["name"], "type": c.get("type", "")} for c in table["columns"]
+            ],
+            "fks": _edges_touching(table["name"], foreign_keys),
+        }
+    )
 
 
 def schema_fingerprint(
@@ -570,40 +593,26 @@ def schema_fingerprint(
 ) -> str:
     """Hash of the whole database structure: every table fingerprint plus the
     foreign_keys and identity_links edge sets."""
-    return _stable_hash({
-        "tables": {t["name"]: table_fingerprint(t, foreign_keys) for t in schema["tables"]},
-        "foreign_keys": sorted(
-            ({k: fk[k] for k in ("column", "target", "cardinality", "declared")}
-             for fk in foreign_keys),
-            key=lambda e: (e["column"], e["target"]),
-        ),
-        "identity_links": sorted(
-            ({"column": link["column"], "target": link["target"]}
-             for link in (identity_links or [])),
-            key=lambda e: (e["column"], e["target"]),
-        ),
-    })
+    return _stable_hash(
+        {
+            "tables": {
+                t["name"]: table_fingerprint(t, foreign_keys) for t in schema["tables"]
+            },
+            "foreign_keys": sorted(
+                (
+                    {k: fk[k] for k in ("column", "target", "cardinality", "declared")}
+                    for fk in foreign_keys
+                ),
+                key=lambda e: (e["column"], e["target"]),
+            ),
+            "identity_links": sorted(
+                (
+                    {"column": link["column"], "target": link["target"]}
+                    for link in (identity_links or [])
+                ),
+                key=lambda e: (e["column"], e["target"]),
+            ),
+        }
+    )
 
 
-# --- S0 schema validation -----------------------------------------------------
-
-_CONTRACTS_DIR = ROOT / "docs" / "mvp" / "contracts"
-
-
-@functools.lru_cache(maxsize=None)
-def _load_schema(schema_filename: str) -> dict[str, Any]:
-    path = _CONTRACTS_DIR / schema_filename
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def validate_against_schema(instance: Any, schema_filename: str) -> list[str]:
-    """Validate `instance` against an S0 contract schema; return a list of
-    human-readable problems (empty means valid). Used as the final guard before
-    any model is written, so a malformed document is never persisted."""
-    schema = _load_schema(schema_filename)
-    validator = jsonschema.Draft202012Validator(schema)
-    problems: list[str] = []
-    for error in sorted(validator.iter_errors(instance), key=lambda e: list(e.path)):
-        location = "/".join(str(p) for p in error.path) or "(root)"
-        problems.append(f"{location}: {error.message}")
-    return problems

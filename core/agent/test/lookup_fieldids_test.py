@@ -7,7 +7,7 @@ never a silent resolve. An exact canonical id still works, and ``{audit: true}``
 still lists the fields.
 
 lookup.py is run as a subprocess with its cwd set to a temp run worktree holding
-``audit/spec.json`` — the same shape sql_execute_test.py uses.
+``template/spec.json`` — the same shape sql_execute_test.py uses.
 
 Run: ``python3 -m core.agent.test.lookup_fieldids_test`` (from repo root).
 """
@@ -20,28 +20,38 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-TOOLS = REPO_ROOT / "core" / "agent" / ".opencode" / "tools"
+TOOLS = REPO_ROOT / "core" / "agent" / "tools"
 
 
 def _audit() -> dict:
     # Field ids are canonical slugs: <group>/<name>.
-    return {"audit": "patient-details", "fields": [
-        {"id": "patient-details/ethnic_category", "name": "Ethnic category",
-         "type": "category",
-         "permitted_values": {"A": "British", "B": "Irish"}},
-        {"id": "patient-details/sex", "name": "Sex", "type": "category"},
-        {"id": "delivery/mode_of_delivery", "name": "Mode of delivery",
-         "type": "category"},
-    ]}
+    return {
+        "audit": "patient-details",
+        "fields": [
+            {
+                "id": "patient-details/ethnic_category",
+                "name": "Ethnic category",
+                "type": "category",
+                "permitted_values": {"A": "British", "B": "Irish"},
+            },
+            {"id": "patient-details/sex", "name": "Sex", "type": "category"},
+            {
+                "id": "delivery/mode_of_delivery",
+                "name": "Mode of delivery",
+                "type": "category",
+            },
+        ],
+    }
 
 
 class LookupFieldIdsTest(unittest.TestCase):
     def setUp(self):
         self._dir = tempfile.TemporaryDirectory()
         self.worktree = Path(self._dir.name)
-        (self.worktree / "audit").mkdir()
-        (self.worktree / "audit" / "spec.json").write_text(
-            json.dumps(_audit()), encoding="utf-8")
+        (self.worktree / "template").mkdir()
+        (self.worktree / "template" / "spec.json").write_text(
+            json.dumps(_audit()), encoding="utf-8"
+        )
 
     def tearDown(self):
         self._dir.cleanup()
@@ -49,7 +59,9 @@ class LookupFieldIdsTest(unittest.TestCase):
     def _tool(self, request: dict) -> dict:
         proc = subprocess.run(
             [sys.executable, str(TOOLS / "lookup.py"), json.dumps(request)],
-            capture_output=True, text=True, cwd=self.worktree,
+            capture_output=True,
+            text=True,
+            cwd=self.worktree,
         )
         return json.loads(proc.stdout.strip() or proc.stderr.strip())
 
@@ -98,6 +110,42 @@ class LookupFieldIdsTest(unittest.TestCase):
         ids = {f["id"] for f in res["fields"]}
         self.assertIn("patient-details/ethnic_category", ids)
         self.assertIn("delivery/mode_of_delivery", ids)
+
+    # --- database/table reads moved to the navigate tools -----------------
+
+    def test_database_request_redirects_to_navigate_tools(self):
+        # The {database} selector left lookup: it now redirects to the
+        # navigate tools rather than serving the database digest.
+        res = self._tool({"database": "cord-ph"})
+        self.assertFalse(res["ok"], res)
+        for tool in (
+            "catalog_execute",
+            "search_execute",
+            "describe_execute",
+            "join_paths_execute",
+        ):
+            self.assertIn(tool, res["error"], res)
+
+    def test_database_table_request_redirects_to_navigate_tools(self):
+        # The {database, table} selector left lookup too — same redirect.
+        res = self._tool({"database": "cord-ph", "table": "births"})
+        self.assertFalse(res["ok"], res)
+        self.assertIn("describe_execute", res["error"], res)
+
+    def test_bare_table_request_redirects_to_navigate_tools(self):
+        # A `table` with no `database` is still a database read — redirect.
+        res = self._tool({"table": "births"})
+        self.assertFalse(res["ok"], res)
+        self.assertIn("describe_execute", res["error"], res)
+
+    def test_no_selector_error_names_only_field_and_audit(self):
+        # The no-selector help now offers only {field} / {audit} and points at
+        # the navigate tools for database reads.
+        res = self._tool({})
+        self.assertFalse(res["ok"], res)
+        self.assertIn("field", res["error"], res)
+        self.assertIn("audit", res["error"], res)
+        self.assertIn("search_execute", res["error"], res)
 
 
 if __name__ == "__main__":

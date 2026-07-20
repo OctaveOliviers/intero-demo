@@ -12,18 +12,19 @@
 //
 // Datasets share one descriptor shape (see buildDataset):
 //   • cordAll / cordNicu — Flow A, the uploaded "Cord pH (local)" audit. Two
-//     sheets ("ALL" and "NICU") faithfully reproduce docs/templates/
+//     sheets ("ALL" and "NICU") faithfully reproduce data/templates/
 //     cord-ph-lo-audit.xlsx, including the blank spacer columns.
 //   • chestPain          — Flow B, built live from the pasted chest-pain email
 //
 // This module is pure data + builders — no Svelte stores, no env. mock.js wires
-// it into the api/run layer.
+// it into the table-population API layer.
 //
 // All human-readable (translatable) strings live in the locale-selected content
 // pack (src/lib/mock/content). This module reads them via CONTENT and keeps the
 // logic — SQL, identifiers, numbers, dates, codes, cadence, timeline assembly.
 
 import { CONTENT } from "./mock/content/index.js";
+import { ARTIFACT_WORKSPACE_THREAD_ID } from "./artifactWorkspaceDemo.js";
 
 // --- Databases (README §6.2) ------------------------------------------------
 // The picker offers patient notes, lab results and radiology. MOCK_DATABASE
@@ -90,7 +91,7 @@ function noteResult(notes) {
 // Dataset 1 — Cord pH (local) audit (Flow A) — two sheets: ALL + NICU
 // ===========================================================================
 //
-// Reproduces docs/templates/cord-ph-lo-audit.xlsx exactly: same sheets, same
+// Reproduces data/templates/cord-ph-lo-audit.xlsx exactly: same sheets, same
 // column headers (incl. the blank spacer columns F/L/S/AC on ALL and J on
 // NICU), fully populated for every baby. Every populated cell is either:
 //   • DIRECT      — copied from a structured EHR table (carries a SELECT, a
@@ -478,6 +479,13 @@ export const NPDA_PATIENT_COUNT = NPDA_ROW_ORDER.length;
 // the order they appear in the dataset document, grouped into the seven sections
 // by blank spacer columns (_s1.._s6).
 const NPDA_COLUMNS = CONTENT.columns.npda;
+const DW = CONTENT.diabetesWorklist;
+
+const DIABETES_WORKLIST_COLUMNS = DW.columns;
+
+const DIABETES_WORKLIST_ROW_ORDER = [
+  "NPD002", "NPD003", "NPD005", "NPD006", "NPD007", "NPD008", "NPD010",
+];
 
 // --- NPDA permitted-value code maps (NPDA 2026 dataset spec) -----------------
 // Every populated NPDA cell holds the audit's *coded* permitted value — a
@@ -795,6 +803,86 @@ function makeNpdaCell(colKey, { r, ref, db }) {
 
     default:
       return { ref, value: "" }; // blank spacer columns (_s1.._s6)
+  }
+}
+
+function diabetesWorklistDirect({ r, ref, db, table, column, value, resultValue, explanation }) {
+  const sql = `SELECT PATIENT_ID, ${column} FROM ${table} WHERE PATIENT_ID = '${r.code}'`;
+  const rv = resultValue !== undefined ? resultValue : value;
+  return {
+    ref, value, sql,
+    result: structuredResult(["PATIENT_ID", column], [[r.code, rv]]),
+    meta: { kind: "direct", database: db, sql, explanation },
+  };
+}
+
+function firstNoteEvidence(r, type) {
+  const note = r.notes.find((n) => n.type === type);
+  const sentence = String(note?.text || "").split(".")[0].trim();
+  return sentence ? [sentence] : [];
+}
+
+function noteDate(r, type) {
+  return r.notes.find((n) => n.type === type)?.date || r.visitDate;
+}
+
+function makeDiabetesWorklistCell(colKey, { r, ref, db }) {
+  switch (colKey) {
+    case "patient":
+      return diabetesWorklistDirect({
+        r, ref, db, table: "patient_demographics", column: "PATIENT_ID", value: r.code,
+        explanation: DW.cell.patientExplanation(r.code),
+      });
+    case "hba1c":
+      return makeNpdaCell("hba1c", { r, ref, db });
+    case "hba1cDate":
+      return diabetesWorklistDirect({
+        r, ref, db, table: "clinic_observations", column: "Hba1c_recorded_date",
+        value: fmtDMY(r.visitDate),
+        explanation: DW.cell.hba1cDate(r.code),
+      });
+    case "glucoseIntervention":
+      return npdaInterp({
+        r, ref, db, value: r.i.lifestyle.e[0],
+        noteTypes: ["diabetes_clinic"], evidence: r.i.lifestyle.e,
+        explanation: DW.cell.glucoseIntervention(r.code),
+      });
+    case "acr":
+      return makeNpdaCell("acr", { r, ref, db });
+    case "acrDate":
+      if (r.acr == null) {
+        return diabetesWorklistDirect({
+          r, ref, db, table: "clinic_observations", column: "Urinary_ACR_recorded_date",
+          value: "", resultValue: null,
+          explanation: DW.cell.acrDateMissing(r.code),
+        });
+      }
+      return diabetesWorklistDirect({
+        r, ref, db, table: "clinic_observations", column: "Urinary_ACR_recorded_date",
+        value: fmtDMY(r.visitDate),
+        explanation: DW.cell.acrDate(r.code),
+      });
+    case "admission":
+      if (r.admission) {
+        return npdaInterp({
+          r, ref, db, value: r.i.admission.e[0], noteTypes: ["admission"],
+          evidence: r.i.admission.e,
+          explanation: DW.cell.dkaAdmission(r.code),
+        });
+      }
+      return diabetesWorklistDirect({
+        r, ref, db, table: "hospital_admissions", column: "Reason_for_admission", value: DW.cell.noneRecorded,
+        resultValue: null,
+        explanation: DW.cell.noAdmission(r.code),
+      });
+    case "lastReview":
+      return npdaInterp({
+        r, ref, db, value: fmtDMY(noteDate(r, "annual_review")),
+        noteTypes: ["annual_review"], evidence: firstNoteEvidence(r, "annual_review"),
+        explanation: DW.cell.lastReview(r.code),
+      });
+    default:
+      return { ref, value: "" };
   }
 }
 
@@ -1316,6 +1404,11 @@ const npda = buildDataset({
   columns: NPDA_COLUMNS, rowOrder: NPDA_ROW_ORDER, records: NPDA_RECORDS, makeCell: makeNpdaCell,
 });
 
+const diabetesWorklist = buildDataset({
+  id: "diabetesWorklist", sheet: DW.sheetName, label: DW.fileLabel || "diabetes-reporting-risk-worklist.xlsx",
+  columns: DIABETES_WORKLIST_COLUMNS, rowOrder: DIABETES_WORKLIST_ROW_ORDER, records: NPDA_RECORDS, makeCell: makeDiabetesWorklistCell,
+});
+
 const epilepsy = buildDataset({
   id: "epilepsy", sheet: "Epilepsy", label: "epilepsy12-audit.xlsx",
   columns: EPILEPSY_COLUMNS, rowOrder: EPILEPSY_ROW_ORDER, records: EPILEPSY_RECORDS, makeCell: makeEpilepsyCell,
@@ -1353,8 +1446,47 @@ cordAll.registerSql(SQL_RESULTS);
 cordNicu.registerSql(SQL_RESULTS);
 chestPain.registerSql(SQL_RESULTS);
 npda.registerSql(SQL_RESULTS);
+diabetesWorklist.registerSql(SQL_RESULTS);
 epilepsy.registerSql(SQL_RESULTS);
 trauma.registerSql(SQL_RESULTS);
+
+function selectedDiabetesColumns(query) {
+  const match = /SELECT\s+(.+?)\s+FROM\s+/i.exec(query || "");
+  if (!match) return [];
+  return match[1]
+    .split(",")
+    .map((part) => part.trim().replace(/^.*\./, ""))
+    .filter((column) => column && column !== "PATIENT_ID");
+}
+
+function diabetesSqlValue(r, column) {
+  switch (column) {
+    case "NHS_Number":
+      return NPDA_NHS[r.code];
+    case "Diabetes_type":
+      return DIABETES_TYPE[r.diabetesType].code;
+    case "Hba1c":
+      return dec1(r.hba1c);
+    case "Hba1c_recorded_date":
+      return fmtDMY(r.visitDate);
+    case "Urinary_ACR":
+      return r.acr == null ? null : dec1(r.acr);
+    case "Urinary_ACR_recorded_date":
+      return r.acr == null ? null : fmtDMY(r.visitDate);
+    case "Foot_assessment_date":
+      return r.footDate ? fmtDMY(r.footDate) : null;
+    case "Retinal_screening_date":
+      return r.retinalDate ? fmtDMY(r.retinalDate) : null;
+    case "Psychological_screening_date":
+      return r.psychScreen ? fmtDMY(r.psychScreen) : null;
+    case "Visit_date":
+      return fmtDMY(r.visitDate);
+    case "Reason_for_admission":
+      return r.admission ? "DKA admission" : null;
+    default:
+      return null;
+  }
+}
 
 export function resolveSql(query) {
   const q = (query || "").trim();
@@ -1431,6 +1563,15 @@ export function resolveSql(query) {
   }
 
   // --- NPDA paediatric diabetes dataset (NPD###; diabetes/clinic tables) ---
+  if (/COUNT\(\*\)\s+AS\s+n\s+FROM\s+diabetes_diagnoses/i.test(q)) {
+    return structuredResult(["n"], [[12]]);
+  }
+  if (/COUNT\(\*\)\s+AS\s+n\s+FROM\s+clinic_observations/i.test(q) && /Hba1c\s*>=\s*70/i.test(q)) {
+    return structuredResult(["n"], [[5]]);
+  }
+  if (/COUNT\(\*\)\s+AS\s+n\s+FROM\s+clinic_observations/i.test(q) && /Urinary_ACR\s+IS\s+NULL/i.test(q)) {
+    return structuredResult(["n"], [[2]]);
+  }
   const npdMatch = /'(NPD\d{3})'/.exec(q);
   const npdPatient = /'(npda-patient-\d+)'/.exec(q);
   if (npdMatch || npdPatient || /diabetes_diagnoses|clinic_observations|diabetes_screening|diabetes_education|hospital_admissions/i.test(q)) {
@@ -1446,15 +1587,20 @@ export function resolveSql(query) {
       return noteResult(notes.length ? notes : nr.notes);
     }
     if (nr) {
+      const selected = selectedDiabetesColumns(q);
+      const columns = selected.length ? selected : ["NHS_Number", "Diabetes_type", "Hba1c"];
       return structuredResult(
-        ["PATIENT_ID", "NHS_Number", "Diabetes_type", "Hba1c"],
-        [[nr.code, NPDA_NHS[nr.code], DIABETES_TYPE[nr.diabetesType].code, nr.hba1c]],
+        ["PATIENT_ID", ...columns],
+        [[nr.code, ...columns.map((column) => diabetesSqlValue(nr, column))]],
       );
     }
     return structuredResult(["PATIENT_ID", "value"], []);
   }
 
   // --- Cord-pH dataset ---
+  if (/COUNT\(\*\)\s+AS\s+n\s+FROM\s+cord_ph_birth_records/i.test(q)) {
+    return structuredResult(["n"], [[412]]);
+  }
   const patientMatch = /'(cph-baby-\d+|CPH\d+)'/.exec(q);
   const code = patientMatch
     ? (patientMatch[1].startsWith("CPH")
@@ -1485,22 +1631,25 @@ export function resolveSql(query) {
 }
 
 // --- Workbook builders (dataset-aware) --------------------------------------
-// cord-pH (two sheets) stays the mockGetWorkbook reload fallback.
+// cord-pH (two sheets) stays the mockGetTablePopulationWorkbook reload fallback.
 export function buildWorkbookEvent() {
   return cordWorkbookEvent();
 }
 export function buildPopulatedWorkbook() {
   return cordPopulatedWorkbook();
 }
+export function buildDiabetesWorklistPopulatedWorkbook() {
+  return diabetesWorklist.populatedWorkbook();
+}
 
-// --- Dataset-keyed snapshot + seeded dashboard audits -----------------------
-// The 3 seeded BPT dashboards each open to their OWN workbook: a runId maps to
+// --- Dataset-keyed snapshot + seeded dashboard tables -----------------------
+// The 3 seeded BPT dashboards each open to their OWN workbook: a tablePopulationId maps to
 // the dataset whose populated snapshot openWorkbook should return. Anything not
 // in this map falls back to the cord-pH workbook (the live-upload Flow A).
-const SEEDED_DASHBOARD_RUNS = [
-  { runId: "mock-run-npda", dataset: npda },
-  { runId: "mock-run-epilepsy", dataset: epilepsy },
-  { runId: "mock-run-trauma", dataset: trauma },
+const SEEDED_DASHBOARD_POPULATIONS = [
+  { tablePopulationId: "mock-tp-npda", dataset: npda },
+  { tablePopulationId: "mock-tp-epilepsy", dataset: epilepsy },
+  { tablePopulationId: "mock-tp-trauma", dataset: trauma },
 ];
 
 // Mark every populated cell reviewed and clear any blocked state, so a seeded
@@ -1523,22 +1672,22 @@ function markAllReviewed(workbook) {
   return { ...workbook, cellMetadata };
 }
 
-export function buildPopulatedWorkbookForRun(runId) {
-  const hit = SEEDED_DASHBOARD_RUNS.find((s) => s.runId === runId);
+export function buildPopulatedWorkbookForTablePopulation(tablePopulationId) {
+  const hit = SEEDED_DASHBOARD_POPULATIONS.find((s) => s.tablePopulationId === tablePopulationId);
   // Seeded BPT dashboards open fully clean; cord-pH (the fallback, created live)
   // keeps its needs-review/blocked cells for the live review walkthrough.
   return hit ? markAllReviewed(hit.dataset.populatedWorkbook()) : cordPopulatedWorkbook();
 }
 
-// The 3 seed audit records (sidebar rows). Hardcoded per the wiring contract so
+// The 3 seed populated-table records (sidebar rows). Hardcoded per the wiring contract so
 // this works even before any CONTENT.dashboards exists. `createdAt` is set by
 // the store seeder, keeping this pure.
-export function seededDashboardAuditRecords() {
+export function seededDashboardPopulatedTableRecords() {
   const base = { status: "completed", messages: [], activity: [], reviewSummary: null, workbook: null, runStartedAt: null, runEndedAt: null, filters: {}, criteria: [] };
   return [
-    { ...base, id: "npda-lo-audit", runId: "mock-run-npda", title: "Diabetes BPT", submissionDeadline: "2026-07-20" },
-    { ...base, id: "epilepsy12-lo-audit", runId: "mock-run-epilepsy", title: "Epilepsy BPT", submissionDeadline: "2027-01-12" },
-    { ...base, id: "nmtr-trauma-lo-audit", runId: "mock-run-trauma", title: "Major Trauma BPT", submissionDeadline: "Submit ≤25 days of discharge" },
+    { ...base, id: "npda-lo-audit", tablePopulationId: "mock-tp-npda", title: "Diabetes BPT", submissionDeadline: "2026-07-20" },
+    { ...base, id: "epilepsy12-lo-audit", tablePopulationId: "mock-tp-epilepsy", title: "Epilepsy BPT", submissionDeadline: "2027-01-12" },
+    { ...base, id: "nmtr-trauma-lo-audit", tablePopulationId: "mock-tp-trauma", title: "Major Trauma BPT", submissionDeadline: "Submit ≤25 days of discharge" },
   ];
 }
 
@@ -1735,6 +1884,61 @@ function timelineA() {
   ];
 }
 
+// Flow TBL — a thread-spawned TABLE population. REUSES the cord-pH workbook +
+// cell builders, but a COMPACT timeline: a couple of column batches, the review
+// summary, then done. Two reasons it's short: (1) the table inspector demo shows
+// running → done quickly (the user watches it fill, gets the completion toast,
+// clicks through), and (2) it keeps the store test fast. The wrapped table population is still
+// the same engine / stream / workbook — only the step list is trimmed. It
+// keeps the cord workbook's needs-review/blocked cells so the cell-evidence
+// walkthrough still demos in the opened table.
+function timelineTable() {
+  return [
+    act(250, T.flowA.reviewingTemplate.headline, T.flowA.reviewingTemplate.detail),
+    tool(rnd(350, 500), "query_schema", "ok", T.tools.inspectedSchema),
+    { kind: "workbook", wait: rnd(350, 500), event: cordWorkbookEvent() },
+    act(rnd(300, 450), T.cord.mapTemplate.headline, T.cord.mapTemplate.detail),
+    cordAll.columnBatch(rnd(300, 450), "patient"),
+    act(rnd(300, 450), T.cord.copyBirthRecord.headline, T.cord.copyBirthRecord.detail),
+    ...cordAll.streamColumns(() => rnd(150, 300), ["dcc", "liquorMeconium"]),
+    act(rnd(300, 450), T.cord.dischargeSummaries.headline, T.cord.dischargeSummaries.detail),
+    act(rnd(300, 450), T.cord.finalizing.headline, T.cord.finalizing.detail),
+    reviewSummary(rnd(200, 350), {
+      totals: totalsFromCellMetadata(cordPopulatedWorkbook().cellMetadata),
+    }),
+    { kind: "done", wait: rnd(300, 450), event: { type: "done" } },
+  ];
+}
+
+function diabetesWorklistPopulation(ds) {
+  const steps = [];
+  const noteCell = () => rnd(700, 1200);
+  const dwt = T.diabetesWorklist;
+
+  steps.push(act(rnd(700, 950), dwt.scoping.headline, dwt.scoping.detail));
+  steps.push(ds.columnBatch(rnd(500, 750), "patient"));
+  steps.push(tool(rnd(800, 1100), "sql_execute", "ok", dwt.fetchingEvidence));
+  steps.push(ds.multiColumnBatch(rnd(850, 1150), ["hba1c", "hba1cDate"]));
+  steps.push(ds.multiColumnBatch(rnd(700, 950), ["acr", "acrDate"]));
+  steps.push(act(rnd(850, 1150), dwt.readingNotes.headline, dwt.readingNotes.detail));
+  steps.push(...ds.streamColumns(noteCell, ["glucoseIntervention", "admission", "lastReview"]));
+  steps.push(reviewSummary(rnd(500, 750), {
+    totals: totalsFromCellMetadata(ds.populatedWorkbook().cellMetadata),
+  }));
+  steps.push({ kind: "done", wait: rnd(400, 650), event: { type: "done" } });
+  return steps;
+}
+
+function timelineDiabetesWorklist() {
+  const dwt = T.diabetesWorklist;
+  return [
+    act(450, dwt.creating.headline, dwt.creating.detail),
+    tool(rnd(650, 900), "query_schema", "ok", T.tools.inspectedSchema),
+    { kind: "workbook", wait: rnd(550, 800), event: diabetesWorklist.workbookEvent() },
+    ...diabetesWorklistPopulation(diabetesWorklist),
+  ];
+}
+
 // Flow B — describe the data (the chest-pain email): build the spreadsheet
 // first, then populate it column-by-column.
 function timelineB() {
@@ -1926,8 +2130,637 @@ export function buildTimeline(flow) {
   if (flow === "C") return timelineC();
   if (flow === "E") return timelineEpilepsy();
   if (flow === "T") return timelineTrauma();
+  if (flow === "DW") return timelineDiabetesWorklist();
+  if (flow === "TBL") return timelineTable();
   return flow === "B" ? timelineB() : timelineA();
 }
 
 // --- Sample doctor's email (Flow B) ----------------------------------------
 export const mockSampleEmail = CONTENT.email;
+
+// --- Data-library Datasets (saved cohort filters) ---------------------------
+// A Dataset is a saved, named filter scoping the hospital database to a slice
+// (library-and-sources.md §A). Each criterion binds to a real table.column with
+// a parameterised SQL predicate; `cohort_sql` is the read-only statement that
+// implements the slice, and `count` is its proved COUNT(DISTINCT identity).
+//
+// Seeded: one cord-pH Dataset — term babies (gestation ≥ 39) admitted to NICU —
+// with two filter criteria, a not_available row for a free-text-only concept,
+// and a deterministic count. PATCH / add-filter recompute the count with no LLM.
+
+export const DATASET_NOT_AVAILABLE_REASON =
+  "Recorded only in free-text notes, not in a filterable column — deferred (structured fields only).";
+
+// Shapes conform to specs/product/contracts/dataset.schema.json: `schema_version`
+// "1", predicate `op` from the contract symbol enum (">=", "=", …), and no extra
+// keys on `predicate`. The `display` string is the contract-formatted one-liner the
+// backend computes (store.display_predicate) — the chip strips the label off it.
+export const MOCK_LIBRARY_DATASETS = [
+  {
+    schema_version: "1",
+    id: "ds-cordph-nicu",
+    name: "Term babies admitted to NICU",
+    description:
+      "The group of babies born at term (39 weeks or more) who were admitted to the neonatal unit.",
+    databases: ["cord-ph"],
+    cohort: {
+      database: "cord-ph",
+      from: "cord_ph_birth_records",
+      identity_select: "DISTINCT cord_ph_birth_records.patient_code",
+      identity_keys: ["patient_code"],
+    },
+    criteria: [
+      {
+        criterion_id: "gestation_weeks",
+        label: "Gestation (weeks)",
+        type: "number",
+        source: "cord-ph -> cord_ph_birth_records.gestation_weeks",
+        predicate: { op: ">=", value: 39 },
+        display: "Gestation (weeks) ≥ 39",
+        sql: "cord_ph_birth_records.gestation_weeks >= :gestation_weeks",
+        params: { gestation_weeks: 39 },
+      },
+      {
+        criterion_id: "admitted_nicu",
+        label: "Admitted to NICU",
+        type: "category",
+        source: "cord-ph -> cord_ph_birth_records.nicu_admission",
+        predicate: { op: "=", value: "yes" },
+        display: "Admitted to NICU = yes",
+        sql: "cord_ph_birth_records.nicu_admission = :admitted_nicu",
+        params: { admitted_nicu: "yes" },
+      },
+    ],
+    not_available: [
+      {
+        phrase: "showed signs of birth asphyxia",
+        reason: DATASET_NOT_AVAILABLE_REASON,
+      },
+    ],
+    count: 1,
+  },
+];
+
+// Compose the read-only cohort SQL from the Dataset's criteria — the exact,
+// transparent statement of the slice shown in the raw-SQL view. Pure: it is the
+// single source of `cohort_sql`, so any chip edit recomposes it deterministically.
+export function composeCohortSql(dataset) {
+  const cohort = dataset?.cohort || {};
+  const from = cohort.from || "records";
+  // The contract's cohort_sql ENUMERATES the slice's identities
+  // (SELECT DISTINCT <identity> … — dataset.schema.json), the same shape the real
+  // backend persists; the count is run separately. identity_select already carries
+  // the DISTINCT, so we don't double it.
+  const identity = cohort.identity_select || "DISTINCT *";
+  const criteria = Array.isArray(dataset?.criteria) ? dataset.criteria : [];
+  const where = criteria.map((c) => c.sql).filter(Boolean);
+  const lines = [`SELECT ${identity}`, `FROM ${from}`];
+  if (where.length) {
+    lines.push("WHERE " + where.join("\n  AND "));
+  }
+  return lines.join("\n") + ";";
+}
+
+// Deterministic, no-LLM count recompute. Each filter is "tighter or looser" by a
+// reproducible rule keyed off its predicate, so editing a chip changes the count
+// the same way every time (a stand-in for the real read-only COUNT). The seeded
+// Dataset (gestation ≥ 39, NICU = yes) resolves to 1 to match the fixture.
+export function deriveDatasetCount(dataset) {
+  const BASE = 240; // notional cohort size before filters
+  const criteria = Array.isArray(dataset?.criteria) ? dataset.criteria : [];
+  let count = BASE;
+  for (const c of criteria) {
+    const p = c.predicate || {};
+    if (c.type === "number") {
+      const v = Number(Array.isArray(p.value) ? p.value[0] : p.value);
+      if (Number.isFinite(v)) {
+        // A `>=` threshold keeps the rows at or above it: every step up the scale
+        // drops ~1/40 of the notional 40-week span, so a higher cut → fewer rows.
+        const span = p.op === "<=" ? v - 20 : 40 - v;
+        count = Math.round((count * Math.max(0, Math.min(span, 40))) / 40);
+      }
+    } else {
+      // A categorical equality keeps a deterministic fraction of the cohort.
+      count = Math.round(count * 0.2);
+    }
+  }
+  return Math.max(0, count);
+}
+
+// --- Threads (the conversation surface) ------------------------------------
+// A thread is the free-ranging, UNSCOPED conversation surface (product-flows.md
+// §Threads, tables & outputs). The shapes below mirror the FROZEN backend
+// contract EXACTLY — core/threads/store.py (mint/append/title) plus the agent
+// result shapes. The mock layer in mock.js reuses these constants + helpers so
+// VITE_MOCK is a faithful demo.
+
+// Default title until the first user message names the thread; ~60-char trim
+// ceiling for a derived title (store.py DEFAULT_TITLE / _TITLE_MAX).
+export const THREAD_DEFAULT_TITLE = "New thread";
+export const DIABETES_DEMO_THREAD_TITLE = "Remboursements diabète pedia";
+const THREAD_TITLE_MAX = 60;
+
+// The honest agent-message scope disclosure. The real backend passes every
+// message to the agent; mock mode mirrors that with canned agent outputs.
+export const THREAD_WHOLE_DB_DISCLOSURE =
+  "answered across the whole hospital database";
+
+// A canned chat answer + ≥1 inline citation the mock returns for a chat-style
+// message, MIRRORING the server (the real answer is the chat-answer skill's
+// output; the citation is the evidence-skill source shape).
+export const THREAD_CHAT_ANSWER =
+  "Across the whole hospital database, there were 412 births this quarter [1].";
+export const THREAD_CHAT_CITATIONS = [
+  {
+    kind: "aggregate",
+    marker: "1",
+    database: "cord-ph",
+    query: "SELECT COUNT(*) AS n FROM cord_ph_birth_records",
+    table_column: "cord_ph_birth_records.patient_code",
+    explanation: "count of birth records across the whole hospital database",
+    denominator: { label: "birth records", value: 412 },
+    completeness: { label: "records counted", value: "412/412" },
+    covered_rows: [
+      {
+        kind: "source",
+        database: "cord-ph",
+        query:
+          "SELECT patient_code FROM cord_ph_birth_records WHERE patient_code = 'CPH001'",
+        table_column: "cord_ph_birth_records.patient_code",
+        explanation: "covered birth record",
+      },
+    ],
+  },
+];
+
+export const DIABETES_WORKLIST_SOURCE_TEMPLATE = "diabetes-worklist";
+export const DIABETES_WORKLIST_TABLE_TITLE = DW.tableTitle;
+export const DIABETES_RISK_LIST_ASK_ID = "ask-diabetes-risk-list";
+export const DIABETES_RISK_LIST_QUESTION_ID = "show_diabetes_risk_list";
+export const DIABETES_RISK_LIST_SHOW_CHOICE_ID = "show_list";
+export const DIABETES_RISK_LIST_KEEP_CHOICE_ID = "keep_summary";
+export const DIABETES_WORKLIST_ASK_ID = "ask-diabetes-worklist";
+export const DIABETES_WORKLIST_QUESTION_ID = "create_diabetes_worklist";
+export const DIABETES_WORKLIST_CREATE_CHOICE_ID = "create_table";
+export const DIABETES_WORKLIST_KEEP_CHOICE_ID = "keep_list";
+
+export const DIABETES_WORKLIST_ANSWER = DW.answer;
+
+export const DIABETES_PATIENT_RISK_LIST_ANSWER = DIABETES_WORKLIST_ANSWER;
+
+export const DIABETES_WORKLIST_CITATIONS = [
+  {
+    kind: "aggregate",
+    marker: "1",
+    database: MOCK_DATABASE.id,
+    query: "SELECT COUNT(*) AS n FROM diabetes_diagnoses WHERE audit_year = '2025/26'",
+    table_column: "diabetes_diagnoses.PATIENT_ID",
+    explanation: DW.citations.cohort.explanation,
+    denominator: { label: DW.citations.cohort.denominatorLabel, value: 12 },
+    completeness: { label: DW.citations.cohort.completenessLabel, value: "12/12" },
+  },
+  {
+    kind: "aggregate",
+    marker: "2",
+    database: MOCK_DATABASE.id,
+    query: "SELECT COUNT(*) AS n FROM clinic_observations WHERE Hba1c >= 70 AND audit_year = '2025/26'",
+    table_column: "clinic_observations.Hba1c",
+    explanation: DW.citations.highHba1c.explanation,
+    denominator: { label: DW.citations.highHba1c.denominatorLabel, value: 5 },
+    completeness: { label: DW.citations.highHba1c.completenessLabel, value: "12/12" },
+  },
+  {
+    kind: "aggregate",
+    marker: "3",
+    database: MOCK_DATABASE.id,
+    query: "SELECT COUNT(*) AS n FROM clinic_observations WHERE Urinary_ACR IS NULL AND audit_year = '2025/26'",
+    table_column: "clinic_observations.Urinary_ACR",
+    explanation: DW.citations.missingAcr.explanation,
+    denominator: { label: DW.citations.missingAcr.denominatorLabel, value: 2 },
+    completeness: { label: DW.citations.missingAcr.completenessLabel, value: "12/12" },
+  },
+  {
+    marker: "4",
+    database: MOCK_DATABASE.id,
+    query: "SELECT PATIENT_ID, Hba1c FROM clinic_observations WHERE PATIENT_ID = 'NPD002'",
+    table_column: "clinic_observations.Hba1c",
+    explanation: DW.citations.hba1c("NPD002"),
+  },
+  {
+    marker: "5",
+    database: MOCK_DATABASE.id,
+    query: "SELECT PATIENT_ID, Hba1c FROM clinic_observations WHERE PATIENT_ID = 'NPD003'",
+    table_column: "clinic_observations.Hba1c",
+    explanation: DW.citations.hba1c("NPD003"),
+  },
+  {
+    marker: "6",
+    database: MOCK_DATABASE.id,
+    query: "SELECT AUTHOR_ROLE, DATE, NOTE_TYPE, TEXT FROM clinical_notes WHERE PATIENT = 'npda-patient-003' AND NOTE_TYPE IN ('admission')",
+    table_column: "clinical_notes.TEXT",
+    explanation: DW.citations.dkaNewDiagnosis("NPD003"),
+    citations: [DW.evidence.dkaNewDiagnosis],
+  },
+  {
+    marker: "7",
+    database: MOCK_DATABASE.id,
+    query: "SELECT PATIENT_ID, Hba1c FROM clinic_observations WHERE PATIENT_ID = 'NPD005'",
+    table_column: "clinic_observations.Hba1c",
+    explanation: DW.citations.hba1c("NPD005"),
+  },
+  {
+    marker: "8",
+    database: MOCK_DATABASE.id,
+    query: "SELECT PATIENT_ID, Hba1c FROM clinic_observations WHERE PATIENT_ID = 'NPD006'",
+    table_column: "clinic_observations.Hba1c",
+    explanation: DW.citations.hba1c("NPD006"),
+  },
+  {
+    marker: "9",
+    database: MOCK_DATABASE.id,
+    query: "SELECT AUTHOR_ROLE, DATE, NOTE_TYPE, TEXT FROM clinical_notes WHERE PATIENT = 'npda-patient-006' AND NOTE_TYPE IN ('admission')",
+    table_column: "clinical_notes.TEXT",
+    explanation: DW.citations.recentDka("NPD006"),
+    citations: [DW.evidence.recentDka],
+  },
+  {
+    marker: "10",
+    database: MOCK_DATABASE.id,
+    query: "SELECT PATIENT_ID, Urinary_ACR FROM clinic_observations WHERE PATIENT_ID = 'NPD007'",
+    table_column: "clinic_observations.Urinary_ACR",
+    explanation: DW.citations.urinaryAcr("NPD007"),
+  },
+  {
+    marker: "11",
+    database: MOCK_DATABASE.id,
+    query: "SELECT PATIENT_ID, Hba1c FROM clinic_observations WHERE PATIENT_ID = 'NPD008'",
+    table_column: "clinic_observations.Hba1c",
+    explanation: DW.citations.hba1c("NPD008"),
+  },
+  {
+    marker: "12",
+    database: MOCK_DATABASE.id,
+    query: "SELECT PATIENT_ID, Urinary_ACR FROM clinic_observations WHERE PATIENT_ID = 'NPD010'",
+    table_column: "clinic_observations.Urinary_ACR",
+    explanation: DW.citations.urinaryAcr("NPD010"),
+  },
+];
+
+function normalizeScopeText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function wholeDbScope() {
+  return {
+    kind: "whole_db",
+    dataset_id: null,
+    disclosure: THREAD_WHOLE_DB_DISCLOSURE,
+  };
+}
+
+// Derive a thread title from the first user message — trimmed, truncated to ~60
+// chars; "New thread" for an empty message (store._derive_title).
+export function deriveThreadTitle(message) {
+  const text = String(message || "").trim();
+  if (!text) return THREAD_DEFAULT_TITLE;
+  // Truncate by Unicode code point (spread to an array of code points) to match
+  // the server's Python slice `text[:60]`, which counts code points — a plain
+  // JS `.slice(60)` counts UTF-16 code units and would diverge (or split a
+  // surrogate pair) on non-BMP characters, breaking mock↔server title parity.
+  const points = [...text];
+  return points.length > THREAD_TITLE_MAX
+    ? points.slice(0, THREAD_TITLE_MAX).join("").replace(/\s+$/, "")
+    : text;
+}
+
+export function mockAskUserQuestionRequest() {
+  return {
+    id: "ask-mock-dataset",
+    status: "pending",
+    questions: [
+      {
+        id: "dataset_scope",
+        question: "Which Dataset should I use?",
+        choices: [
+          { id: "whole_db", label: "Whole hospital database" },
+          { id: "ds-nicu", label: "Term babies admitted to NICU" },
+          { id: "ds-quarter", label: "Latest complete quarter" },
+        ],
+        allow_other: true,
+        required: true,
+      },
+      {
+        id: "answer_format",
+        question: "What output format do you want?",
+        choices: [
+          { id: "short_answer", label: "Short answer" },
+          { id: "table", label: "Table" },
+        ],
+        allow_other: true,
+        required: false,
+      },
+    ],
+    answers: [],
+  };
+}
+
+export function diabetesWorklistAskUserQuestionRequest() {
+  return {
+    id: DIABETES_WORKLIST_ASK_ID,
+    status: "pending",
+    questions: [
+      {
+        id: DIABETES_WORKLIST_QUESTION_ID,
+        question: DW.ask.question,
+        choices: [
+          { id: DIABETES_WORKLIST_CREATE_CHOICE_ID, label: DW.ask.createLabel },
+          { id: DIABETES_WORKLIST_KEEP_CHOICE_ID, label: DW.ask.keepLabel },
+        ],
+        allow_other: false,
+        required: true,
+      },
+    ],
+    answers: [],
+  };
+}
+
+export function diabetesRiskListAskUserQuestionRequest() {
+  return {
+    id: DIABETES_RISK_LIST_ASK_ID,
+    status: "pending",
+    questions: [
+      {
+        id: DIABETES_RISK_LIST_QUESTION_ID,
+        question: DW.riskListAsk.question,
+        choices: [
+          { id: DIABETES_RISK_LIST_SHOW_CHOICE_ID, label: DW.riskListAsk.showLabel },
+          { id: DIABETES_RISK_LIST_KEEP_CHOICE_ID, label: DW.riskListAsk.keepLabel },
+        ],
+        allow_other: false,
+        required: true,
+      },
+    ],
+    answers: [],
+  };
+}
+
+export function isDiabetesWorklistPrompt(content) {
+  const text = normalizeScopeText(content);
+  return /\b(diabetes|diabete)\b/.test(text);
+}
+
+// The agent resolution for one message. There is no mock pre-agent classifier:
+// the mock agent either asks a structured question (for demo trigger text) or
+// returns a canned chat answer with citations.
+export function resolveThreadMessage(content) {
+  const normalized = normalizeScopeText(content);
+  if (isDiabetesWorklistPrompt(content)) {
+    return {
+      message: DIABETES_WORKLIST_ANSWER,
+      resolution: {
+        output: "chat",
+        scope: wholeDbScope(),
+        artifact_id: null,
+        seam: null,
+        citations: DIABETES_WORKLIST_CITATIONS.map((citation) => ({ ...citation })),
+        ask_user_questions: diabetesWorklistAskUserQuestionRequest(),
+      },
+    };
+  }
+  if (normalized.includes("needs dataset")) {
+    return {
+      message: "",
+      resolution: {
+        output: "chat",
+        scope: wholeDbScope(),
+        artifact_id: null,
+        seam: null,
+        ask_user_questions: mockAskUserQuestionRequest(),
+      },
+    };
+  }
+  if (/\b(table|audit|spreadsheet)\b/i.test(String(content || ""))) {
+    return {
+      message: "I started that table.",
+      resolution: {
+        output: "table",
+        scope: wholeDbScope(),
+        artifact_id: null,
+        seam: null,
+      },
+    };
+  }
+  return {
+    message: THREAD_CHAT_ANSWER,
+    resolution: {
+      output: "chat",
+      scope: wholeDbScope(),
+      artifact_id: null,
+      seam: null,
+      citations: THREAD_CHAT_CITATIONS.map((c) => ({ ...c })),
+    },
+  };
+}
+
+// --- Tables (the populated audit table — a first-class re-openable entity) ---
+// A `table` wraps an existing table population (table.schema.json; decision 0004).
+// When a table is created, the system PINS this spec (columns/grain + scope) and
+// spawns table population; `table_population_id` back-references that population.
+// In mock mode the wrapped population is the cord-pH
+// Flow A timeline (kept needs-review/blocked cells, so the live fill + evidence
+// walkthrough demo end-to-end). These builders are PURE; the side-effecting mint
+// (population registration, store insert) lives in mock.js.
+
+export const TABLE_WHOLE_DB_SCOPE_DISCLOSURE = "the whole hospital database";
+
+// The pinned columns/grain snapshot a table takes at creation. For a mock
+// template-backed table this mirrors the cord-pH audit's shape — a minimal
+// snapshot, enough for the contract + the inspector title.
+export function buildTableSpec() {
+  return {
+    columns: [
+      { id: "patient", name: "Patient" },
+      { id: "cord_ph", name: "Cord pH" },
+      { id: "discharge_summary", name: "Discharge summary" },
+    ],
+    grain: "one row per patient record",
+  };
+}
+
+export function buildDiabetesWorklistSpec() {
+  return {
+    columns: DIABETES_WORKLIST_COLUMNS.map((column) => ({
+      id: column.key,
+      name: column.header,
+    })),
+    grain: "one row per paediatric diabetes patient with reporting or BPT follow-up context",
+  };
+}
+
+// Build the full frozen table entity (table.schema.json) for a freshly-spawned
+// mock table. `tablePopulationId` is the wrapped population (already registered with a timeline by
+// the caller); `threadId` is the provenance back-ref (null for a direct create).
+export function buildMockTable({ id, title, description, sourceTemplate, datasetId, tablePopulationId, threadId, now }) {
+  const stamp = now || new Date().toISOString();
+  const template = sourceTemplate || "cord-ph";
+  return {
+    schema_version: "1",
+    id,
+    title: title || "Untitled table",
+    description: description || "",
+    source_template: template,
+    dataset_id: datasetId ?? null,
+    scope_disclosure: TABLE_WHOLE_DB_SCOPE_DISCLOSURE,
+    spec: template === DIABETES_WORKLIST_SOURCE_TEMPLATE ? buildDiabetesWorklistSpec() : buildTableSpec(),
+    table_population_id: tablePopulationId ?? null,
+    // Mirror the backend: a table with a wrapped population is "in_progress"; an ad-hoc
+    // table (no population — the template-backed engine can't populate it) is "queued".
+    status: tablePopulationId ? "in_progress" : "queued",
+    reporting_period_label: "1 Apr 2025 – 31 Mar 2026",
+    thread_id: threadId ?? null,
+    created_at: stamp,
+    updated_at: stamp,
+  };
+}
+
+// Two seed threads mirroring the full frozen shape. Recency is expressed via
+// updated_at so list ordering (DESC) is exercised by the demo.
+export const MOCK_THREADS = [
+  {
+    schema_version: "1",
+    id: ARTIFACT_WORKSPACE_THREAD_ID,
+    title: "Lung MOC Prep",
+    created_at: "2026-07-09T10:00:00+00:00",
+    updated_at: "2026-07-09T10:00:05+00:00",
+    // Starts empty: the streamed opening plays live when the doctor sends a
+    // MOC message (from here or via keyword from a New chat).
+    messages: [],
+    artifact_ids: [],
+  },
+  {
+    schema_version: "1",
+    id: "thread-seedaudit01",
+    title: "Audit every patient missing a discharge summary",
+    created_at: "2026-06-24T09:00:00+00:00",
+    updated_at: "2026-06-24T09:00:05+00:00",
+    messages: [
+      {
+        role: "user",
+        content: "Audit every patient missing a discharge summary",
+        created_at: "2026-06-24T09:00:00+00:00",
+      },
+      {
+        role: "agent",
+        content: THREAD_CHAT_ANSWER,
+        created_at: "2026-06-24T09:00:05+00:00",
+        resolution: {
+          output: "chat",
+          scope: {
+            kind: "whole_db",
+            dataset_id: null,
+            disclosure: THREAD_WHOLE_DB_DISCLOSURE,
+          },
+          artifact_id: null,
+          seam: null,
+          citations: THREAD_CHAT_CITATIONS.map((c) => ({ ...c })),
+        },
+      },
+    ],
+    artifact_ids: [],
+  },
+  {
+    schema_version: "1",
+    id: "thread-seedchat01",
+    title: "How are admissions trending this week?",
+    created_at: "2026-06-23T14:30:00+00:00",
+    updated_at: "2026-06-23T14:30:04+00:00",
+    messages: [
+      {
+        role: "user",
+        content: "How are admissions trending this week?",
+        created_at: "2026-06-23T14:30:00+00:00",
+      },
+      {
+        role: "agent",
+        content: THREAD_CHAT_ANSWER,
+        created_at: "2026-06-23T14:30:04+00:00",
+        resolution: {
+          output: "chat",
+          scope: {
+            kind: "whole_db",
+            dataset_id: null,
+            disclosure: THREAD_WHOLE_DB_DISCLOSURE,
+          },
+          artifact_id: null,
+          seam: null,
+          citations: THREAD_CHAT_CITATIONS.map((c) => ({ ...c })),
+        },
+      },
+    ],
+    artifact_ids: [],
+  },
+];
+
+// Seed tables (the populated-table cards the Tables section shows on load). Each
+// is a fully-formed `table` entity (table.schema.json shape) carrying a
+// table_population_id so the existing population pipeline can fill it when a card is opened; the mock
+// layer registers those table_population_ids in `tablePopulationFlows` so the stream plays. Distinct
+// `source_template` values + recency (updated_at DESC) exercise the section's
+// filter, search, and ordering. `tablePopulationId` here is the placeholder the mock layer
+// rewrites to a freshly registered table population on boot (so the timeline is wired).
+export const MOCK_TABLES = [
+  {
+    schema_version: "1",
+    id: "table-seedcordph01",
+    title: "Cord pH compliance — Q4 2025/26",
+    description: "Every delivery missing a paired cord-gas sample across the trust.",
+    source_template: "cord-ph",
+    dataset_id: null,
+    scope_disclosure: TABLE_WHOLE_DB_SCOPE_DISCLOSURE,
+    spec: buildTableSpec(),
+    table_population_id: "table-seedcordph01-tp",
+    status: "complete",
+    reporting_period_label: "1 Apr 2025 – 31 Mar 2026",
+    thread_id: null,
+    created_at: "2026-06-25T11:00:00+00:00",
+    updated_at: "2026-06-25T11:42:00+00:00",
+  },
+  {
+    schema_version: "1",
+    id: "table-seedchestpain01",
+    title: "Chest-pain pathway timings",
+    description: "Door-to-ECG and troponin turnaround for every chest-pain attendance.",
+    source_template: "chest-pain",
+    dataset_id: null,
+    scope_disclosure: TABLE_WHOLE_DB_SCOPE_DISCLOSURE,
+    spec: buildTableSpec(),
+    table_population_id: "table-seedchestpain01-tp",
+    status: "complete",
+    reporting_period_label: "1 Jan 2026 – 31 Mar 2026",
+    thread_id: null,
+    created_at: "2026-06-24T16:00:00+00:00",
+    updated_at: "2026-06-24T16:18:00+00:00",
+  },
+  {
+    schema_version: "1",
+    id: "table-seedcordph02",
+    title: "Cord pH — NICU admissions",
+    description: "NICU-admitted neonates and their cord-gas documentation.",
+    source_template: "cord-ph",
+    dataset_id: null,
+    scope_disclosure: TABLE_WHOLE_DB_SCOPE_DISCLOSURE,
+    spec: buildTableSpec(),
+    table_population_id: "table-seedcordph02-tp",
+    status: "complete",
+    reporting_period_label: "1 Apr 2025 – 31 Mar 2026",
+    thread_id: null,
+    created_at: "2026-06-22T08:30:00+00:00",
+    updated_at: "2026-06-22T09:05:00+00:00",
+  },
+];

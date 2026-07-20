@@ -1,0 +1,6 @@
+# Dev/lint/type tooling for the pre-commit gate (see ../docs/pre-commit.md).
+# Install into the project venv:
+#   intero/.venv/bin/pip install -r intero/requirements-dev.txt
+ruff>=0.8
+mypy>=1.13
+pre-commit>=4.0

@@ -5,11 +5,11 @@
       "npm": "@ai-sdk/openai-compatible",
       "name": "Remote LLM",
       "options": {
-        "baseURL": "{env:LLM_API_BASE}",
-        "apiKey": "{env:LLM_API_KEY}"
+        "baseURL": "{env:LLM_TABLE_API_BASE}",
+        "apiKey": "{env:LLM_TABLE_API_KEY}"
       },
       "models": {
-        "{env:LLM_MODEL}": {}
+        "{env:LLM_TABLE_MODEL}": {}
       }
     }
   },
@@ -17,9 +17,15 @@
     "*": "deny",
     "sql_execute": "allow",
     "lookup_execute": "allow",
+    "search_execute": "allow",
+    "describe_execute": "allow",
+    "join_paths_execute": "allow",
+    "catalog_execute": "allow",
     "skill": {
       "*": "deny",
-      "cell-fill": "allow"
+      "table-fill": "allow",
+      "navigate": "allow",
+      "evidence": "allow"
     },
     "question": "ask",
     "doom_loop": "ask"

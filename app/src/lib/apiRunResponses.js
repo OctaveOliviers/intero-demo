@@ -9,7 +9,7 @@ function refreshErrorFromResponseBody(body, statusText) {
   return out;
 }
 
-export async function parseRefreshRunResponse(res, throwIfUnauthorized) {
+export async function parseRefreshTablePopulationResponse(res, throwIfUnauthorized) {
   if (!res.ok) {
     await throwIfUnauthorized(res);
     const err = await res.json().catch(() => ({ detail: res.statusText }));

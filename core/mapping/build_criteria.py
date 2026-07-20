@@ -33,26 +33,18 @@ schema (`mapping.schema.json`) before they are returned.
 from __future__ import annotations
 
 import json
-import logging
-import re
 from typing import Any
 
 from core.clients import llm
-from core.indexing.profile import validate_against_schema
+from core.clients.llm_builder import build_validated
+from core.source_ref import try_parse_source
+from core.contracts import validate_against_schema
 from pydantic import BaseModel, ConfigDict, Field
 
-logger = logging.getLogger(__name__)
-
 _SCHEMA_FILE = "mapping.schema.json"
-_MAX_BUILD_ATTEMPTS = 3
 
 _FILTER_TYPES = {"category", "number", "date"}
 _FROM_VALUES = {"audit_field", "db_column", "audit_field+db_column"}
-
-# "<db> -> <table>.<column>" — the canonical source reference used everywhere in
-# mapping.json. Parsed so we can check a binding cites a column that really exists.
-_SOURCE_RE = re.compile(r"^\s*(?P<db>[^>]+?)\s*->\s*(?P<table>[^.]+?)\.(?P<column>.+?)\s*$")
-
 
 class _CriteriaSelectionOutput(BaseModel):
     """Typed contract for criteria selection during mapping (A6.1)."""
@@ -146,13 +138,6 @@ def _index_columns(databases: list[tuple[str, dict[str, Any]]]) -> dict[tuple[st
     return index
 
 
-def _parse_source(source: str) -> tuple[str, str, str] | None:
-    m = _SOURCE_RE.match(source or "")
-    if not m:
-        return None
-    return m.group("db").strip(), m.group("table").strip(), m.group("column").strip()
-
-
 # --- assembly + validation ----------------------------------------------------
 def _as_item_list(raw: Any) -> list[Any]:
     """Normalize uncertain top-level containers into a list of candidate items."""
@@ -173,7 +158,7 @@ def _clean_binding(
     The `type` is taken from model.json (referenced, authoritative), falling back
     to the LLM's proposal only if the column carries no filter_type."""
     source = str(raw.get("source") or "").strip()
-    parsed = _parse_source(source)
+    parsed = try_parse_source(source)
     if not parsed:
         return None
     col = columns.get(parsed)
@@ -211,7 +196,7 @@ def _clean_not_expressible(
     raw: dict[str, Any], columns: dict[tuple[str, str, str], dict[str, Any]]
 ) -> dict[str, Any] | None:
     source = str(raw.get("source") or "").strip()
-    parsed = _parse_source(source)
+    parsed = try_parse_source(source)
     if not parsed or parsed not in columns:
         return None
     criterion_id = str(raw.get("criterion_id") or "").strip()
@@ -292,8 +277,8 @@ async def build_criteria_bindings(
     `mapping.json`. ONE LLM call selects the relevant dimensions from `audit` and
     `databases` and links each to `identity`; deterministic code coerces the result
     against the real schema (columns must exist + be filterable; type read from
-    model.json). Retries on malformed output; raises `RuntimeError` after
-    `_MAX_BUILD_ATTEMPTS`.
+    model.json). Retries on malformed output; raises `BuilderValidationError`
+    (a `RuntimeError`) when the attempts run out.
 
     `audit` is the spec.json document, `databases` a list of `(db_id, database_json)`
     pairs, `identity` the mapping's identity block (anchor + join keys).
@@ -323,9 +308,7 @@ async def build_criteria_bindings(
         indent=2,
     )
 
-    instructions = _PROMPT
-    problems: list[str] = []
-    for attempt in range(1, _MAX_BUILD_ATTEMPTS + 1):
+    async def _attempt(instructions: str) -> tuple[dict[str, Any] | None, list[str]]:
         try:
             selection_typed = await llm.respond_typed(
                 instructions,
@@ -337,31 +320,20 @@ async def build_criteria_bindings(
             )
             selection = selection_typed.model_dump(mode="python", exclude_none=True)
         except llm.LLMRequestError as exc:
-            problems = [f"criteria_bindings: {exc}"]
-        else:
-            blocks = assemble_criteria(selection, databases)
-            problems = _validate(blocks, audit_id, database_ids, identity)
-            if not problems and not blocks["criteria_bindings"]:
-                problems = ["criteria_bindings: no usable bindings were produced"]
-            if not problems:
-                return blocks
-        logger.warning(
-            "criteria bindings failed validation (attempt %d/%d): %s",
-            attempt, _MAX_BUILD_ATTEMPTS, "; ".join(problems),
-        )
-        instructions = _PROMPT + _retry_feedback(problems)
-    raise RuntimeError(
-        f"criteria bindings failed validation after {_MAX_BUILD_ATTEMPTS} attempts: "
-        + "; ".join(problems)
-    )
+            return None, [f"criteria_bindings: {exc}"]
+        blocks = assemble_criteria(selection, databases)
+        problems = _validate(blocks, audit_id, database_ids, identity)
+        if not problems and not blocks["criteria_bindings"]:
+            problems = ["criteria_bindings: no usable bindings were produced"]
+        return blocks, problems
 
-
-def _retry_feedback(problems: list[str]) -> str:
-    joined = "\n".join(f"- {p}" for p in problems)
-    return (
-        "\n\nYOUR PREVIOUS OUTPUT WAS REJECTED for these reasons:\n"
-        f"{joined}\n"
-        "Produce a corrected JSON object that fixes every issue. Bind only real, "
-        "filterable columns from the given model.json. Output only the JSON "
-        "object, starting with `{`."
+    return await build_validated(
+        _attempt,
+        prompt=_PROMPT,
+        label="criteria bindings",
+        guidance=(
+            "Produce a corrected JSON object that fixes every issue. Bind only "
+            "real, filterable columns from the given model.json. Output only the "
+            "JSON object, starting with `{`."
+        ),
     )

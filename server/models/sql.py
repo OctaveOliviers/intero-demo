@@ -6,7 +6,14 @@ class SqlQuery(BaseModel):
 
     query: str
     database: str | None = None
-    run_id: str | None = Field(default=None, alias="runId")
+    table_population_id: str | None = Field(default=None, alias="tablePopulationId")
+
+
+class ChatCitationEvidenceRequest(BaseModel):
+    thread_id: str | None = Field(default=None, alias="thread_id")
+    message_index: int | None = Field(default=None, alias="message_index")
+    marker: str | None = None
+    covered_row_index: int | None = Field(default=None, alias="covered_row_index")
 
 
 class SqlResponse(BaseModel):

@@ -1,47 +1,74 @@
 <script>
   import { onMount, tick } from "svelte";
-  import {
-    audits, currentAuditId, deleteAudit, resetAuditHistory,
-  } from "../stores/audits.js";
+  import { currentPopulatedTableId, resetPopulatedTableHistory } from "../stores/populatedTables.js";
   import {
     goHome,
     currentView,
     libraryPage,
     openTemplatesLibrary,
     openDatabasesLibrary,
-    selectAudit,
+    openSettings,
+    openDataLibrary,
+    openThreadView,
   } from "../stores/navigation.js";
+  import {
+    startNewChat,
+    threads,
+    refreshThreads,
+    openThread,
+    removeThread,
+    renameThread,
+    currentThreadId,
+    pendingNewChat,
+    sending,
+    filterThreads,
+    resetThreads,
+  } from "../stores/threads.js";
+  import { threadDotState } from "../stores/threadDotState.js";
+  import {
+    resetTables,
+  } from "../stores/tables.js";
+  import { authStatus } from "../stores/auth.js";
+  import {
+    hasPendingDatasetShares,
+    refreshSharedNotifications,
+  } from "../stores/sharedNotifications.js";
   import { resetChatRuntime } from "../stores/chat.js";
   import { authLogout } from "../lib/api.js";
+  import { isMockMode } from "../lib/mock.js";
   import { clearAuth } from "../stores/auth.js";
-  import { addToast } from "../stores/toasts.js";
+  import { attachmentTypeIcon } from "../lib/attachmentTypes.js";
+  import {
+    ARTIFACT_WORKSPACE_STATES,
+    ARTIFACT_WORKSPACE_THREAD_ID,
+    visibleDemoArtifacts,
+  } from "../lib/artifactWorkspaceDemo.js";
+  import { artifactWorkspaceDemoState, openDemoPinnedArtifact } from "../stores/artifactWorkspaceDemo.js";
   import Icon from "./Icon.svelte";
-  import SettingsModal from "./SettingsModal.svelte";
+  import SidebarItem from "./SidebarItem.svelte";
   import FeedbackModal from "./FeedbackModal.svelte";
-  import { CONTENT } from "../lib/mock/content/index.js";
   import { _ } from "svelte-i18n";
 
-  // Tracked-dashboard descriptors (§7.1) drive the per-row leading logos and the
-  // collapsed-rail logo stack (§4.2/§4.3). Map an audit row to its logo by its id
-  // OR templateId, so a freshly created audit (uuid id) also shows its logo.
-  const dashboards = CONTENT.dashboards || [];
-  function dashboardFor(audit) {
-    if (!audit) return undefined;
-    return dashboards.find((d) => d.auditId === audit.id || d.auditId === audit.templateId);
-  }
-  // The collapsed rail shows a logo only for dashboards whose audit EXISTS, so
-  // cord-pH appears only once created — not in the base state (Change 1). `openId`
-  // is the matching audit's real id to open.
-  $: railDashboards = dashboards
-    .map((d) => {
-      const a = $audits.find((x) => x.id === d.auditId || x.templateId === d.auditId);
-      return a ? { logo: d.logo, title: d.title, openId: a.id } : null;
-    })
-    .filter(Boolean);
-
-  let showSettings = false;
   let showFeedback = false;
   let logoutBusy = false;
+  const showDatabasesNav = !isMockMode("databases");
+  // The mock's seeded inbound shares are long-accepted history, not news — no
+  // notification dot for them in the demo.
+  const showShareDots = !isMockMode("grants");
+  // The demo starts clean: the Lung MOC chat appears in the sidebar only once
+  // the streamed opening has been triggered (a "moc" message from a New chat
+  // starts the run). An artifact shows under PINNED ARTIFACTS only when the
+  // doctor pins it from the tray's three-dot menu — never automatically.
+  $: demoStarted = $artifactWorkspaceDemoState.runStatus !== "idle";
+  $: pinnedArtifacts = demoStarted
+    ? visibleDemoArtifacts($artifactWorkspaceDemoState).filter(
+        (artifact) => artifact.kind !== "inline_analysis" && artifact.pinned,
+      )
+    : [];
+  $: hideResizer =
+    $currentView === "thread" &&
+    $currentThreadId === ARTIFACT_WORKSPACE_THREAD_ID &&
+    $artifactWorkspaceDemoState.workspaceState === ARTIFACT_WORKSPACE_STATES.ARTIFACT_EXPANDED;
 
   const WIDTH_KEY = "intero.leftPanel.width";
   const COLLAPSED_KEY = "intero.leftPanel.collapsed";
@@ -53,16 +80,38 @@
   let collapsed = false;
   let dragging = false;
 
-  // Search-analyses client-side filter.
+  // The single top search bar — one query that filters BOTH the Tables and the
+  // Chats sections by title (case-insensitive); empty shows all.
   let searchOpen = false;
   let query = "";
   let searchInput;
 
-  // Per-row overflow menu + inline rename.
-  let menuOpenId = null;
-  let renamingId = null;
-  let renameValue = "";
-  let renameInput;
+  // A SINGLE "which row menu is open" state for chat rows, so opening any row's
+  // menu closes any other and the window-click closeMenus clears it.
+  let openMenuKey = null;
+  const chatKey = (id) => `chat:${id}`;
+  function toggleMenu(key) {
+    openMenuKey = openMenuKey === key ? null : key;
+  }
+
+  // Populate the Tables + Threads sections once authenticated (and re-populate on
+  // a user change). Reuses the stores' existing refresh actions — no polling. The
+  // thread store already refreshes its own list on send/new/delete.
+  let sectionsLoadedFor = null;
+  $: if ($authStatus === "authenticated" && sectionsLoadedFor !== "authenticated") {
+    sectionsLoadedFor = "authenticated";
+    void refreshThreads();
+    void refreshSharedNotifications();
+  } else if ($authStatus !== "authenticated") {
+    sectionsLoadedFor = null;
+  }
+
+  // The single top search filters chats by title (case-insensitive); pinned
+  // artifacts remain visible as quick access. The (pre-seeded) demo thread is
+  // held back until the demo run has been triggered.
+  $: filteredThreads = filterThreads($threads, query).filter(
+    (thread) => demoStarted || thread.id !== ARTIFACT_WORKSPACE_THREAD_ID,
+  );
 
   onMount(() => {
     const w = parseInt(localStorage.getItem(WIDTH_KEY), 10);
@@ -75,18 +124,49 @@
     localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
   }
 
-  $: filtered = query.trim()
-    ? $audits.filter((a) =>
-        (a.title || "").toLowerCase().includes(query.trim().toLowerCase()),
-      )
-    : $audits;
+  // Publish the panel's rendered width + collapsed state so content areas can
+  // pick their centering reference — see ThreadView's .thread-col: panel OPEN
+  // → the chat centers on the SCREEN; panel folded → on the main area.
+  $: if (typeof document !== "undefined") {
+    document.documentElement.style.setProperty("--left-panel-width", `${collapsed ? 56 : width}px`);
+    document.documentElement.classList.toggle("left-panel-collapsed", collapsed);
+  }
 
-  function handleNew() {
-    currentAuditId.set(null);
-    goHome();
+  // Open a fresh chat — the thread conversation surface (UI label "New chat";
+  // "thread" stays the backend/domain term). This is the single primary entry
+  // (it replaces the old "New audit"): a chat can produce a table, so populated tables are
+  // created through it. Switch to the thread view and open the PENDING landing —
+  // NO thread is persisted until the first message is sent (startNewChat just
+  // clears the open thread + flags the landing; sendFirstMessage mints it).
+  function handleNewChat() {
+    currentPopulatedTableId.set(null);
+    openThreadView();
+    startNewChat();
+  }
+
+  // Open a chat from the Threads section: load the thread FIRST, then route to the
+  // chat surface — so selecting a chat never flashes the new-chat landing or the
+  // previously-open chat while getThread is still awaiting (Bug A). openThread
+  // clears the pending landing up front; the view switch waits for the load.
+  async function handleOpenThread(id) {
+    // Guard against switching threads mid-send: a send disables the composer but
+    // the chat rows stay clickable, so without this a click during $sending could
+    // race the in-flight post (the store also drops stale post-await writes, but
+    // blocking the switch here keeps the send landing in the thread it began in).
+    if ($sending) return;
+    await openThread(id);
+    openThreadView();
+  }
+
+  async function handleOpenPinnedArtifact(id) {
+    if ($sending) return;
+    await openThread(ARTIFACT_WORKSPACE_THREAD_ID);
+    openThreadView();
+    openDemoPinnedArtifact(id);
   }
 
   function handleTemplates() {
+    void refreshSharedNotifications({ force: true });
     openTemplatesLibrary();
   }
 
@@ -94,12 +174,16 @@
     openDatabasesLibrary();
   }
 
+  function handleDataLibrary() {
+    void refreshSharedNotifications({ force: true });
+    openDataLibrary();
+  }
+
   function toggleCollapsed() {
     collapsed = !collapsed;
     if (collapsed) {
       searchOpen = false;
-      menuOpenId = null;
-      renamingId = null;
+      openMenuKey = null;
     }
   }
 
@@ -142,62 +226,8 @@
     window.addEventListener("mouseup", onUp);
   }
 
-  function toggleMenu(e, id) {
-    e.stopPropagation();
-    menuOpenId = menuOpenId === id ? null : id;
-  }
-
-  async function startRename(id, title) {
-    menuOpenId = null;
-    renamingId = id;
-    renameValue = title || "";
-    await tick();
-    renameInput?.focus();
-    renameInput?.select();
-  }
-
-  function commitRename() {
-    if (renamingId == null) return;
-    const id = renamingId;
-    const next = renameValue.trim();
-    renamingId = null;
-    if (!next) return;
-    // Use the exported writable's update; the store's save subscription persists it.
-    audits.update((list) =>
-      list.map((a) => (a.id === id ? { ...a, title: next } : a)),
-    );
-  }
-
-  function cancelRename() {
-    renamingId = null;
-  }
-
-  function onRenameKey(e) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      commitRename();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      cancelRename();
-    }
-  }
-
-  async function handleDelete(id) {
-    menuOpenId = null;
-    if (!confirm($_("leftPanel.deleteConfirm"))) {
-      return;
-    }
-    try {
-      await deleteAudit(id);
-    } catch (err) {
-      // Backend delete failed — keep the row so the UI never lies about what's stored.
-      addToast({ kind: "error", message: $_("leftPanel.deleteFailed") });
-      console.warn("Delete analysis failed:", err);
-    }
-  }
-
   function closeMenus() {
-    menuOpenId = null;
+    openMenuKey = null;
   }
 
   async function handleLogout() {
@@ -209,14 +239,17 @@
       // Resilient logout: always clear local auth/runtime even if API call fails.
       console.warn("Logout request failed; clearing local auth state anyway.", err);
     } finally {
-      showSettings = false;
       showFeedback = false;
       searchOpen = false;
       query = "";
-      menuOpenId = null;
-      renamingId = null;
+      openMenuKey = null;
       resetChatRuntime();
-      resetAuditHistory();
+      resetPopulatedTableHistory();
+      // Clear the previous user's thread + table state so it doesn't stay
+      // resident for the next sign-in on this tab (the fresh-chat landing fires
+      // again via App.svelte's chatDefaulted reset on the auth gate).
+      resetThreads();
+      resetTables();
       goHome();
       clearAuth();
       logoutBusy = false;
@@ -247,9 +280,14 @@
     </div>
 
     <nav class="menu">
-      <button class="menu-row" on:click={handleNew}>
+      <button
+        class="menu-row"
+        class:active-link={$currentView === "thread" && $pendingNewChat}
+        on:click={handleNewChat}
+        disabled={$sending}
+      >
         <Icon name="new" size={18} />
-        <span>{$_("leftPanel.newAudit")}</span>
+        <span>{$_("leftPanel.newChat")}</span>
       </button>
       {#if searchOpen}
         <div class="menu-row search-row">
@@ -266,96 +304,82 @@
       {:else}
         <button class="menu-row" on:click={toggleSearch}>
           <Icon name="search" size={18} />
-          <span>{$_("leftPanel.searchAudits")}</span>
+          <span>{$_("leftPanel.search")}</span>
         </button>
       {/if}
+      <button
+        class="menu-row"
+        class:active-link={$currentView === "library" && $libraryPage.section === "datasets"}
+        on:click={handleDataLibrary}
+      >
+        <Icon name={attachmentTypeIcon("dataset")} size={18} />
+        <span class="menu-label">{$_("leftPanel.dataLibrary")}</span>
+        {#if showShareDots && $hasPendingDatasetShares}
+          <span class="nav-dot" title={$_("leftPanel.newSharedDataset")} aria-hidden="true" />
+        {/if}
+      </button>
       <button
         class="menu-row"
         class:active-link={$currentView === "library" && $libraryPage.section === "templates"}
         on:click={handleTemplates}
       >
-        <Icon name="table" size={18} />
-        <span>{$_("leftPanel.templates")}</span>
+        <Icon name={attachmentTypeIcon("template")} size={18} />
+        <span class="menu-label">{$_("leftPanel.templates")}</span>
       </button>
-      <button
-        class="menu-row"
-        class:active-link={$currentView === "library" && $libraryPage.section === "databases"}
-        on:click={handleDatabases}
-      >
-        <Icon name="database" size={18} />
-        <span>{$_("leftPanel.databases")}</span>
-      </button>
+      {#if showDatabasesNav}
+        <button
+          class="menu-row"
+          class:active-link={$currentView === "library" && $libraryPage.section === "databases"}
+          on:click={handleDatabases}
+        >
+          <Icon name="database" size={18} />
+          <span>{$_("leftPanel.databases")}</span>
+        </button>
+      {/if}
     </nav>
 
     <div class="list">
-      {#if filtered.length === 0}
-        <div class="empty">
-          {query.trim() ? $_("leftPanel.noMatches") : $_("leftPanel.noAudits")}
-        </div>
-      {:else}
-        {#each filtered as audit (audit.id)}
-          <div class="row-wrap">
-            {#if renamingId === audit.id}
-              <input
-                class="rename-input"
-                type="text"
-                bind:this={renameInput}
-                bind:value={renameValue}
-                on:keydown={onRenameKey}
-                on:blur={commitRename}
-                on:click|stopPropagation
-              />
-            {:else}
-              <button
-                class="item"
-                class:active={$currentAuditId === audit.id && $currentView === "results"}
-                class:menu-open={menuOpenId === audit.id}
-                on:click={() => selectAudit(audit.id)}
-                title={audit.title}
-              >
-                {#if dashboardFor(audit)}
-                  <span class="item-logo">
-                    <Icon name={dashboardFor(audit).logo} size={16} />
-                  </span>
-                {/if}
-                <span class="title">{audit.title}</span>
-                {#if audit.status === "running"}
-                  <span class="dot running" title={$_("common.running")} aria-hidden="true" />
-                {/if}
-              </button>
-              <button
-                type="button"
-                class="more-btn"
-                class:open={menuOpenId === audit.id}
-                on:click={(e) => toggleMenu(e, audit.id)}
-                title={$_("common.more")}
-                aria-label={$_("common.moreOptions")}
-              >
-                <Icon name="more" size={18} />
-              </button>
-
-              {#if menuOpenId === audit.id}
-                <div class="menu-pop" on:click|stopPropagation>
-                  <button
-                    class="pop-item"
-                    on:click={() => startRename(audit.id, audit.title)}
-                  >
-                    <Icon name="rename" size={16} />
-                    <span>{$_("common.rename")}</span>
-                  </button>
-                  <button
-                    class="pop-item danger"
-                    on:click={() => handleDelete(audit.id)}
-                  >
-                    <Icon name="trash" size={16} />
-                    <span>{$_("common.delete")}</span>
-                  </button>
-                </div>
-              {/if}
-            {/if}
+      {#if pinnedArtifacts.length}
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">{$_("leftPanel.pinnedArtifacts")}</span>
           </div>
-        {/each}
+          {#each pinnedArtifacts as artifact (artifact.id)}
+            <button class="artifact-link" type="button" on:click={() => handleOpenPinnedArtifact(artifact.id)}>
+              <Icon name={artifact.kind === "table" ? "table" : "chart"} size={16} />
+              <span>{artifact.title}</span>
+            </button>
+          {/each}
+        </div>
       {/if}
+
+      <!-- Threads section: the chats, recency order. The single top search filters
+           this list by title; click opens the chat surface; a per-row delete
+           removes the chat (behind the row-menu affordance). -->
+      <div class="section">
+        <div class="section-head">
+          <span class="section-title">{$_("leftPanel.threads")}</span>
+        </div>
+        {#if filteredThreads.length === 0}
+          <div class="empty">
+            {query.trim() ? $_("leftPanel.noChatMatches") : $_("leftPanel.noChats")}
+          </div>
+        {:else}
+          {#each filteredThreads as thread (thread.id)}
+            <SidebarItem
+              title={thread.title}
+              active={$currentThreadId === thread.id && $currentView === "thread"}
+              dot={threadDotState(thread)}
+              menuOpen={openMenuKey === chatKey(thread.id)}
+              deleteConfirm={$_("leftPanel.deleteChatConfirm")}
+              onOpen={() => handleOpenThread(thread.id)}
+              onToggleMenu={() => toggleMenu(chatKey(thread.id))}
+              onRename={(next) => renameThread(thread.id, next)}
+              onDelete={() => removeThread(thread.id)}
+            />
+          {/each}
+        {/if}
+      </div>
     </div>
 
     <div class="footer">
@@ -363,7 +387,7 @@
         <Icon name="feedback" size={18} />
         <span>{$_("leftPanel.feedback")}</span>
       </button>
-      <button class="menu-row" on:click={() => (showSettings = true)}>
+      <button class="menu-row" on:click={openSettings}>
         <Icon name="settings" size={18} />
         <span>{$_("leftPanel.settings")}</span>
       </button>
@@ -376,6 +400,7 @@
     <div
       class="resizer"
       class:active={dragging}
+      class:hidden={hideResizer}
       role="separator"
       aria-orientation="vertical"
       on:mousedown={startDrag}
@@ -394,16 +419,35 @@
         <span class="logo-default"><Icon name="logo" /></span>
         <span class="logo-hover"><Icon name="sidebar" /></span>
       </button>
-      <button class="icon-btn" on:click={handleNew} title={$_("leftPanel.newAudit")} aria-label={$_("leftPanel.newAudit")}>
+      <button
+        class="icon-btn"
+        class:rail-active={$currentView === "thread" && $pendingNewChat}
+        on:click={() => { collapsed = false; handleNewChat(); }}
+        title={$_("leftPanel.newChat")}
+        aria-label={$_("leftPanel.newChat")}
+        disabled={$sending}
+      >
         <Icon name="new" />
       </button>
       <button
         class="icon-btn"
         on:click={() => { collapsed = false; toggleSearch(); }}
-        title={$_("leftPanel.searchAudits")}
-        aria-label={$_("leftPanel.searchAudits")}
+        title={$_("leftPanel.search")}
+        aria-label={$_("leftPanel.search")}
       >
         <Icon name="search" />
+      </button>
+      <button
+        class="icon-btn"
+        class:rail-active={$currentView === "library" && $libraryPage.section === "datasets"}
+        on:click={handleDataLibrary}
+        title={$_("leftPanel.dataLibrary")}
+        aria-label={$_("leftPanel.dataLibrary")}
+      >
+        <Icon name={attachmentTypeIcon("dataset")} />
+        {#if showShareDots && $hasPendingDatasetShares}
+          <span class="rail-dot" title={$_("leftPanel.newSharedDataset")} aria-hidden="true" />
+        {/if}
       </button>
       <button
         class="icon-btn"
@@ -412,31 +456,18 @@
         title={$_("leftPanel.templates")}
         aria-label={$_("leftPanel.templates")}
       >
-        <Icon name="table" />
+        <Icon name={attachmentTypeIcon("template")} />
       </button>
-      <button
-        class="icon-btn"
-        class:rail-active={$currentView === "library" && $libraryPage.section === "databases"}
-        on:click={handleDatabases}
-        title={$_("leftPanel.databases")}
-        aria-label={$_("leftPanel.databases")}
-      >
-        <Icon name="database" />
-      </button>
-
-      {#if railDashboards.length}
-        <div class="rail-dashboards">
-          {#each railDashboards as d (d.openId)}
-            <button
-              class="icon-btn"
-              on:click={() => selectAudit(d.openId)}
-              title={d.title}
-              aria-label={d.title}
-            >
-              <Icon name={d.logo} />
-            </button>
-          {/each}
-        </div>
+      {#if showDatabasesNav}
+        <button
+          class="icon-btn"
+          class:rail-active={$currentView === "library" && $libraryPage.section === "databases"}
+          on:click={handleDatabases}
+          title={$_("leftPanel.databases")}
+          aria-label={$_("leftPanel.databases")}
+        >
+          <Icon name="database" />
+        </button>
       {/if}
 
       <button
@@ -449,7 +480,7 @@
       </button>
       <button
         class="icon-btn rail-settings"
-        on:click={() => (showSettings = true)}
+        on:click={openSettings}
         title={$_("leftPanel.settings")}
         aria-label={$_("leftPanel.settings")}
       >
@@ -468,10 +499,6 @@
   {/if}
 </aside>
 
-{#if showSettings}
-  <SettingsModal on:close={() => (showSettings = false)} />
-{/if}
-
 {#if showFeedback}
   <FeedbackModal on:close={() => (showFeedback = false)} />
 {/if}
@@ -481,8 +508,8 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    background: var(--color-sidebar);
-    border-right: 1px solid var(--color-border);
+    background: var(--color-bg);
+    border-right: 0;
     height: 100vh;
     min-height: 0;
     flex-shrink: 0;
@@ -499,7 +526,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-3) var(--space-3);
+    padding: var(--space-6) var(--space-3) var(--space-3);
     flex-shrink: 0;
     min-height: 52px;
     box-sizing: border-box;
@@ -516,6 +543,7 @@
 
   /* Icon button (ghost, square) — §3.1 */
   .icon-btn {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -588,6 +616,33 @@
     color: var(--color-text-secondary);
   }
 
+  .menu-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nav-dot,
+  .rail-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: var(--radius-pill);
+    background: var(--color-accent);
+    flex-shrink: 0;
+  }
+
+  .nav-dot {
+    margin-left: auto;
+  }
+
+  .rail-dot {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+  }
+
   /* Inline search: the "Search analyses" row becomes a borderless,
      transparent input in place — same text format as the label. The row
      keeps the gray box while active so it reads as the focused control. */
@@ -620,26 +675,7 @@
     opacity: 1;
   }
 
-  .rename-input {
-    width: 100%;
-    box-sizing: border-box;
-    margin-top: 2px;
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    font-family: inherit;
-    font-size: var(--text-sm);
-    color: var(--color-text);
-  }
-
-  .rename-input:focus {
-    outline: none;
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px var(--color-accent-weak);
-  }
-
-  /* Analyses list */
+  /* Artifacts / Chats list */
   .list {
     flex: 1;
     overflow-y: auto;
@@ -656,161 +692,64 @@
     padding: var(--space-6) var(--space-3);
   }
 
-  .row-wrap {
-    position: relative;
-  }
-
-  .item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    width: 100%;
-    padding: var(--space-2) var(--space-2);
-    border: none;
-    background: transparent;
-    border-radius: var(--radius-md);
-    text-align: left;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background var(--dur-fast) var(--ease);
-  }
-
-  .item:hover,
-  .item.active,
-  .item.menu-open {
-    background: var(--color-hover);
-  }
-
-  /* Leading dashboard logo on tracked-dashboard rows (§4.2). The `.item` flex
-     row + its existing gap handle the spacing; keep the glyph from shrinking. */
-  .item-logo {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    color: var(--color-text-secondary);
-  }
-
-  .title {
-    flex: 1;
-    min-width: 0;
-    font-size: var(--text-sm);
-    font-weight: var(--weight-normal);
-    color: var(--color-text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .dot {
-    width: 7px;
-    height: 7px;
-    border-radius: var(--radius-pill);
-    flex-shrink: 0;
-  }
-
-  .dot.running {
-    background: var(--color-warning);
-    animation: pulse 1.4s ease-in-out infinite;
-  }
-
-  .row-wrap:hover .dot.running {
-    display: none;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
-
-  /* `more` button — revealed on row hover (ChatGPT style) */
-  .more-btn {
-    position: absolute;
-    top: 50%;
-    right: var(--space-1);
-    transform: translateY(-50%);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
-  }
-
-  .row-wrap:hover .more-btn,
-  .more-btn.open {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .more-btn:hover {
-    background: var(--color-border);
-    color: var(--color-text);
-  }
-
-  /* Reserve space for the more-btn only while it is visible, so the name
-     truncates instead of sliding under the button. */
-  .row-wrap:hover .title,
-  .item.menu-open .title {
-    padding-right: 22px;
-  }
-
-  /* Overflow menu — §3.5 */
-  .menu-pop {
-    position: absolute;
-    top: calc(100% - 2px);
-    right: var(--space-2);
-    z-index: 20;
-    min-width: 140px;
-    padding: var(--space-1);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
+  /* Artifacts / Threads sections — quiet labeled groups in the scroll region. */
+  .section {
+    margin-top: var(--space-3);
+    padding-top: var(--space-1);
     display: flex;
     flex-direction: column;
     gap: 1px;
   }
 
-  .pop-item {
+  .section-head {
+    display: flex;
+    align-items: center;
+    padding: 0 var(--space-2) var(--space-1);
+  }
+
+  .section-title {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-muted);
+  }
+
+  .artifact-link {
+    width: 100%;
+    min-height: 34px;
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    width: 100%;
-    padding: var(--space-2) var(--space-2);
-    border: none;
-    background: transparent;
-    border-radius: var(--radius-sm);
-    text-align: left;
-    cursor: pointer;
-    font-family: inherit;
-    font-size: var(--text-sm);
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
     color: var(--color-text);
-    transition: background var(--dur-fast) var(--ease);
+    text-align: left;
+    font-size: var(--text-sm);
   }
 
-  .pop-item:hover {
+  .artifact-link:hover,
+  .artifact-link:focus-visible {
     background: var(--color-hover);
   }
 
-  .pop-item.danger {
-    color: var(--color-danger);
+  .artifact-link :global(.icon) {
+    color: var(--color-text-secondary);
   }
 
-  .pop-item.danger:hover {
-    background: var(--color-danger-weak);
+  .artifact-link span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
+
+  /* The Tables/Chats rows themselves — title button, status dot, more-btn,
+     menu-pop, and inline rename — live in the shared SidebarItem component. */
 
   /* Footer */
   .footer {
-    padding: var(--space-2);
+    padding: var(--space-2) var(--space-2) var(--space-6);
     flex-shrink: 0;
   }
 
@@ -820,7 +759,7 @@
     flex-direction: column;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-3) 0;
+    padding: var(--space-6) 0;
     flex: 1;
     min-height: 0;
   }
@@ -851,23 +790,6 @@
     display: inline-flex;
   }
 
-  /* Collapsed-rail dashboard logo stack (§4.3): below the fixed nav icons,
-     visually separated by a hairline divider, above the pinned controls. */
-  .rail-dashboards {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-2);
-    width: 100%;
-    padding-top: var(--space-2);
-    margin-top: var(--space-1);
-    border-top: 1px solid var(--color-border);
-  }
-
-  .rail-dashboards .icon-btn {
-    color: var(--color-text);
-  }
-
   .rail-feedback {
     margin-top: auto;
   }
@@ -875,18 +797,33 @@
   /* Resizer */
   .resizer {
     position: absolute;
-    top: 0;
-    right: -3px;
-    width: 6px;
-    height: 100%;
+    top: var(--space-6);
+    right: 0;
+    bottom: var(--space-6);
+    width: 1px;
+    height: auto;
     cursor: col-resize;
     z-index: 10;
-    background: transparent;
+    background: var(--color-border);
     transition: background var(--dur-fast) var(--ease);
+  }
+
+  .resizer::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: -4px;
+    bottom: 0;
+    left: -4px;
   }
 
   .resizer:hover,
   .resizer.active {
-    background: var(--color-accent);
+    background: var(--color-border-strong);
+  }
+
+  .resizer.hidden {
+    opacity: 0;
+    pointer-events: none;
   }
 </style>

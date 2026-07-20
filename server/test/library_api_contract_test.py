@@ -5,11 +5,18 @@ from unittest.mock import patch
 
 from fastapi import HTTPException
 
-from server.routes import audits as audits_routes
+from server.routes import templates as templates_routes
 from server.routes import databases as databases_routes
+from server.test._audit_auth_helper import AuditAuthMixin
 
 
-class LibraryApiContractTest(unittest.IsolatedAsyncioTestCase):
+class LibraryApiContractTest(AuditAuthMixin, unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self._audit_auth_setup()
+
+    def tearDown(self):
+        self._audit_auth_teardown()
+
     async def test_get_audits_list_item_contract_keys_and_types(self):
         audit = {
             "id": "a1",
@@ -26,8 +33,10 @@ class LibraryApiContractTest(unittest.IsolatedAsyncioTestCase):
             "provenance_ref": None,
             "provenance_url": None,
         }
-        with patch.object(audits_routes, "load_audit_registry", return_value=[audit]):
-            rows = await audits_routes.list_audits()
+        with patch.object(
+            templates_routes, "load_audit_registry", return_value=[audit]
+        ):
+            rows = await templates_routes.list_templates(self._owner_request("a1"))
         item = rows[0].model_dump(by_alias=True)
         expected_keys = {
             "id",
@@ -55,7 +64,7 @@ class LibraryApiContractTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(item["readOnly"], bool)
         self.assertIsInstance(item["stale"], bool)
 
-    async def test_get_audit_detail_contract_and_error_statuses(self):
+    async def test_get_template_detail_contract_and_error_statuses(self):
         audit = {
             "id": "a1",
             "name": "Audit",
@@ -77,10 +86,12 @@ class LibraryApiContractTest(unittest.IsolatedAsyncioTestCase):
             (audit_dir / "spec.json").write_text('{"fields":[]}', encoding="utf-8")
             (audit_dir / "mapping.json").write_text('{"fields":[]}', encoding="utf-8")
             with (
-                patch.object(audits_routes, "get_audit_by_id", return_value=audit),
-                patch.object(audits_routes, "AUDITS_DIR", Path(tmpdir)),
+                patch.object(templates_routes, "get_audit_by_id", return_value=audit),
+                patch.object(templates_routes, "TEMPLATES_DIR", Path(tmpdir)),
             ):
-                detail = await audits_routes.get_audit_detail("a1")
+                detail = await templates_routes.get_template_detail(
+                    "a1", self._owner_request("a1")
+                )
             payload = detail.model_dump(by_alias=True)
             expected_keys = {
                 "id",
@@ -104,21 +115,27 @@ class LibraryApiContractTest(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(payload["spec"], dict)
             self.assertIsInstance(payload["mapping"], dict)
 
-            with patch.object(audits_routes, "get_audit_by_id", return_value=None):
+            with patch.object(templates_routes, "get_audit_by_id", return_value=None):
                 with self.assertRaises(HTTPException) as not_found:
-                    await audits_routes.get_audit_detail("missing")
+                    await templates_routes.get_template_detail(
+                        "missing", self._owner_request()
+                    )
             self.assertEqual(not_found.exception.status_code, 404)
-            self.assertEqual(not_found.exception.detail, "Audit not found.")
+            self.assertEqual(not_found.exception.detail, "Template not found.")
 
             (audit_dir / "spec.json").write_text("{not-json", encoding="utf-8")
             with (
-                patch.object(audits_routes, "get_audit_by_id", return_value=audit),
-                patch.object(audits_routes, "AUDITS_DIR", Path(tmpdir)),
+                patch.object(templates_routes, "get_audit_by_id", return_value=audit),
+                patch.object(templates_routes, "TEMPLATES_DIR", Path(tmpdir)),
             ):
                 with self.assertRaises(HTTPException) as malformed:
-                    await audits_routes.get_audit_detail("a1")
+                    await templates_routes.get_template_detail(
+                        "a1", self._owner_request("a1")
+                    )
             self.assertEqual(malformed.exception.status_code, 422)
-            self.assertEqual(malformed.exception.detail, "Audit spec is invalid JSON.")
+            self.assertEqual(
+                malformed.exception.detail, "Template spec is invalid JSON."
+            )
 
     async def test_get_databases_list_item_contract_keys_and_types(self):
         db = {
@@ -214,7 +231,9 @@ class LibraryApiContractTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(set(payload.keys()), expected_keys)
             self.assertIsInstance(payload["model"], dict)
 
-            with patch.object(databases_routes, "_get_database_by_id", return_value=None):
+            with patch.object(
+                databases_routes, "_get_database_by_id", return_value=None
+            ):
                 with self.assertRaises(HTTPException) as not_found:
                     await databases_routes.get_database_detail("missing")
             self.assertEqual(not_found.exception.status_code, 404)
@@ -228,7 +247,9 @@ class LibraryApiContractTest(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(HTTPException) as malformed:
                     await databases_routes.get_database_detail("d1")
             self.assertEqual(malformed.exception.status_code, 422)
-            self.assertEqual(malformed.exception.detail, "Database model is invalid JSON.")
+            self.assertEqual(
+                malformed.exception.detail, "Database model is invalid JSON."
+            )
 
 
 if __name__ == "__main__":

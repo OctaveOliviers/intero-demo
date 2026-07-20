@@ -110,7 +110,7 @@ class SeedModelLinkTest(unittest.TestCase):
 
     def test_npda_clinical_seed_links_to_demographics(self):
         model = json.loads(
-            (REPO_ROOT / "seed/databases/npda-clinical/model.json").read_text()
+            (REPO_ROOT / "data/seed/databases/npda-clinical/model.json").read_text()
         )
         links = model.get("identity_links") or []
         self.assertIn(

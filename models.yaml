@@ -12,11 +12,15 @@ stages:
     provider: ollama
     model: qwen3:32b
     endpoint: http://localhost:11434/v1
-  tier2:
+  thread_agent:
     provider: ollama
-    model: qwen3:8b
+    model: qwen3:32b
     endpoint: http://localhost:11434/v1
-  tier3_agent:
+  table_agent:
+    provider: ollama
+    model: qwen3:32b
+    endpoint: http://localhost:11434/v1
+  filters:
     provider: ollama
     model: qwen3:32b
     endpoint: http://localhost:11434/v1

@@ -27,7 +27,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import sqlite3
 import sys
 import tempfile
 from pathlib import Path
@@ -36,12 +35,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from core.config import ROOT  # noqa: E402
+from core import table_population  # noqa: E402
+from core.filters import cohort as cohort_filters  # noqa: E402
+from core.table_population.populate import TablePopulationContext  # noqa: E402
+from core.table_population.populate import prepopulate  # noqa: E402
 from core.indexing.build_audit_spec import build_audit_spec  # noqa: E402
 from core.indexing.build_database_model import build_database_model  # noqa: E402
-from core.indexing.profile import validate_against_schema  # noqa: E402
-from core.mapping.build_audit_database_map import build_audit_database_mapping  # noqa: E402
-from core.running.orchestrator import RunStore, precompute_pending_cells  # noqa: E402
-from core.running.try_direct import try_direct  # noqa: E402
+from core.contracts import validate_against_schema  # noqa: E402
+from core.mapping import build_audit_database_mapping  # noqa: E402
 from core.store import Run, Store  # noqa: E402
 from scripts.eval_lib import (  # noqa: E402
     format_report,
@@ -50,15 +51,15 @@ from scripts.eval_lib import (  # noqa: E402
     score_mapping,
 )
 
-SEED_DIR = ROOT / "seed"
+SEED_DIR = ROOT / "data" / "seed"
 VAR_DIR = ROOT / "var"
 
 # The golden corpus: cord-pH is the clean case; the NPDA database models are
 # the realistic messy multi-source case. The cord-pH source workbook ships in
-# docs/templates/; NPDA has no source workbook (its spec was authored from the
+# data/templates/; NPDA has no source workbook (its spec was authored from the
 # published dataset), so the audit-spec eval covers cord-pH only until T11
 # adds an NPDA fixture.
-AUDIT_CASES = [("cord-ph", ROOT / "docs" / "templates" / "cord-ph-lo-audit.xlsx")]
+AUDIT_CASES = [("cord-ph", ROOT / "data" / "templates" / "cord-ph-lo-audit.xlsx")]
 DB_CASES = ["cord-ph", "npda-demographics", "npda-clinical"]
 MAPPING_CASES = [("cord-ph", ["cord-ph"])]
 
@@ -88,7 +89,7 @@ async def eval_index_db() -> dict[str, dict]:
 async def eval_index_audit() -> dict[str, dict]:
     results: dict[str, dict] = {}
     for audit_id, workbook in AUDIT_CASES:
-        golden_path = SEED_DIR / "audits" / audit_id / "spec.json"
+        golden_path = SEED_DIR / "templates" / audit_id / "spec.json"
         if not workbook.exists():
             print(f"!! skipping {audit_id}: source workbook missing ({workbook})")
             continue
@@ -101,20 +102,19 @@ async def eval_index_audit() -> dict[str, dict]:
 
 
 def _resolve_cohort(executable: dict, db_paths: dict[str, Path]) -> list[str]:
-    cohort = executable.get("cohort") or {}
-    db_path = db_paths.get(cohort.get("database"))
-    if db_path is None:
-        return []
-    sql = f"SELECT DISTINCT {cohort['identity_select']} FROM {cohort['from']}"
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    """The ONE core cohort resolver (was a private SQL copy). A candidate
+    mapping whose cohort block is degenerate resolves to an empty cohort —
+    scored 0.0 with an 'empty cohort' mismatch — instead of crashing the eval."""
     try:
-        return [str(r[0]) for r in conn.execute(sql).fetchall()]
-    finally:
-        conn.close()
+        return [str(m) for m in cohort_filters.resolve_cohort(executable, db_paths)]
+    except ValueError:
+        return []
 
 
-async def _tier1_fill_rate(audit_id: str, mapping: dict, audit_spec: dict) -> dict:
-    """Run the mapping's compiled executable through the REAL try_direct against
+async def _prepopulate_fill_rate(
+    audit_id: str, mapping: dict, audit_spec: dict
+) -> dict:
+    """Run the mapping's compiled executable through the REAL prepopulate against
     the seeded database(s); fill-rate = filled direct cells / direct cells."""
     executable = mapping.get("executable") or {}
     db_paths = {
@@ -123,27 +123,38 @@ async def _tier1_fill_rate(audit_id: str, mapping: dict, audit_spec: dict) -> di
     }
     cohort = _resolve_cohort(executable, db_paths)
     if not cohort:
-        return {"metrics": {"tier1_fill_rate": 0.0, "cohort": 0}, "mismatches": ["empty cohort"]}
+        return {
+            "metrics": {"prepopulate_fill_rate": 0.0, "cohort": 0},
+            "mismatches": ["empty cohort"],
+        }
 
     with tempfile.TemporaryDirectory() as d:
         store = Store(Path(d) / "state.db")
         try:
             store.create_run(Run(id="eval", audit_id=audit_id, status="in_progress"))
-            store.insert_pending_cells(precompute_pending_cells("eval", executable, cohort))
-            run_store = RunStore(
-                store, "eval",
-                executable=executable, cohort=cohort,
-                database_paths=db_paths, audit=audit_spec,
+            store.insert_pending_cells(
+                table_population.build_pending_table_cells("eval", executable, cohort)
             )
-            await try_direct(run_store)
+            run_store = TablePopulationContext(
+                store,
+                "eval",
+                executable=executable,
+                cohort=cohort,
+                database_paths=db_paths,
+                field_spec=audit_spec,
+            )
+            await prepopulate(run_store)
             cells = store.get_cells("eval")
         finally:
             store.close()
 
-    direct_regions = {r["id"] for r in executable.get("regions") or [] if r.get("kind") == "direct"}
+    direct_regions = {
+        r["id"] for r in executable.get("regions") or [] if r.get("kind") == "direct"
+    }
     direct_fields = {
         entry.get("field")
-        for r in executable.get("regions") or [] if r["id"] in direct_regions
+        for r in executable.get("regions") or []
+        if r["id"] in direct_regions
         for entry in r.get("cell_map") or []
     }
     direct_cells = [c for c in cells if c.field in direct_fields]
@@ -153,12 +164,15 @@ async def _tier1_fill_rate(audit_id: str, mapping: dict, audit_spec: dict) -> di
         "metrics": {
             "cohort": len(cohort),
             "direct_cells": len(direct_cells),
-            "tier1_fill_rate": round(len(filled) / len(direct_cells), 4) if direct_cells else 0.0,
-            "tier1_blocked": len(blocked),
+            "prepopulate_fill_rate": round(len(filled) / len(direct_cells), 4)
+            if direct_cells
+            else 0.0,
+            "prepopulate_blocked": len(blocked),
         },
         "mismatches": [
             f"unfilled direct cell {c.ref} ({c.field}/{c.member}): state={c.state}"
-            for c in direct_cells if c.state not in ("filled",)
+            for c in direct_cells
+            if c.state not in ("filled",)
         ][:20],
     }
 
@@ -166,13 +180,15 @@ async def _tier1_fill_rate(audit_id: str, mapping: dict, audit_spec: dict) -> di
 async def eval_mapping() -> dict[str, dict]:
     results: dict[str, dict] = {}
     for audit_id, db_ids in MAPPING_CASES:
-        golden = _read_json(SEED_DIR / "audits" / audit_id / "mapping.json")
-        audit_spec = _read_json(SEED_DIR / "audits" / audit_id / "spec.json")
+        golden = _read_json(SEED_DIR / "templates" / audit_id / "mapping.json")
+        audit_spec = _read_json(SEED_DIR / "templates" / audit_id / "spec.json")
         databases = [
             (db_id, _read_json(SEED_DIR / "databases" / db_id / "model.json"))
             for db_id in db_ids
         ]
-        candidate = await build_audit_database_mapping(audit_spec, databases, audit_id=audit_id)
+        candidate = await build_audit_database_mapping(
+            audit_spec, databases, audit_id=audit_id
+        )
         scored = score_mapping(golden, candidate)
         problems = validate_against_schema(candidate, "mapping.schema.json")
         scored["metrics"]["schema_valid"] = 1.0 if not problems else 0.0
@@ -181,12 +197,12 @@ async def eval_mapping() -> dict[str, dict]:
         # Layer 2 (decision 8): the candidate must not just look right — its
         # compiled plan must FILL cells. The golden's own fill-rate prints as
         # the baseline.
-        results[f"mapping:{audit_id}:tier1-candidate"] = await _tier1_fill_rate(
-            audit_id, candidate, audit_spec
-        )
-        results[f"mapping:{audit_id}:tier1-golden"] = await _tier1_fill_rate(
-            audit_id, golden, audit_spec
-        )
+        results[
+            f"mapping:{audit_id}:prepopulate-candidate"
+        ] = await _prepopulate_fill_rate(audit_id, candidate, audit_spec)
+        results[
+            f"mapping:{audit_id}:prepopulate-golden"
+        ] = await _prepopulate_fill_rate(audit_id, golden, audit_spec)
     return results
 
 
@@ -194,13 +210,19 @@ async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--stage",
-        choices=["all", "index-db", "index-audit", "mapping", "tier1-golden"],
+        choices=["all", "index-db", "index-audit", "mapping", "prepopulate-golden"],
         default="all",
-        help="tier1-golden runs ONLY the golden mapping's Tier-1 fill-rate — no LLM needed",
+        help="prepopulate-golden runs ONLY the golden mapping's prepopulate fill-rate — no LLM needed",
     )
-    ap.add_argument("--threshold", type=float, default=0.8,
-                    help="exit non-zero when any 0..1 metric falls below this")
-    ap.add_argument("--json", type=Path, default=None, help="also write raw scores to this path")
+    ap.add_argument(
+        "--threshold",
+        type=float,
+        default=0.8,
+        help="exit non-zero when any 0..1 metric falls below this",
+    )
+    ap.add_argument(
+        "--json", type=Path, default=None, help="also write raw scores to this path"
+    )
     args = ap.parse_args()
 
     results: dict[str, dict] = {}
@@ -210,13 +232,13 @@ async def main() -> int:
         results.update(await eval_index_audit())
     if args.stage in ("all", "mapping"):
         results.update(await eval_mapping())
-    if args.stage == "tier1-golden":
+    if args.stage == "prepopulate-golden":
         for audit_id, _dbs in MAPPING_CASES:
-            golden = _read_json(SEED_DIR / "audits" / audit_id / "mapping.json")
-            audit_spec = _read_json(SEED_DIR / "audits" / audit_id / "spec.json")
-            results[f"mapping:{audit_id}:tier1-golden"] = await _tier1_fill_rate(
-                audit_id, golden, audit_spec
-            )
+            golden = _read_json(SEED_DIR / "templates" / audit_id / "mapping.json")
+            audit_spec = _read_json(SEED_DIR / "templates" / audit_id / "spec.json")
+            results[
+                f"mapping:{audit_id}:prepopulate-golden"
+            ] = await _prepopulate_fill_rate(audit_id, golden, audit_spec)
 
     failures = []
     for title, scored in results.items():
@@ -228,7 +250,11 @@ async def main() -> int:
             # named in the report, but an input gap never gates the eval red.
             if title.startswith("index-audit:") and name == "code_set_match":
                 continue
-            if isinstance(value, float) and 0.0 <= value <= 1.0 and value < args.threshold:
+            if (
+                isinstance(value, float)
+                and 0.0 <= value <= 1.0
+                and value < args.threshold
+            ):
                 failures.append(f"{title}.{name}={value} < {args.threshold}")
     if args.json:
         args.json.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")

@@ -12,14 +12,17 @@ never writes a broken file.
 
 from __future__ import annotations
 
-import json
 import logging
-import re
 import sqlite3
 from pathlib import Path
 from typing import Any
 
 from core.clients import llm
+from core.clients.llm_builder import (
+    build_validated,
+    parse_json_object,
+)
+from core.contracts import validate_against_schema
 from core.indexing.profile import (
     classify_column,
     discover_foreign_keys,
@@ -29,13 +32,11 @@ from core.indexing.profile import (
     readonly_connection,
     schema_fingerprint,
     table_fingerprint,
-    validate_against_schema,
 )
 
 logger = logging.getLogger(__name__)
 
 _SCHEMA_FILE = "database-model.schema.json"
-_MAX_BUILD_ATTEMPTS = 3
 
 _INTERNAL_TABLES = {"import_metadata", "sqlite_sequence", "sqlite_stat1", "sqlite_stat4"}
 
@@ -43,12 +44,6 @@ _INTERNAL_TABLES = {"import_metadata", "sqlite_sequence", "sqlite_stat1", "sqlit
 # records. The Synthea exports store almost everything as TEXT; keep it honest.
 _CANONICAL_TYPES = {"integer": "integer", "int": "integer", "real": "real",
                     "float": "real", "blob": "blob", "text": "text"}
-
-
-class BuilderValidationError(RuntimeError):
-    """Raised when the builder's LLM output cannot be made into a valid model
-    after all retries. The caller (service.run_indexing) marks the entity
-    `status: error` and no broken model is ever written."""
 
 
 _PROMPT = """\
@@ -191,18 +186,6 @@ def _render_for_llm(
             )
         lines.append("")
     return "\n".join(lines)
-
-
-def _parse_json(raw: str) -> dict[str, Any]:
-    """Parse the model's JSON, tolerating ```json fences and stray prose."""
-    text = raw.strip()
-    if text.startswith("```"):
-        text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
-        text = re.sub(r"\n?```$", "", text.strip())
-    start, end = text.find("{"), text.rfind("}")
-    if start != -1 and end != -1:
-        text = text[start : end + 1]
-    return json.loads(text)
 
 
 def _build_filterable_surface(
@@ -394,7 +377,7 @@ async def build_database_model(
     `previous` is the prior model (a ready model on re-index, the stub on first
     index); its asserted prose is preserved for structurally-unchanged tables
     (`_merge_durable`). Retries on malformed LLM output; raises
-    `BuilderValidationError` after `_MAX_BUILD_ATTEMPTS`."""
+    `BuilderValidationError` when the attempts run out."""
     schema = extract_schema(db_path)
     classifications = _build_filterable_surface(db_path, schema)
     identity_links = discover_identity_links(
@@ -408,45 +391,29 @@ async def build_database_model(
     if display_name:
         user_input = f"database_name_hint: {display_name}\n\n{user_input}"
 
-    instructions = _PROMPT
-    problems: list[str] = []
-    for attempt in range(1, _MAX_BUILD_ATTEMPTS + 1):
+    async def _attempt(instructions: str) -> tuple[dict[str, Any] | None, list[str]]:
         # The clinical-prose pass dominates output size — every table + every
         # column gets a description, so a wide schema (Synthea-export shape:
         # ~14 tables × ~15 cols) easily fills 6k mid-JSON. 12k carries the
         # full cord-pH model end-to-end without truncation.
         raw = await llm.respond(instructions, user_input, max_output_tokens=12000, stage="index_db")
         try:
-            prose = _parse_json(raw)
-            if not isinstance(prose, dict):
-                raise ValueError("top-level JSON is not an object")
-        except (json.JSONDecodeError, ValueError) as exc:
-            problems = [f"LLM output was not parseable JSON: {exc}"]
-        else:
-            model = _merge_durable(
-                _assemble(database_id, schema, classifications, prose,
-                          identity_links, foreign_keys, grain),
-                previous,
-            )
-            problems = validate_against_schema(model, _SCHEMA_FILE)
-            if not problems:
-                return model
-        logger.warning(
-            "database model failed validation (attempt %d/%d): %s",
-            attempt, _MAX_BUILD_ATTEMPTS, "; ".join(problems),
+            prose = parse_json_object(raw)
+        except ValueError as exc:
+            return None, [f"LLM output was not parseable JSON: {exc}"]
+        model = _merge_durable(
+            _assemble(database_id, schema, classifications, prose,
+                      identity_links, foreign_keys, grain),
+            previous,
         )
-        instructions = _PROMPT + _retry_feedback(problems)
-    raise BuilderValidationError(
-        f"database model failed validation after {_MAX_BUILD_ATTEMPTS} attempts: "
-        + "; ".join(problems)
-    )
+        return model, validate_against_schema(model, _SCHEMA_FILE)
 
-
-def _retry_feedback(problems: list[str]) -> str:
-    joined = "\n".join(f"- {p}" for p in problems)
-    return (
-        "\n\nYOUR PREVIOUS OUTPUT WAS REJECTED for these reasons:\n"
-        f"{joined}\n"
-        "Produce a corrected JSON object that fixes every issue. Output only the "
-        "JSON object, starting with `{`, including every table and column."
+    return await build_validated(
+        _attempt,
+        prompt=_PROMPT,
+        label="database model",
+        guidance=(
+            "Produce a corrected JSON object that fixes every issue. Output only "
+            "the JSON object, starting with `{`, including every table and column."
+        ),
     )

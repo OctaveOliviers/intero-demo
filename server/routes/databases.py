@@ -4,11 +4,12 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from core import indexing
 from core.catalog import load_database_catalog
 from core.config import DATABASES_DIR
+from server.auth.deps import require_permission
 from server.models import (
     DatabaseDetailResponse,
     DatabaseInfo,
@@ -17,6 +18,14 @@ from server.models import (
 )
 
 router = APIRouter()
+
+# Source-database management (and the detail endpoint that returns the full
+# model.json) is admin-only — `database.manage`, held only by `admin`
+# (control-plane §9; api.md Authorization rules). Wiring it as a route
+# dependency runs the authz check BEFORE the handler body, so a clinician's 403
+# never loads or leaks a resource payload. The summary list `GET /api/databases`
+# stays clinician-readable (pre-Q31) and is intentionally NOT gated.
+_require_database_manage = Depends(require_permission("database.manage"))
 
 
 def _new_database_id() -> str:
@@ -80,7 +89,11 @@ async def list_databases():
     return [_database_info_from_catalog_entry(db) for db in load_database_catalog()]
 
 
-@router.get("/api/databases/{db_id}", response_model=DatabaseDetailResponse)
+@router.get(
+    "/api/databases/{db_id}",
+    response_model=DatabaseDetailResponse,
+    dependencies=[_require_database_manage],
+)
 async def get_database_detail(db_id: str):
     if db_id.startswith("_"):
         raise HTTPException(status_code=404, detail="Database not found.")
@@ -88,7 +101,9 @@ async def get_database_detail(db_id: str):
     if db is None:
         raise HTTPException(status_code=404, detail="Database not found.")
 
-    model = _load_json_file(DATABASES_DIR / db_id / "model.json", label="Database model")
+    model = _load_json_file(
+        DATABASES_DIR / db_id / "model.json", label="Database model"
+    )
     base = _database_info_from_catalog_entry(db)
     return DatabaseDetailResponse(
         id=base.id,
@@ -121,7 +136,11 @@ def _validate_sqlite_file(path: Path) -> None:
         raise HTTPException(status_code=415, detail=f"Not a valid SQLite database: {e}")
 
 
-@router.post("/api/databases/upload", response_model=DatabaseUploadResponse)
+@router.post(
+    "/api/databases/upload",
+    response_model=DatabaseUploadResponse,
+    dependencies=[_require_database_manage],
+)
 async def upload_database(file: UploadFile = File(...)):
     """Upload a SQLite file and kick off background indexing.
 
@@ -135,9 +154,15 @@ async def upload_database(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Database file is required.")
     ext = Path(file.filename).suffix.lower()
     if ext not in (".sqlite", ".sqlite3", ".db"):
-        raise HTTPException(status_code=415, detail="Only .sqlite, .sqlite3, and .db files are supported.")
+        raise HTTPException(
+            status_code=415,
+            detail="Only .sqlite, .sqlite3, and .db files are supported.",
+        )
 
-    fallback = Path(file.filename).stem.replace("_", " ").replace("-", " ").strip().title() or "Untitled Database"
+    fallback = (
+        Path(file.filename).stem.replace("_", " ").replace("-", " ").strip().title()
+        or "Untitled Database"
+    )
 
     # The id is an opaque UUID decided up front; the stored SQLite path embeds
     # it, and it stays fixed for the life of the database (renames only touch the
@@ -164,7 +189,11 @@ async def upload_database(file: UploadFile = File(...)):
     return DatabaseUploadResponse(id=final_id, name=fallback, status="indexing")
 
 
-@router.post("/api/databases/{db_id}/reindex", response_model=DatabaseUploadResponse)
+@router.post(
+    "/api/databases/{db_id}/reindex",
+    response_model=DatabaseUploadResponse,
+    dependencies=[_require_database_manage],
+)
 async def reindex_database(db_id: str):
     """Retry indexing for a database whose previous build failed."""
     if db_id.startswith("_") or not indexing.exists("database", db_id):
@@ -173,7 +202,11 @@ async def reindex_database(db_id: str):
     return DatabaseUploadResponse(id=db_id, name=name, status="indexing")
 
 
-@router.patch("/api/databases/{db_id}", response_model=DatabaseInfo)
+@router.patch(
+    "/api/databases/{db_id}",
+    response_model=DatabaseInfo,
+    dependencies=[_require_database_manage],
+)
 async def rename_database(db_id: str, req: DatabaseRenameRequest):
     if db_id.startswith("_") or not indexing.exists("database", db_id):
         raise HTTPException(status_code=404, detail="Database not found.")
@@ -192,12 +225,19 @@ async def rename_database(db_id: str, req: DatabaseRenameRequest):
     if db is None:
         raise HTTPException(status_code=500, detail="Rename failed.")
     return DatabaseInfo(
-        id=db["id"], name=db["name"], description=db["description"],
-        type=db["type"], path=db["path"],
+        id=db["id"],
+        name=db["name"],
+        description=db["description"],
+        type=db["type"],
+        path=db["path"],
     )
 
 
-@router.delete("/api/databases/{db_id}", status_code=204)
+@router.delete(
+    "/api/databases/{db_id}",
+    status_code=204,
+    dependencies=[_require_database_manage],
+)
 async def delete_database(db_id: str):
     db_dir = DATABASES_DIR / db_id
     if db_id.startswith("_") or not db_dir.is_dir():

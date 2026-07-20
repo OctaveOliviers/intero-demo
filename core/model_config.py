@@ -7,9 +7,9 @@ Two files at the repo root:
   stage key** (a stage present locally replaces that stage's entry entirely;
   absent stages fall through to the default).
 
-A stage absent after the merge falls back to the ``LLM_API_BASE`` /
-``LLM_MODEL`` / ``LLM_API_KEY`` env trio — with no config files at all,
-behaviour is byte-identical to the pre-config code path.
+Every stage MUST resolve to an entry after the merge — a stage with no entry is
+a hard :class:`ModelConfigError`, so all LLM calls go through this per-stage
+config (there is no global single-endpoint fallback).
 
 Secrets never live in either file: ``api_key_env`` names an environment
 variable read at call time. Startup never downloads models — it only makes
@@ -34,15 +34,33 @@ logger = logging.getLogger(__name__)
 # Repo root: core/model_config.py -> core/ -> root.
 _ROOT = Path(__file__).resolve().parents[1]
 
-# The closed stage set (model-config.md §Stage keys). `filters` is reserved for
-# the deferred parseFilters extractor — configuring it is a validation error.
-STAGES = ("index_audit", "index_db", "mapping", "tier2", "tier3_agent")
-_RESERVED_STAGES = ("filters",)
+# The closed stage set (model-config.md §Stage keys). `filters` is the Dataset
+# grounding stage — turning a plain-language slice into grounded filter criteria
+# (inclusion-criteria-setup.md). It subsumes the former deferred `parseFilters`
+# extractor, so it is now a real, configurable stage rather than reserved.
+# `thread_agent` is the conversational thread agent (also the /api/generate
+# data-describe brain); `table_agent` is the table-population agent.
+STAGES = (
+    "index_audit",
+    "index_db",
+    "mapping",
+    "thread_agent",
+    "table_agent",
+    "filters",
+)
+_RESERVED_STAGES = ()
 
 _REQUIRED_FIELDS = ("provider", "model", "endpoint")
 _PROVIDERS = ("ollama", "openai-compatible")
+_APIS = ("chat", "responses")
 _ALLOWED_FIELDS = {
-    "provider", "model", "endpoint", "api_key_env", "temperature", "max_tokens",
+    "provider",
+    "model",
+    "endpoint",
+    "api_key_env",
+    "temperature",
+    "max_tokens",
+    "api",
     "extra_body",
 }
 
@@ -63,6 +81,11 @@ class StageConfig:
     api_key: str
     temperature: float | None = None
     max_tokens: int | None = None
+    # Which OpenAI-compatible API shape this endpoint speaks: ``chat`` (the default,
+    # ``/chat/completions``) or ``responses`` (``/responses`` — what the newer
+    # reasoning models, e.g. gpt-5 nano, expose; they reject ``max_tokens`` on the
+    # chat route and take ``max_output_tokens`` on the Responses route instead).
+    api: str = "chat"
     # Raw passthrough merged into the chat/completions request body — the escape
     # hatch for provider-specific params the closed config set does not name, most
     # notably disabling a model's reasoning/thinking (the spelling varies per
@@ -70,8 +93,8 @@ class StageConfig:
     # `{"chat_template_kwargs": {"enable_thinking": false}}`). Merged LAST, so a key
     # here wins over the computed body. Empty dict when unset.
     extra_body: dict = field(default_factory=dict)
-    # "models.yaml" / "models.local.yaml" / "env" — for logs and the run record.
-    source: str = "env"
+    # "models.yaml" / "models.local.yaml" — for logs and the run record.
+    source: str = "models.yaml"
 
 
 def _read_config_file(path: Path) -> dict:
@@ -120,18 +143,26 @@ def _validate_entry(filename: str, stage: str, entry: object) -> dict:
         raise ModelConfigError(
             f"{filename}: stage `{stage}` has unknown field(s): {', '.join(sorted(unknown))}"
         )
-    for field in _REQUIRED_FIELDS:
-        value = entry.get(field)
+    for required_field in _REQUIRED_FIELDS:
+        value = entry.get(required_field)
         if not isinstance(value, str) or not value.strip():
-            raise ModelConfigError(f"{filename}: stage `{stage}` is missing required `{field}`")
+            raise ModelConfigError(
+                f"{filename}: stage `{stage}` is missing required `{required_field}`"
+            )
     if entry["provider"] not in _PROVIDERS:
         raise ModelConfigError(
             f"{filename}: stage `{stage}` provider must be one of {', '.join(_PROVIDERS)}"
         )
+    if "api" in entry and entry["api"] not in _APIS:
+        raise ModelConfigError(
+            f"{filename}: stage `{stage}` `api` must be one of {', '.join(_APIS)}"
+        )
     api_key_env = entry.get("api_key_env")
     if api_key_env is not None:
         if not isinstance(api_key_env, str) or not api_key_env.strip():
-            raise ModelConfigError(f"{filename}: stage `{stage}` `api_key_env` must be a non-empty string")
+            raise ModelConfigError(
+                f"{filename}: stage `{stage}` `api_key_env` must be a non-empty string"
+            )
         if _looks_like_literal_secret(api_key_env):
             raise ModelConfigError(
                 f"{filename}: stage `{stage}` `api_key_env` looks like a literal key — it must NAME an env var"
@@ -151,26 +182,24 @@ def load_merged(root: Path | None = None) -> dict[str, dict]:
     merged: dict[str, dict] = {}
     for filename in ("models.yaml", "models.local.yaml"):
         for stage, entry in _read_config_file(base / filename).items():
-            merged[stage] = {**_validate_entry(filename, stage, entry), "_source": filename}
+            merged[stage] = {
+                **_validate_entry(filename, stage, entry),
+                "_source": filename,
+            }
     return merged
 
 
 def resolve_stage(stage: str, root: Path | None = None) -> StageConfig:
-    """The effective config for one stage: the merged file entry, or the
-    ``LLM_*`` env trio when the stage has no entry (byte-identical fallback)."""
+    """The effective config for one stage: the merged ``models.yaml`` /
+    ``models.local.yaml`` entry. A stage with no entry is a hard error — there
+    is no global single-endpoint fallback."""
     if stage not in STAGES:
         raise ModelConfigError(f"unknown stage `{stage}` (known: {', '.join(STAGES)})")
     entry = load_merged(root).get(stage)
     if entry is None:
-        # Read the env at call time so tests and late exports behave; values
-        # match core.config's import-time constants in normal server runs.
-        return StageConfig(
-            stage=stage,
-            provider="openai-compatible",
-            model=os.environ.get("LLM_MODEL", ""),
-            endpoint=os.environ.get("LLM_API_BASE", ""),
-            api_key=os.environ.get("LLM_API_KEY", ""),
-            source="env",
+        raise ModelConfigError(
+            f"stage `{stage}` has no entry in models.yaml / models.local.yaml — "
+            "every stage must be configured (no env fallback)"
         )
     api_key_env = entry.get("api_key_env")
     temperature = entry.get("temperature")
@@ -184,6 +213,7 @@ def resolve_stage(stage: str, root: Path | None = None) -> StageConfig:
         api_key=os.environ.get(api_key_env, "") if api_key_env else "",
         temperature=float(temperature) if temperature is not None else None,
         max_tokens=int(max_tokens) if max_tokens is not None else None,
+        api=str(entry.get("api") or "chat"),
         extra_body=dict(extra_body) if isinstance(extra_body, dict) else {},
         source=entry["_source"],
     )
@@ -235,7 +265,10 @@ def ensure_endpoints_ready(root: Path | None = None) -> list[str]:
         if _endpoint_alive(provider, endpoint):
             continue
         if provider == "ollama" and _is_local(endpoint):
-            logger.info("model-config: local Ollama at %s is down — starting `ollama serve`", endpoint)
+            logger.info(
+                "model-config: local Ollama at %s is down — starting `ollama serve`",
+                endpoint,
+            )
             try:
                 proc = subprocess.Popen(
                     ["ollama", "serve"],
@@ -244,7 +277,9 @@ def ensure_endpoints_ready(root: Path | None = None) -> list[str]:
                     start_new_session=True,
                 )
             except OSError as exc:
-                warnings.append(f"stage `{stage}`: could not start `ollama serve` for {endpoint}: {exc}")
+                warnings.append(
+                    f"stage `{stage}`: could not start `ollama serve` for {endpoint}: {exc}"
+                )
                 continue
             _spawned.append(proc)
             for _ in range(10):
@@ -252,7 +287,9 @@ def ensure_endpoints_ready(root: Path | None = None) -> list[str]:
                 if _endpoint_alive(provider, endpoint):
                     break
             else:
-                warnings.append(f"stage `{stage}`: endpoint {endpoint} still down after starting Ollama")
+                warnings.append(
+                    f"stage `{stage}`: endpoint {endpoint} still down after starting Ollama"
+                )
             continue
         warnings.append(f"stage `{stage}`: endpoint {endpoint} is not reachable")
     for message in warnings:
@@ -269,17 +306,22 @@ def shutdown_spawned() -> None:
             proc.terminate()
 
 
-def tier3_agent_env() -> dict[str, str]:
-    """The env-var projection for the opencode agent process: the
-    ``tier3_agent`` stage mapped onto the ``{env:LLM_*}`` keys
-    ``core/agent/opencode.json`` substitutes. Empty when the stage has no
-    config entry (the child then inherits the parent env unchanged)."""
-    entry = load_merged().get("tier3_agent")
-    if entry is None:
-        return {}
-    cfg = resolve_stage("tier3_agent")
-    return {
-        "LLM_API_BASE": cfg.endpoint,
-        "LLM_MODEL": cfg.model,
-        "LLM_API_KEY": cfg.api_key,
-    }
+def agent_env() -> dict[str, str]:
+    """The env-var projection for the shared opencode server process: the
+    ``thread_agent`` and ``table_agent`` stages mapped onto the
+    ``{env:LLM_THREAD_*}`` / ``{env:LLM_TABLE_*}`` keys the per-worktree
+    opencode configs substitute (a thread worktree's config names the THREAD
+    keys, a table run's the TABLE keys — that per-directory config is what
+    gives each agent its own model on the one server). A stage with no config
+    entry projects nothing for its keys (the child then inherits the parent
+    env unchanged)."""
+    merged = load_merged()
+    env: dict[str, str] = {}
+    for stage, prefix in (("thread_agent", "LLM_THREAD"), ("table_agent", "LLM_TABLE")):
+        if merged.get(stage) is None:
+            continue
+        cfg = resolve_stage(stage)
+        env[f"{prefix}_API_BASE"] = cfg.endpoint
+        env[f"{prefix}_MODEL"] = cfg.model
+        env[f"{prefix}_API_KEY"] = cfg.api_key
+    return env

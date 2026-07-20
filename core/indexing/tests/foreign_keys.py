@@ -23,12 +23,12 @@ from core.indexing.build_database_model import (  # noqa: E402
     _render_for_llm,
     extract_schema,
 )
+from core.contracts import validate_against_schema  # noqa: E402
 from core.indexing.profile import (  # noqa: E402
     discover_foreign_keys,
     grain_cardinality_warnings,
     grain_signal,
     schema_fingerprint,
-    validate_against_schema,
 )
 
 PIDS = [f"NORTH-2020-{i:03d}" for i in range(6)]
@@ -290,7 +290,7 @@ class SeedModelFKTest(unittest.TestCase):
 
     def test_npda_demographics_seed_has_registrations_fk(self):
         model = json.loads(
-            (REPO_ROOT / "seed/databases/npda-demographics/model.json").read_text()
+            (REPO_ROOT / "data/seed/databases/npda-demographics/model.json").read_text()
         )
         edges = {(e["column"], e["target"]) for e in model.get("foreign_keys", [])}
         # The patients<->registrations 1:1 join is present; with no declared FK the

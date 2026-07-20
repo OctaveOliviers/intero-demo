@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import asyncio
 import subprocess
-import sys
 from pathlib import Path
 
 
@@ -27,9 +26,22 @@ def _run(cmd: list[str]) -> None:
 
 
 async def _seeded_smoke() -> None:
+    from types import SimpleNamespace
+
     from core.catalog import load_audit_registry, load_database_catalog
+    from server.auth import store as auth_store
+    from server.auth.grants import backfill_owner_self_grants
     from server.routes.audits import get_audit_detail
     from server.routes.databases import get_database_detail
+
+    # The audit detail route is now owner-or-grant gated (#302), and the smoke must
+    # run on a clean `var/`. Stand up the control-plane store the way the server's
+    # lifespan does (init -> seed the demo admin -> backfill owner self-grants), so
+    # the seeded audits are OWNED by the demo admin and the gated read passes.
+    # All three are idempotent no-ops once applied.
+    auth_store.init_store()
+    auth_store.seed_default_user()
+    backfill_owner_self_grants()
 
     audits = load_audit_registry()
     databases = load_database_catalog()
@@ -38,8 +50,22 @@ async def _seeded_smoke() -> None:
     if not databases:
         raise SystemExit("seeded-smoke failed: no databases found after `make seed`.")
 
+    # The seeded audits are owned by the demo `admin`; resolve its id by role (never
+    # a hardcoded username) and run the gated detail read as that account.
+    admin_role_id = auth_store.get_role_id(auth_store.SEED_USER_ROLE)
+    admin_id = (
+        auth_store.get_first_user_id_with_role(admin_role_id) if admin_role_id else None
+    )
+    if admin_id is None:
+        raise SystemExit("seeded-smoke failed: no demo admin seeded after `make seed`.")
+    admin_request = SimpleNamespace(
+        state=SimpleNamespace(
+            user={"id": admin_id, "role": auth_store.SEED_USER_ROLE}, user_id=admin_id
+        )
+    )
+
     # Validate at least one real list item can be opened via detail route.
-    await get_audit_detail(audits[0]["id"])
+    await get_audit_detail(audits[0]["id"], admin_request)
     await get_database_detail(databases[0]["id"])
     print(
         f"seeded-smoke: OK (audits={len(audits)}, databases={len(databases)}, "

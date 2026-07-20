@@ -1,6 +1,6 @@
 """A5 verify: `spec.json` + `model.json` satisfy what A4 consumes.
 
-Covers the A5 checklist (docs/mvp/BUILD-PLAN.md §A5):
+Covers the A5 checklist (specs/mvp/BUILD-PLAN.md §A5):
   * the rebuilt seed `spec.json` validates against `audit-spec.schema.json`
     AFTER `field.id` is derived (the FK every cell's `field` resolves through);
   * every `field` referenced by the seed `mapping.json` (its compiled `executable`)
@@ -39,14 +39,15 @@ from core.indexing.build_database_model import extract_schema  # noqa: E402
 from core.indexing.profile import (  # noqa: E402
     classify_column,
     readonly_connection,
-    validate_against_schema,
 )
 from core.mapping.build_populate_spec import fold_executable  # noqa: E402
 from core.slug import slugify  # noqa: E402
 
-SEED = REPO_ROOT / "seed/audits/cord-ph"
+SEED = REPO_ROOT / "data/seed/templates/cord-ph"
 AUDIT_SCHEMA = json.loads(
-    (REPO_ROOT / "docs/mvp/contracts/audit-spec.schema.json").read_text(encoding="utf-8")
+    (REPO_ROOT / "specs/product/contracts/audit-spec.schema.json").read_text(
+        encoding="utf-8"
+    )
 )
 SEED_AUDIT = json.loads((SEED / "spec.json").read_text(encoding="utf-8"))
 SEED_MAPPING = json.loads((SEED / "mapping.json").read_text(encoding="utf-8"))
@@ -64,7 +65,9 @@ class SeedAuditSpecTest(unittest.TestCase):
         # an object array. This test IS the enforcement; the schema's `id`
         # description points back to it.
         ids = [f["id"] for f in SEED_AUDIT["fields"]]
-        self.assertEqual(len(ids), len(set(ids)), "field ids must be unique within the audit")
+        self.assertEqual(
+            len(ids), len(set(ids)), "field ids must be unique within the audit"
+        )
 
     def test_field_ids_follow_the_prefixed_convention(self):
         # Multi-sheet audits (cord-pH has ALL + NICU) prefix every id with the
@@ -75,9 +78,13 @@ class SeedAuditSpecTest(unittest.TestCase):
         for f in SEED_AUDIT["fields"]:
             fid = f["id"]
             if multi:
-                self.assertIn("/", fid, f"multi-sheet audit id {fid!r} must carry a sheet prefix")
+                self.assertIn(
+                    "/", fid, f"multi-sheet audit id {fid!r} must carry a sheet prefix"
+                )
                 sheet, _, body = fid.partition("/")
-                self.assertEqual(sheet, slugify(sheet), f"prefix slug malformed: {sheet!r}")
+                self.assertEqual(
+                    sheet, slugify(sheet), f"prefix slug malformed: {sheet!r}"
+                )
                 self.assertEqual(body, slugify(body), f"body slug malformed: {body!r}")
             else:
                 self.assertNotIn("/", fid)
@@ -89,7 +96,11 @@ class SeedAuditSpecTest(unittest.TestCase):
         # holds it on the seed even when the schema is bypassed.
         for f in SEED_AUDIT["fields"]:
             cell = f.get("cell", "")
-            self.assertRegex(cell, r"^[A-Z]+$", f"field {f['id']!r} cell {cell!r} must be a bare letter")
+            self.assertRegex(
+                cell,
+                r"^[A-Z]+$",
+                f"field {f['id']!r} cell {cell!r} must be a bare letter",
+            )
 
 
 class FKSeamTest(unittest.TestCase):
@@ -124,6 +135,7 @@ class FKSeamTest(unittest.TestCase):
         # state explicitly — two cells with the same FK + one orphan was the
         # original bug shape).
         from collections import Counter
+
         fk_counts = Counter(fks)
         # We allow multiple cells to point at the same audit field ONLY by design
         # (e.g. row_id echo in two regions). For cord-pH today every FK appears
@@ -152,8 +164,7 @@ def _skeleton_sheets(*sheets: tuple[str, list[str]]) -> list[dict]:
     out = []
     for name, headers in sheets:
         cells = [
-            {"cell": f"{chr(ord('A') + i)}1", "value": h}
-            for i, h in enumerate(headers)
+            {"cell": f"{chr(ord('A') + i)}1", "value": h} for i, h in enumerate(headers)
         ]
         out.append({"name": name, "cells": cells})
     return out
@@ -169,8 +180,7 @@ class IdDerivationTest(unittest.TestCase):
         fields, _ = extract_field_skeleton(
             _skeleton_sheets(("Data", ["Patient code", "Gestation (weeks)"]))
         )
-        self.assertEqual([f["id"] for f in fields],
-                         ["patient_code", "gestation_weeks"])
+        self.assertEqual([f["id"] for f in fields], ["patient_code", "gestation_weeks"])
 
     def test_multi_sheet_ids_are_sheet_prefixed(self):
         # Two sheets → every id carries the sheet slug as a prefix. Mirrors
@@ -178,8 +188,7 @@ class IdDerivationTest(unittest.TestCase):
         fields, _ = extract_field_skeleton(
             _skeleton_sheets(("ALL", ["Patient code"]), ("NICU", ["Cooled"]))
         )
-        self.assertEqual([f["id"] for f in fields],
-                         ["all/patient_code", "nicu/cooled"])
+        self.assertEqual([f["id"] for f in fields], ["all/patient_code", "nicu/cooled"])
 
     def test_id_collisions_raise_rather_than_suffix(self):
         # The earlier `_2`/`_3` suffix logic silently created orphan ids no
@@ -214,17 +223,26 @@ class StatePreservationTest(unittest.TestCase):
     def test_default_survives_reindex(self):
         old = {
             "inclusion_criteria": [
-                {"id": "gestation_weeks", "label": "G", "type": "number",
-                 "suggested": True, "default": 37},
+                {
+                    "id": "gestation_weeks",
+                    "label": "G",
+                    "type": "number",
+                    "suggested": True,
+                    "default": 37,
+                },
             ],
         }
         new = self._build(
             ["X"],
-            {"title": "T", "description": "d", "grain": "g",
-             "fields": [{"number": 1, "type": "text"}],
-             "inclusion_criteria": [
-                 {"id": "gestation_weeks", "label": "G", "type": "number"},
-             ]},
+            {
+                "title": "T",
+                "description": "d",
+                "grain": "g",
+                "fields": [{"number": 1, "type": "text"}],
+                "inclusion_criteria": [
+                    {"id": "gestation_weeks", "label": "G", "type": "number"},
+                ],
+            },
             previous=old,
         )
         self.assertEqual(new["inclusion_criteria"][0]["default"], 37)
@@ -233,30 +251,57 @@ class StatePreservationTest(unittest.TestCase):
         # The seed pattern: the header "Mode of delivery" slugs to
         # "mode_of_delivery", but the library set `id = "delivery"` so executable
         # FKs already in flight stay valid. Re-index must keep "delivery".
-        old = {"fields": [
-            {"id": "delivery", "number": 1, "name": "Mode of delivery", "type": "category"},
-        ]}
+        old = {
+            "fields": [
+                {
+                    "id": "delivery",
+                    "number": 1,
+                    "name": "Mode of delivery",
+                    "type": "category",
+                },
+            ]
+        }
         new = self._build(
             ["Mode of delivery"],
-            {"title": "T", "description": "d", "grain": "g",
-             "fields": [{"number": 1, "type": "category",
-                         "permitted_values": {"1": "SVD"}}],
-             "inclusion_criteria": []},
+            {
+                "title": "T",
+                "description": "d",
+                "grain": "g",
+                "fields": [
+                    {"number": 1, "type": "category", "permitted_values": {"1": "SVD"}}
+                ],
+                "inclusion_criteria": [],
+            },
             previous=old,
         )
-        self.assertEqual(new["fields"][0]["id"], "delivery",
-                         "library-set id must survive re-index, not snap back to the slug")
+        self.assertEqual(
+            new["fields"][0]["id"],
+            "delivery",
+            "library-set id must survive re-index, not snap back to the slug",
+        )
 
     def test_notes_and_permitted_values_survive_when_regen_left_them_empty(self):
-        old = {"fields": [
-            {"id": "delivery", "number": 1, "name": "Mode of delivery", "type": "category",
-             "notes": "library-written", "permitted_values": {"1": "SVD", "2": "CS"}},
-        ]}
+        old = {
+            "fields": [
+                {
+                    "id": "delivery",
+                    "number": 1,
+                    "name": "Mode of delivery",
+                    "type": "category",
+                    "notes": "library-written",
+                    "permitted_values": {"1": "SVD", "2": "CS"},
+                },
+            ]
+        }
         new = self._build(
             ["Mode of delivery"],
-            {"title": "T", "description": "d", "grain": "g",
-             "fields": [{"number": 1, "type": "text"}],
-             "inclusion_criteria": []},
+            {
+                "title": "T",
+                "description": "d",
+                "grain": "g",
+                "fields": [{"number": 1, "type": "text"}],
+                "inclusion_criteria": [],
+            },
             previous=old,
         )
         f = new["fields"][0]
@@ -266,14 +311,20 @@ class StatePreservationTest(unittest.TestCase):
     def test_regen_does_not_blow_away_a_fresh_fill(self):
         # The regen IS authoritative for any field the new spec did fill — a fresh
         # `notes` from the rebuild wins over an empty old notes.
-        old = {"fields": [
-            {"id": "x", "number": 1, "name": "X", "type": "text", "notes": "old"},
-        ]}
+        old = {
+            "fields": [
+                {"id": "x", "number": 1, "name": "X", "type": "text", "notes": "old"},
+            ]
+        }
         new = self._build(
             ["X"],
-            {"title": "T", "description": "d", "grain": "g",
-             "fields": [{"number": 1, "type": "text", "notes": "fresh"}],
-             "inclusion_criteria": []},
+            {
+                "title": "T",
+                "description": "d",
+                "grain": "g",
+                "fields": [{"number": 1, "type": "text", "notes": "fresh"}],
+                "inclusion_criteria": [],
+            },
             previous=old,
         )
         self.assertEqual(new["fields"][0]["notes"], "fresh")
@@ -308,9 +359,12 @@ def _make_cordph_like_db(path: Path) -> None:
             )
         conn.execute(
             "INSERT INTO clinical_notes (patient_code, text) VALUES (?, ?)",
-            ("CORD-0001", "A long narrative note documenting the delivery, with "
-                          "free prose about cord around neck, resuscitation, and "
-                          "the immediate postnatal course of the baby."),
+            (
+                "CORD-0001",
+                "A long narrative note documenting the delivery, with "
+                "free prose about cord around neck, resuscitation, and "
+                "the immediate postnatal course of the baby.",
+            ),
         )
         conn.commit()
     finally:
@@ -367,10 +421,12 @@ class FilterableSurfaceTest(unittest.TestCase):
 
 
 DATABASE_SCHEMA = json.loads(
-    (REPO_ROOT / "docs/mvp/contracts/database-model.schema.json").read_text(encoding="utf-8")
+    (REPO_ROOT / "specs/product/contracts/database-model.schema.json").read_text(
+        encoding="utf-8"
+    )
 )
-SEED_DB_JSON = REPO_ROOT / "seed/databases/cord-ph/model.json"
-SEED_SQLITE = REPO_ROOT / "database/cord-ph/sql/cord_ph.sqlite"
+SEED_DB_JSON = REPO_ROOT / "data/seed/databases/cord-ph/model.json"
+SEED_SQLITE = REPO_ROOT / "data/database/cord-ph-unstructured/sql/cord_ph.sqlite"
 
 
 def _build_seed_sqlite_if_missing() -> bool:
@@ -378,19 +434,20 @@ def _build_seed_sqlite_if_missing() -> bool:
     Deterministic — same CSVs → same DB. Returns True if the DB is available."""
     if SEED_SQLITE.exists():
         return True
-    csv_dir = REPO_ROOT / "database/cord-ph/csv"
+    csv_dir = REPO_ROOT / "data/database/cord-ph-unstructured/csv"
     if not csv_dir.exists():
         return False
     # Drive `build_database` directly so the test stays single-process and
     # doesn't hijack sys.argv via the CLI's parse_args.
-    from database.scripts.build_emr_db import build_database
+    from data.database.scripts.build_emr_db import build_database
+
     SEED_SQLITE.parent.mkdir(parents=True, exist_ok=True)
     build_database(csv_dirs=[csv_dir], db_path=SEED_SQLITE)
     return SEED_SQLITE.exists()
 
 
 class SeedDatabaseSanityTest(unittest.TestCase):
-    """The committed `seed/databases/cord-ph/model.json` is schema-valid,
+    """The committed `data/seed/databases/cord-ph/model.json` is schema-valid,
     duplication-free, and re-profiles cleanly against the live sqlite (the
     deterministic surface is reproducible from the source). Smoke-tests the
     profiler against the full seed shape, not just the 2-table mini DB in
@@ -408,12 +465,16 @@ class SeedDatabaseSanityTest(unittest.TestCase):
         # Names are the structural identifiers; duplicates would silently shadow
         # in any lookup downstream (mapping prompt, code binding).
         table_names = [t["name"] for t in self.committed["tables"]]
-        self.assertEqual(len(table_names), len(set(table_names)),
-                         f"duplicate table names: {table_names}")
+        self.assertEqual(
+            len(table_names),
+            len(set(table_names)),
+            f"duplicate table names: {table_names}",
+        )
         for t in self.committed["tables"]:
             col_names = [c["name"] for c in t["columns"]]
             self.assertEqual(
-                len(col_names), len(set(col_names)),
+                len(col_names),
+                len(set(col_names)),
                 f"duplicate columns in {t['name']!r}: {col_names}",
             )
 
@@ -441,7 +502,9 @@ class SeedDatabaseSanityTest(unittest.TestCase):
                 for col in table["columns"]:
                     cname = col["name"]
                     live = classify_column(
-                        conn, table["name"], cname,
+                        conn,
+                        table["name"],
+                        cname,
                         is_pk=col["primary_key"],
                         is_fk=(table["name"], cname) in fk_pairs,
                     )
@@ -452,10 +515,17 @@ class SeedDatabaseSanityTest(unittest.TestCase):
                     )
                     # Compare the deterministic-surface keys only — description
                     # and codes are LLM/prose territory.
-                    for key in ("filterable", "filter_type", "values", "range", "reason"):
+                    for key in (
+                        "filterable",
+                        "filter_type",
+                        "values",
+                        "range",
+                        "reason",
+                    ):
                         if key in live or key in committed:
                             self.assertEqual(
-                                committed.get(key), live.get(key),
+                                committed.get(key),
+                                live.get(key),
                                 f"{table['name']}.{cname}.{key} drifted: "
                                 f"committed {committed.get(key)!r} vs live {live.get(key)!r}",
                             )
@@ -473,35 +543,54 @@ class DeterministicSurfaceTest(unittest.TestCase):
     def test_llm_prose_cannot_override_classifications(self):
         # One table, two columns: a real category and a real identifier.
         schema = {
-            "tables": [{
-                "name": "t", "row_count": 10, "columns": [
-                    {"name": "mode", "type": "TEXT", "primary_key": False},
-                    {"name": "id",   "type": "TEXT", "primary_key": True},
-                ],
-            }],
+            "tables": [
+                {
+                    "name": "t",
+                    "row_count": 10,
+                    "columns": [
+                        {"name": "mode", "type": "TEXT", "primary_key": False},
+                        {"name": "id", "type": "TEXT", "primary_key": True},
+                    ],
+                }
+            ],
             "relationships": [],
         }
         classifications = {
             "t": {
-                "mode": {"filterable": True, "filter_type": "category",
-                         "values": ["a", "b"]},
-                "id":   {"filterable": False, "reason": "identifier"},
+                "mode": {
+                    "filterable": True,
+                    "filter_type": "category",
+                    "values": ["a", "b"],
+                },
+                "id": {"filterable": False, "reason": "identifier"},
             },
         }
         # The LLM tries to lie: claim the identifier is a filterable number, and
         # the category is something it isn't. The deterministic surface must win.
         prose = {
-            "title": "T", "description": "d",
-            "tables": [{
-                "name": "t", "description": "T table",
-                "columns": [
-                    {"name": "mode", "description": "mode-desc",
-                     "filterable": False, "reason": "free-text"},
-                    {"name": "id", "description": "id-desc",
-                     "filterable": True, "filter_type": "number",
-                     "range": {"min": 0, "max": 99}},
-                ],
-            }],
+            "title": "T",
+            "description": "d",
+            "tables": [
+                {
+                    "name": "t",
+                    "description": "T table",
+                    "columns": [
+                        {
+                            "name": "mode",
+                            "description": "mode-desc",
+                            "filterable": False,
+                            "reason": "free-text",
+                        },
+                        {
+                            "name": "id",
+                            "description": "id-desc",
+                            "filterable": True,
+                            "filter_type": "number",
+                            "range": {"min": 0, "max": 99},
+                        },
+                    ],
+                }
+            ],
         }
         model = _db_assemble("test", schema, classifications, prose)
         cols = {c["name"]: c for c in model["tables"][0]["columns"]}

@@ -38,21 +38,29 @@ class OpenCodeServer:
         return self._url
 
     async def start(self, startup_timeout: float = 15.0) -> str:
-        args = [OPENCODE_BIN, "serve", "--hostname", self._host, "--port", str(self._port)]
+        args = [
+            OPENCODE_BIN,
+            "serve",
+            "--hostname",
+            self._host,
+            "--port",
+            str(self._port),
+        ]
         # start_new_session=True puts opencode (and any binaries it execs, like
         # opencode-darwin-arm64) into its own process group, so stop() can take
         # down the whole tree with a single killpg instead of orphaning the
         # native child.
-        # The tier3_agent stage projects onto the {env:LLM_*} keys that
-        # core/agent/opencode.json substitutes; with no stage configured the
-        # child inherits the parent env unchanged (contracts/model-config.md).
-        tier3_env = model_config.tier3_agent_env()
+        # The thread_agent / table_agent stages project onto the
+        # {env:LLM_THREAD_*} / {env:LLM_TABLE_*} keys the per-worktree opencode
+        # configs substitute; with no stage configured the child inherits the
+        # parent env unchanged (contracts/model-config.md).
+        agent_env = model_config.agent_env()
         self._proc = await asyncio.create_subprocess_exec(
             *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             start_new_session=True,
-            env={**os.environ, **tier3_env} if tier3_env else None,
+            env={**os.environ, **agent_env} if agent_env else None,
         )
         assert self._proc.stdout is not None
 
@@ -69,7 +77,9 @@ class OpenCodeServer:
                     return f"http://{m.group(1)}:{m.group(2)}"
 
         try:
-            self._url = await asyncio.wait_for(_read_until_listening(), timeout=startup_timeout)
+            self._url = await asyncio.wait_for(
+                _read_until_listening(), timeout=startup_timeout
+            )
         except (asyncio.TimeoutError, RuntimeError) as exc:
             await self.stop()
             raise RuntimeError(f"opencode serve failed to start: {exc}") from exc
@@ -97,7 +107,9 @@ class OpenCodeServer:
     async def _drain_stderr(self) -> None:
         assert self._proc is not None and self._proc.stderr is not None
         async for line in self._proc.stderr:
-            logger.warning("opencode[stderr]: %s", line.decode("utf-8", "replace").rstrip())
+            logger.warning(
+                "opencode[stderr]: %s", line.decode("utf-8", "replace").rstrip()
+            )
 
     async def stop(self) -> None:
         if self._proc is None:

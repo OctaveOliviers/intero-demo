@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://melodic.health/contracts/dataset.schema.json",
+  "title": "Dataset",
+  "description": "A saved, named filter that scopes the hospital database to a slice (library-and-sources.md, inclusion-criteria-setup.md). Persisted at var/datasets/<id>/dataset.json. The canonical state is `criteria` (each a real column + a structured predicate) and `cohort`; `cohort_sql`, `count`, and each criterion's `sql`/`params`/`display` are DERIVED deterministically and re-derive identically on reload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "name", "databases", "cohort", "criteria"],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "databases": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1,
+      "description": "The source database slugs this Dataset's filters touch."
+    },
+    "cohort": { "$ref": "#/$defs/cohort" },
+    "criteria": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/criterion" },
+      "description": "The grounded inclusion criteria, ANDed over the cohort base."
+    },
+    "not_available": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/notAvailable" },
+      "description": "Phrases that grounded to nothing structural (e.g. concepts only in free-text notes), surfaced honestly rather than invented (structured-only, v1)."
+    },
+    "cohort_sql": {
+      "type": "string",
+      "description": "DERIVED: the read-only SELECT DISTINCT enumerating the slice's identities (the transparent raw-SQL view). Re-derived from criteria + cohort; never hand-authored."
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "DERIVED: COUNT(DISTINCT identity) over the cohort with the criteria applied, proved read-only at definition time."
+    }
+  },
+  "$defs": {
+    "cohort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["database", "from", "identity_select"],
+      "properties": {
+        "database": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The cohort base's home database (the main read-only connection; others ATTACH)."
+        },
+        "from": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The joinable FROM clause the predicates qualify against."
+        },
+        "identity_select": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The identity projection, e.g. `b.patient_code AS patient_code`."
+        },
+        "identity_keys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criterion_id", "label", "type", "source", "predicate"],
+      "properties": {
+        "criterion_id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "type": { "enum": ["category", "number", "date"] },
+        "source": {
+          "type": "string",
+          "pattern": "^.+ -> .+\\..+$",
+          "description": "The real column, `<database> -> <table>.<column>`. Nothing is faked."
+        },
+        "predicate": { "$ref": "#/$defs/predicate" },
+        "display": { "type": "string", "description": "DERIVED clinician-readable one-liner." },
+        "sql": { "type": "string", "description": "DERIVED parameterised clause (value is always a bind)." },
+        "params": { "type": "object", "description": "DERIVED bind values for `sql`." }
+      }
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "value"],
+      "properties": {
+        "op": { "enum": [">=", "<=", ">", "<", "=", "in", "between"] },
+        "value": {
+          "description": "Scalar for =/>=/<=/>/<; a list for `in`; a [lo, hi] pair for `between`. The stored code, never the word.",
+          "anyOf": [
+            { "type": "string" },
+            { "type": "number" },
+            {
+              "type": "array",
+              "items": { "type": ["string", "number"] }
+            }
+          ]
+        }
+      }
+    },
+    "notAvailable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phrase", "reason"],
+      "properties": {
+        "phrase": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

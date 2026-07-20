@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from core.config import STATE_DB_PATH
-from server.auth import store
+from server.auth import service, store
 
 
 class AuthStoreMigrationTests(unittest.TestCase):
@@ -62,12 +62,24 @@ class AuthStoreMigrationTests(unittest.TestCase):
             )
             conn.execute(
                 "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
-                ("tok-1", "u1", "2026-01-01T00:00:00+00:00", "2026-01-01T08:00:00+00:00"),
+                (
+                    "tok-1",
+                    "u1",
+                    "2026-01-01T00:00:00+00:00",
+                    "2026-01-01T08:00:00+00:00",
+                ),
             )
             conn.execute(
                 "INSERT INTO run_attributions (run_id, user_id, audit_id, request, filters, started_at) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
-                ("run-1", "u1", "audit-1", "prompt", "{\"cohort\":\"all\"}", "2026-01-01T00:01:00+00:00"),
+                (
+                    "run-1",
+                    "u1",
+                    "audit-1",
+                    "prompt",
+                    '{"cohort":"all"}',
+                    "2026-01-01T00:01:00+00:00",
+                ),
             )
             conn.execute(
                 "INSERT INTO query_log (user_id, run_id, database, query, ts) VALUES (?, ?, ?, ?, ?)",
@@ -99,6 +111,9 @@ class AuthStoreMigrationTests(unittest.TestCase):
 
             self.assertEqual(len(users), 1)
             self.assertEqual(users[0]["id"], "u1")
+            # Slice 5: the migrated legacy user arrives role-less and the
+            # init_store backfill must resolve it to the clinician default.
+            self.assertEqual(service.role_for("u1"), "clinician")
             self.assertEqual(len(sessions), 1)
             self.assertEqual(sessions[0]["token"], "tok-1")
             self.assertEqual(sessions[0]["last_seen_at"], "2026-01-01T00:00:00+00:00")
@@ -108,6 +123,25 @@ class AuthStoreMigrationTests(unittest.TestCase):
             self.assertEqual(runs[0]["run_id"], "run-1")
             self.assertEqual(len(queries), 1)
             self.assertEqual(queries[0]["user_id"], "u1")
+
+    def test_migrated_user_display_name_defaults_to_username(self) -> None:
+        # Contract §2 marks users.display_name required; the legacy-migration
+        # path must default it to the username like every other creation path.
+        self._seed_legacy_auth_db()
+
+        with (
+            patch.object(store, "AUTH_DB_PATH", self.state_db),
+            patch.object(store, "LEGACY_AUTH_DB_PATH", self.legacy_db),
+        ):
+            store.init_store()
+
+            with sqlite3.connect(self.state_db) as conn:
+                conn.row_factory = sqlite3.Row
+                user = conn.execute(
+                    "SELECT username, display_name FROM users WHERE id = ?", ("u1",)
+                ).fetchone()
+
+            self.assertEqual(user["display_name"], user["username"])
 
 
 if __name__ == "__main__":

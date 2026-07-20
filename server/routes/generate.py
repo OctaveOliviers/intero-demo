@@ -34,7 +34,9 @@ async def generate(body: GenerateRequest):
 
     async def event_source():
         try:
-            async for chunk in respond_stream(INSTRUCTIONS, query):
+            async for chunk in respond_stream(
+                INSTRUCTIONS, query, stage="thread_agent"
+            ):
                 yield chunk
         except LLMConfigError as exc:
             logger.warning("generate: LLM not configured: %s", exc)

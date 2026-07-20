@@ -22,25 +22,41 @@ class LibraryApiGatingSourceTest(unittest.TestCase):
         self.assertIsNotNone(m, f"{name} not found in api.js")
         return m.group("body")
 
-    def test_audits_list_and_detail_use_mock_only_when_audits_flag_enabled(self):
-        list_body = self._extract_fn("listAudits")
-        detail_body = self._extract_fn("getAuditDetail")
+    def test_templates_list_and_detail_use_mock_only_when_templates_flag_enabled(self):
+        list_body = self._extract_fn("listTemplates")
+        detail_body = self._extract_fn("getTemplateDetail")
 
-        self.assertIn('if (isMockMode("audits")) return mockListAudits();', list_body)
-        self.assertIn('fetch(`${API_BASE}/api/audits`)', list_body)
+        self.assertIn(
+            'if (isMockMode("templates")) return mockListTemplates();', list_body
+        )
+        self.assertIn("fetch(`${API_BASE}/api/templates`)", list_body)
 
-        self.assertIn('if (isMockMode("audits")) return mockGetAuditDetail(auditId);', detail_body)
-        self.assertIn('fetch(`${API_BASE}/api/audits/${encodeURIComponent(auditId)}`)', detail_body)
+        self.assertIn(
+            'if (isMockMode("templates")) return mockGetTemplateDetail(templateId);',
+            detail_body,
+        )
+        self.assertIn(
+            "fetch(`${API_BASE}/api/templates/${encodeURIComponent(templateId)}`)",
+            detail_body,
+        )
 
     def test_databases_list_and_detail_use_mock_only_when_databases_flag_enabled(self):
         list_body = self._extract_fn("listDatabases")
         detail_body = self._extract_fn("getDatabaseDetail")
 
-        self.assertIn('if (isMockMode("databases")) return mockListDatabases();', list_body)
-        self.assertIn('fetch(`${API_BASE}/api/databases`)', list_body)
+        self.assertIn(
+            'if (isMockMode("databases")) return mockListDatabases();', list_body
+        )
+        self.assertIn("fetch(`${API_BASE}/api/databases`)", list_body)
 
-        self.assertIn('if (isMockMode("databases")) return mockGetDatabaseDetail(dbId);', detail_body)
-        self.assertIn('fetch(`${API_BASE}/api/databases/${encodeURIComponent(dbId)}`)', detail_body)
+        self.assertIn(
+            'if (isMockMode("databases")) return mockGetDatabaseDetail(dbId);',
+            detail_body,
+        )
+        self.assertIn(
+            "fetch(`${API_BASE}/api/databases/${encodeURIComponent(dbId)}`)",
+            detail_body,
+        )
 
     def test_api_layer_has_no_static_library_fixture_imports(self):
         # Guard against reintroducing static authority in normal (non-mock) mode.

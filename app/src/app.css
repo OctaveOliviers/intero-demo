@@ -1,6 +1,6 @@
 :root {
   /* Neutrals (ChatGPT-like) */
-  --color-bg:            #ffffff;   /* main content area */
+  --color-bg:            #f7f7f7;   /* main app background */
   --color-sidebar:       #f9f9f9;   /* left panel */
   --color-surface:       #ffffff;   /* cards, panels, menus */
   --color-surface-muted: #f4f4f4;   /* code blocks, subtle fills */
@@ -29,6 +29,9 @@
   --color-success: #15803d; --color-success-weak: #dcfce7;
   --color-warning: #b45309; --color-warning-weak: #fef3c7;
   --color-danger:  #b91c1c; --color-danger-weak:  #fee2e2;
+  /* Sharing (§10): a distinct semantic colour for the shared-item badge/banner —
+     violet, kept clear of accent-blue (reserved) and the status hues above. */
+  --color-share: #7c3aed; --color-share-weak: #f3e8ff;
   --color-highlight: #fff3cd; --color-highlight-edge: #f4d35e; /* note highlight */
   /* Tracker-chart status fills (Fix 3): met (clears target) = green,
      not-yet-met = light orange. Blue (--color-accent) is reserved for the

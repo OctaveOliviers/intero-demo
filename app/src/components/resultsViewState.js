@@ -1,3 +1,3 @@
-export function shouldShowTerminalSummary(runStatus, reviewSummary) {
-  return runStatus === "completed" && !!reviewSummary;
+export function shouldShowTerminalSummary(tablePopulationStatus, reviewSummary) {
+  return tablePopulationStatus === "completed" && !!reviewSummary;
 }

@@ -17,6 +17,15 @@ npm run dev
 ```
 
 Opens on `http://localhost:5173`, proxies `/api/*` to `http://127.0.0.1:8000`.
+If another worktree already owns those ports, set this worktree's ports once in
+`../.env`:
+
+```bash
+INTERO_SERVER_PORT=8001
+INTERO_APP_PORT=5174
+```
+
+Then keep using `make dev` for the backend and `npm run dev` for the frontend.
 
 ## Production Build
 
@@ -49,7 +58,7 @@ Commands run in this worktree and observed outcomes:
    - Confirms mock-mode behavior remains unchanged.
 2. `python3 -m unittest server.test.auth_smoke_test -v`
    - Result: `6/6` passing.
-   - Includes authenticated `POST /api/runs` smoke path returning `200` (non-404) in test harness:
+   - Includes authenticated `POST /api/table-populations` smoke path returning `200` (non-404) in test harness:
      `test_authenticated_run_and_query_are_attributed_to_user`.
 3. `npm --prefix app run build`
    - Result: pass (build completes; existing non-blocking warnings unchanged).
@@ -57,7 +66,7 @@ Commands run in this worktree and observed outcomes:
 
 TemplateCard non-regression check:
 
-1. `rg -n "createRunFromAudit\\(runTarget.id" app/src/components/TemplateCard.svelte app/src/lib/runFromSpec.js`
+1. `rg -n "createTablePopulationFromAudit\\(runTarget.id" app/src/components/TemplateCard.svelte app/src/lib/runFromSpec.js`
    - Result: run creation remains wired in both flows:
      - `app/src/components/TemplateCard.svelte:172`
      - `app/src/lib/runFromSpec.js:105`

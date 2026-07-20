@@ -68,6 +68,31 @@ class RuntimePermissionsTest(unittest.TestCase):
             )
         )
 
+    def test_population_lifecycle_columns_are_api_app_only(self):
+        # The runs.population_status record (issue #326) mirrors status.json,
+        # which is owned by the server/session-transport layer: api_app may
+        # write it, every other runtime role is denied.
+        cols = [
+            "population_status",
+            "population_status_detail",
+            "population_result_status",
+        ]
+        self.assertTrue(
+            is_runtime_db_action_allowed(
+                role="api_app", table="runs", action="update", columns=cols
+            )
+        )
+        for role in (
+            "orchestrator_runtime",
+            "agent_runtime_writer",
+            "clinician_editor_runtime",
+        ):
+            self.assertFalse(
+                is_runtime_db_action_allowed(
+                    role=role, table="runs", action="update", columns=cols
+                )
+            )
+
     def test_agent_cannot_edit_clinician_review_columns(self):
         self.assertFalse(
             is_runtime_db_action_allowed(
@@ -119,8 +144,13 @@ class RuntimePermissionsTest(unittest.TestCase):
                 action="update",
                 columns=["status"],
             )
-        self.assertEqual(denied.exception.safe_message, "Permission denied for runtime state operation.")
-        self.assertEqual(str(denied.exception), "Permission denied for runtime state operation.")
+        self.assertEqual(
+            denied.exception.safe_message,
+            "Permission denied for runtime state operation.",
+        )
+        self.assertEqual(
+            str(denied.exception), "Permission denied for runtime state operation."
+        )
         self.assertEqual(denied.exception.role, "agent_runtime_writer")
         self.assertEqual(denied.exception.table, "runs")
         self.assertEqual(denied.exception.action, "update")

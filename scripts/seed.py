@@ -1,9 +1,9 @@
-"""Seed ``var/`` from committed ``seed/`` fixtures — no LLM calls, idempotent.
+"""Seed ``var/`` from committed ``data/seed/`` fixtures — no LLM calls, idempotent.
 
 Implements the seed half of the storage-layout contract
-(``docs/mvp/contracts/storage-layout.md`` §2 / §8.4):
+(``specs/mvp/contracts/storage-layout.md`` §2 / §8.4):
 
-- ``var/audits/<id>/`` holds ``spec.json`` + ``mapping.json`` (+ ``workbook.xlsx``
+- ``var/templates/<id>/`` holds ``spec.json`` + ``mapping.json`` (+ ``workbook.xlsx``
   when an upload is being simulated).
 - ``var/databases/<id>/`` holds ``model.json`` + ``database.sqlite``.
 
@@ -23,10 +23,10 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from core.config import AUDITS_DIR, DATABASES_DIR, ROOT, VAR_DIR
-from database.scripts.build_emr_db import build_database
+from core.config import DATABASES_DIR, DATASETS_DIR, ROOT, TEMPLATES_DIR, VAR_DIR
+from data.database.scripts.build_emr_db import build_database
 
-SEED_DIR = ROOT / "seed"
+SEED_DIR = ROOT / "data" / "seed"
 
 
 @dataclass(frozen=True)
@@ -41,38 +41,41 @@ class DatabaseSeed:
 
 @dataclass(frozen=True)
 class SeedSpec:
-    """One dataset's seed: an audit fixture plus the one or more source
-    databases it binds against. Audit and database directory names land
+    """One dataset's seed: a template fixture plus the one or more source
+    databases it binds against. Template and database directory names land
     verbatim under ``var/`` — no UUID minting, since under the new layout the
     directory key is the canonical id (storage-layout §3)."""
 
-    audit_id: str
+    template_id: str
     databases: tuple[DatabaseSeed, ...]
 
 
 DATASETS: dict[str, SeedSpec] = {
     "cord-ph": SeedSpec(
-        audit_id="cord-ph",
+        template_id="cord-ph",
         databases=(
             DatabaseSeed(
                 db_id="cord-ph",
-                csv_dir=ROOT / "database/cord-ph/csv",
-                sqlite_build_path=ROOT / "database/cord-ph/sql/cord_ph.sqlite",
+                csv_dir=ROOT / "data/database/cord-ph-unstructured/csv",
+                sqlite_build_path=ROOT
+                / "data/database/cord-ph-unstructured/sql/cord_ph.sqlite",
             ),
         ),
     ),
     "npda": SeedSpec(
-        audit_id="npda",
+        template_id="npda",
         databases=(
             DatabaseSeed(
                 db_id="npda-demographics",
-                csv_dir=ROOT / "database/npda-demographics/csv",
-                sqlite_build_path=ROOT / "database/npda-demographics/sql/npda_demographics.sqlite",
+                csv_dir=ROOT / "data/database/npda-demographics/csv",
+                sqlite_build_path=ROOT
+                / "data/database/npda-demographics/sql/npda_demographics.sqlite",
             ),
             DatabaseSeed(
                 db_id="npda-clinical",
-                csv_dir=ROOT / "database/npda-clinical/csv",
-                sqlite_build_path=ROOT / "database/npda-clinical/sql/npda_clinical.sqlite",
+                csv_dir=ROOT / "data/database/npda-clinical/csv",
+                sqlite_build_path=ROOT
+                / "data/database/npda-clinical/sql/npda_clinical.sqlite",
             ),
         ),
     ),
@@ -108,25 +111,45 @@ def _seed_database(db: DatabaseSeed, *, force: bool) -> None:
     if link.is_symlink() or link.exists():
         link.unlink()
     link.symlink_to(os.path.relpath(db.sqlite_build_path, db_dst))
-    print(f"  db     -> {_rel(db_dst)}/  [{', '.join(db_files)}, database.sqlite → built]")
+    print(
+        f"  db     -> {_rel(db_dst)}/  [{', '.join(db_files)}, database.sqlite → built]"
+    )
 
 
 def _seed_one(spec: SeedSpec, *, force: bool) -> None:
     for db in spec.databases:
         _seed_database(db, force=force)
 
-    audit_dst = AUDITS_DIR / spec.audit_id
-    audit_files = _copy_dir(SEED_DIR / "audits" / spec.audit_id, audit_dst)
-    print(f"  audit  -> {_rel(audit_dst)}/  [{', '.join(audit_files)}]")
+    template_dst = TEMPLATES_DIR / spec.template_id
+    template_files = _copy_dir(SEED_DIR / "templates" / spec.template_id, template_dst)
+    print(f"  template  -> {_rel(template_dst)}/  [{', '.join(template_files)}]")
+
+
+def _seed_datasets() -> None:
+    """Copy each committed, pre-grounded Dataset fixture into var/datasets/<id>/.
+
+    A Dataset is a saved, named filter (library-and-sources.md); its fixture is a
+    fully-derived dataset.json (cohort_sql + count already proved offline, no LLM),
+    so the list/get endpoints work the moment the app boots.
+    """
+    src_root = SEED_DIR / "datasets"
+    if not src_root.is_dir():
+        return
+    DATASETS_DIR.mkdir(parents=True, exist_ok=True)
+    for ds_dir in sorted(p for p in src_root.iterdir() if p.is_dir()):
+        files = _copy_dir(ds_dir, DATASETS_DIR / ds_dir.name)
+        print(f"  dataset-> {_rel(DATASETS_DIR / ds_dir.name)}/  [{', '.join(files)}]")
 
 
 def seed(dataset_ids: list[str], *, force: bool) -> None:
-    AUDITS_DIR.mkdir(parents=True, exist_ok=True)
+    TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
     DATABASES_DIR.mkdir(parents=True, exist_ok=True)
     for ds_id in dataset_ids:
         spec = DATASETS[ds_id]
         print(f"\n=== Seeding {ds_id} ===")
         _seed_one(spec, force=force)
+    print("\n=== Seeding datasets ===")
+    _seed_datasets()
     print(f"\nDone. var/ ready under {_rel(VAR_DIR)}.")
 
 
@@ -135,11 +158,14 @@ def parse_args() -> argparse.Namespace:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "datasets", nargs="*", choices=sorted(DATASETS),
+        "datasets",
+        nargs="*",
+        choices=sorted(DATASETS),
         help="Dataset ids to seed. Defaults to all registered datasets.",
     )
     parser.add_argument(
-        "--force", action="store_true",
+        "--force",
+        action="store_true",
         help="Rebuild the sqlite even if it already exists.",
     )
     return parser.parse_args()

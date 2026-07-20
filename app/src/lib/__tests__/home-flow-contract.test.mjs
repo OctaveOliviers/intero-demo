@@ -10,7 +10,7 @@ import {
 import { AuthError } from "../api.js";
 import { defaultDatabaseChipsForMode } from "../spec.js";
 
-test("real-mode template guard accepts backend audit ids only", () => {
+test("real-mode template guard accepts backend template ids only", () => {
   const templates = [{ id: "audit-abc" }, { id: "audit-def" }];
   assert.equal(isTemplateIdAllowed("audit-abc", templates), true);
   assert.equal(isTemplateIdAllowed("cord-ph-lo-audit", templates), false);

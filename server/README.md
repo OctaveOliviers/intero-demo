@@ -6,14 +6,14 @@ FastAPI backend providing the HTTP API and OpenCode agent orchestration.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/audits` | List available audits |
-| `POST` | `/api/runs` | Start an audit run (JSON with `auditId`, or multipart with custom `.xlsx`) |
-| `GET` | `/api/runs/{id}` | Get run state and messages |
-| `GET` | `/api/runs/{id}/stream` | SSE stream of agent events |
-| `POST` | `/api/runs/{id}/stop` | Stop a running audit |
-| `PATCH` | `/api/runs/{id}/cells/{ref}` | Clinician/edit review-correction patch on one interpret cell |
-| `GET` | `/api/runs/{id}/workbook` | Get workbook JSON (sheets + cell metadata + SQL traces) |
-| `GET` | `/api/runs/{id}/download` | Download `result.xlsx` |
+| `GET` |  `/api/templates` | List available audits |
+| `POST` | `/api/table-populations` | Start template-backed table population (JSON with `auditId`) |
+| `GET` | `/api/table-populations/{id}` | Get table-population state and messages |
+| `GET` | `/api/table-populations/{id}/stream` | SSE stream of agent events |
+| `POST` | `/api/table-populations/{id}/stop` | Stop active table population |
+| `PATCH` | `/api/table-populations/{id}/cells/{ref}` | Clinician/edit review-correction patch on one interpret cell |
+| `GET` | `/api/table-populations/{id}/workbook` | Get workbook JSON (sheets + cell metadata + SQL traces) |
+| `GET` | `/api/table-populations/{id}/download` | Download `result.xlsx` |
 | `POST` | `/api/sql` | Execute read-only SQL against clinical DB |
 
 ## Runtime Permission Enforcement (Implemented)
@@ -21,12 +21,12 @@ FastAPI backend providing the HTTP API and OpenCode agent orchestration.
 - Runtime DB role policy authority: `core/store/runtime_permissions.py`.
 - Concrete enforcement points: `core/store/store.py` (fail-closed `PermissionError` on denied
   role/table/action/column access).
-- Run orchestration executes with `orchestrator_runtime` role in `server/routes/runs.py`.
+- Run orchestration executes with `orchestrator_runtime` role in `server/routes/table_populations.py`.
 - Tier-3 agent `database="cells"` SQL path is table-restricted to `cells` only
   (`core/agent/.opencode/tools/sql_execute.py`).
-- Clinician edit endpoint `PATCH /api/runs/{id}/cells/{ref}` enforces:
+- Clinician edit endpoint `PATCH /api/table-populations/{id}/cells/{ref}` enforces:
   - authenticated session,
-  - `run.edit_cells` permission,
+  - `table_population.edit_cells` permission,
   - run owner or admin override,
   - interpret-cell-only edits,
   - constrained edit surface (`reviewState`, `corrected`, `value`),
@@ -41,13 +41,13 @@ is still being phased in.
 Two planes behind a `JobRunner` protocol seam:
 
 - **Control plane** — FastAPI routes handle HTTP, validation, file I/O
-- **Execution plane** — `runner.py`. By default (`OPENCODE_RUNNER=server`) it boots one persistent `opencode serve` at startup and runs each audit as a session against it (`OpenCodeRunner`) — no per-run process spawn. Set `OPENCODE_RUNNER=local` (or if the server fails to boot) to fall back to `LocalRunner`, which spawns a fresh `opencode run` subprocess per audit. Either way events stream back via asyncio queues.
+- **Execution plane** — `core.runtime.Runtime` starts one OpenCode server and wires the table-population session relay used by the `/api/table-populations/*` routes.
 
 Swapping the runner for a remote worker requires no route changes.
 
 ## Agent Execution Flow
 
-`POST /api/runs` copies the audit workbook into the runs store at `var/runs/{id}/result.xlsx` (reached by the agent as `runs/{id}/result.xlsx` via the `agent/runs` symlink). The selected (read-only) database is **symlinked** — not copied — into the same run dir as `var/runs/{id}/database.sqlite`, so the agent addresses it as `runs/{id}/database.sqlite` and never has to handle the database's opaque UUID directory id. The audit model (`agent/audits/<id>/audit.md`) and the database schema model (`agent/databases/<db>/database.md`) are fed to the mapping builder (`core/mapping`) to produce the pre-computed audit→database field mapping (`agent/audits/<id>/mapping.<db>.md`, built on demand and cached). The run prompt is then **lean**: a brief context line, that region-precise field mapping, and the workflow — followed by the run's paths and filters. The raw audit layout and DB schema are NOT injected; the mapping carries each region's anchor and per-cell provenance. It runs the agent against the persistent `opencode serve` (project root `agent/`) — or, in local-runner mode, spawns `opencode run --format json --dir agent/` — and streams events via SSE. The agent follows `agent/workflows/audit-workflow.md` and uses custom tools from `agent/.opencode/tools/` (`sql_execute`, `table`, `populate`, `notes`), plus the `table-export` and `notes` skills. It does not discover databases or load schemas (`table_describe_layout` / `database_load_md` are not in its allow-list).
+`POST /api/table-populations` creates pending cells in `var/state.db`, streams workbook/cell events over SSE, and escalates through `core/table_population` tiers. Tier 3 provisions an OpenCode project under `var/runs/{id}/` with `context.json`, the audit spec, database symlinks, and the `core/agent/.opencode` tool template.
 
 The audit, database, and mapping models are built deterministically server-side by single LLM calls (`server/audit_model_builder.py`, `server/database_model_builder.py`, `server/audit_database_mapper.py`) — not by an agent.
 
@@ -62,7 +62,7 @@ Audits are registered in `agent/audits/*/audit.md`. Each directory contains:
 - `audit.md` — YAML frontmatter (name, description, excel_path) + pre-computed layout model
 - `audit.xlsx` — the Excel workbook to populate
 
-Audits are registered by uploading an `.xlsx` via `POST /api/audits/upload`, which builds `audit.md` in-process (`server/audit_model_builder.py`: one LLM call over the extracted layout). The model is database-agnostic — it captures the layout and a Field Spec (each field's cell, mode, and meaning), never database tables/columns.
+Audits are registered by uploading an `.xlsx` via `POST /api/templates/upload`, which builds `audit.md` in-process (`server/audit_model_builder.py`: one LLM call over the extracted layout). The model is database-agnostic — it captures the layout and a Field Spec (each field's cell, mode, and meaning), never database tables/columns.
 
 ## Database Discovery
 
@@ -83,10 +83,10 @@ server/
 ├── main.py              # FastAPI app, CORS, static mount, error handler
 ├── config.py            # Path constants
 ├── routes/
-│   ├── runs.py          # POST/GET /api/runs, GET .../stream
+│   ├── table_populations.py  # POST/GET /api/table-populations, GET .../stream
 │   ├── workbook.py      # GET .../workbook, .../download
 │   ├── sql.py           # POST /api/sql
-│   └── audits.py        # GET /api/audits
+│   └── templates.py     # GET /api/templates
 └── test/
     └── runner_test.py
 ```

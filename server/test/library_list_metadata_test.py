@@ -3,13 +3,21 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from core.config import AUDITS_DIR, DATABASES_DIR
-from server.routes import audits as audits_routes
+from server.routes import templates as templates_routes
 from server.routes import databases as databases_routes
+from server.test._audit_auth_helper import AuditAuthMixin
 
 
-class LibraryListMetadataTest(unittest.IsolatedAsyncioTestCase):
-    async def test_audits_list_returns_complete_metadata_with_deterministic_defaults(self):
+class LibraryListMetadataTest(AuditAuthMixin, unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self._audit_auth_setup()
+
+    def tearDown(self):
+        self._audit_auth_teardown()
+
+    async def test_audits_list_returns_complete_metadata_with_deterministic_defaults(
+        self,
+    ):
         audit_with_meta = {
             "id": "a1",
             "name": "Audit One",
@@ -33,8 +41,14 @@ class LibraryListMetadataTest(unittest.IsolatedAsyncioTestCase):
             "description": "desc2",
             "excel_path": "workbook.xlsx",
         }
-        with patch.object(audits_routes, "load_audit_registry", return_value=[audit_with_meta, audit_defaults]):
-            rows = await audits_routes.list_audits()
+        with patch.object(
+            templates_routes,
+            "load_audit_registry",
+            return_value=[audit_with_meta, audit_defaults],
+        ):
+            rows = await templates_routes.list_templates(
+                self._owner_request("a1", "a2")
+            )
         self.assertEqual(len(rows), 2)
 
         first = rows[0].model_dump(by_alias=True)
@@ -59,7 +73,9 @@ class LibraryListMetadataTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(second["provenanceUrl"])
         self.assertEqual(second["status"], "ready")
 
-    async def test_databases_list_returns_complete_metadata_with_deterministic_defaults(self):
+    async def test_databases_list_returns_complete_metadata_with_deterministic_defaults(
+        self,
+    ):
         db_with_meta = {
             "id": "d1",
             "name": "Database One",
@@ -83,7 +99,11 @@ class LibraryListMetadataTest(unittest.IsolatedAsyncioTestCase):
             "type": "sqlite",
             "path": "var/databases/d2/database.sqlite",
         }
-        with patch.object(databases_routes, "load_database_catalog", return_value=[db_with_meta, db_defaults]):
+        with patch.object(
+            databases_routes,
+            "load_database_catalog",
+            return_value=[db_with_meta, db_defaults],
+        ):
             rows = await databases_routes.list_databases()
         self.assertEqual(len(rows), 2)
 
@@ -109,7 +129,9 @@ class LibraryListMetadataTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(second["provenanceUrl"])
         self.assertEqual(second["status"], "ready")
 
-    async def test_list_and_detail_metadata_are_consistent_for_audits_and_databases(self):
+    async def test_list_and_detail_metadata_are_consistent_for_audits_and_databases(
+        self,
+    ):
         audit = {
             "id": "a1",
             "name": "Audit",
@@ -150,17 +172,31 @@ class LibraryListMetadataTest(unittest.IsolatedAsyncioTestCase):
             (db_dir / "model.json").write_text("{}", encoding="utf-8")
 
             with (
-                patch.object(audits_routes, "load_audit_registry", return_value=[audit]),
-                patch.object(audits_routes, "get_audit_by_id", return_value=audit),
-                patch.object(audits_routes, "AUDITS_DIR", audit_dir.parent),
-                patch.object(databases_routes, "load_database_catalog", return_value=[db]),
+                patch.object(
+                    templates_routes, "load_audit_registry", return_value=[audit]
+                ),
+                patch.object(templates_routes, "get_audit_by_id", return_value=audit),
+                patch.object(templates_routes, "TEMPLATES_DIR", audit_dir.parent),
+                patch.object(
+                    databases_routes, "load_database_catalog", return_value=[db]
+                ),
                 patch.object(databases_routes, "_get_database_by_id", return_value=db),
                 patch.object(databases_routes, "DATABASES_DIR", db_dir.parent),
             ):
-                audit_list = (await audits_routes.list_audits())[0].model_dump(by_alias=True)
-                audit_detail = (await audits_routes.get_audit_detail("a1")).model_dump(by_alias=True)
-                db_list = (await databases_routes.list_databases())[0].model_dump(by_alias=True)
-                db_detail = (await databases_routes.get_database_detail("d1")).model_dump(by_alias=True)
+                audit_list = (
+                    await templates_routes.list_templates(self._owner_request("a1"))
+                )[0].model_dump(by_alias=True)
+                audit_detail = (
+                    await templates_routes.get_template_detail(
+                        "a1", self._owner_request("a1")
+                    )
+                ).model_dump(by_alias=True)
+                db_list = (await databases_routes.list_databases())[0].model_dump(
+                    by_alias=True
+                )
+                db_detail = (
+                    await databases_routes.get_database_detail("d1")
+                ).model_dump(by_alias=True)
 
         for key in (
             "level",
@@ -175,8 +211,12 @@ class LibraryListMetadataTest(unittest.IsolatedAsyncioTestCase):
             "name",
             "description",
         ):
-            self.assertEqual(audit_list[key], audit_detail[key], f"audit mismatch on {key}")
-            self.assertEqual(db_list[key], db_detail[key], f"database mismatch on {key}")
+            self.assertEqual(
+                audit_list[key], audit_detail[key], f"audit mismatch on {key}"
+            )
+            self.assertEqual(
+                db_list[key], db_detail[key], f"database mismatch on {key}"
+            )
 
 
 if __name__ == "__main__":
