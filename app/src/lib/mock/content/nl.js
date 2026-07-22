@@ -2497,20 +2497,20 @@ const trackers = {
   "t-epi-mh-screening": {
     id: "t-epi-mh-screening",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "Mental-health screening + support",
+    title: "Screening op geestelijke gezondheid + ondersteuning",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Screened", value: 9 / 10, status: "met", highlightRefs: ["Epilepsy!S2", "Epilepsy!S3", "Epilepsy!S4", "Epilepsy!S5", "Epilepsy!S6", "Epilepsy!S7", "Epilepsy!S8", "Epilepsy!S9", "Epilepsy!S11"] },
-      { key: "not-met", label: "Not screened", value: 1 / 10, status: "not-met", highlightRefs: ["Epilepsy!S10"] },
+      { key: "met", label: "Gescreend", value: 9 / 10, status: "met", highlightRefs: ["Epilepsy!S2", "Epilepsy!S3", "Epilepsy!S4", "Epilepsy!S5", "Epilepsy!S6", "Epilepsy!S7", "Epilepsy!S8", "Epilepsy!S9", "Epilepsy!S11"] },
+      { key: "not-met", label: "Niet gescreend", value: 1 / 10, status: "not-met", highlightRefs: ["Epilepsy!S10"] },
     ],
-    criterion: "Epilepsy12 KPIs 6 & 7 — mental-health screening documented in first year, with support where a problem is identified (research §3 B5) [7]",
+    criterion: "Epilepsy12 KPI's 6 & 7 — screening op geestelijke gezondheid gedocumenteerd in het eerste jaar, met ondersteuning wanneer een probleem wordt vastgesteld (onderzoek §3 B5) [7]",
   },
   // B6 — comprehensive care plan by 12 months.
   "t-epi-care-plan-12mo": {
     id: "t-epi-care-plan-12mo",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "Comprehensive care plan by 12 months",
+    title: "Volledig zorgplan binnen 12 maanden",
     kind: "timeseries",
     target: { op: ">=", value: 0.9 },
     elements: [
@@ -2521,20 +2521,20 @@ const trackers = {
       { key: "m5", label: "dec.", value: 0.85, status: "not-met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
       { key: "m6", label: "jan.", value: 0.90, status: "met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
     ],
-    criterion: "Epilepsy12 KPI 9a/9b — an agreed comprehensive care plan by 12 months (research §3 B6) [7]",
+    criterion: "Epilepsy12 KPI 9a/9b — een overeengekomen volledig zorgplan binnen 12 maanden (onderzoek §3 B6) [7]",
   },
   // B7 — valproate/topiramate safety (PPP). Eligible = female ≥12 on valproate/
   // topiramate (EPI002, EPI003, EPI005); EPI005 is the deliberate PPP gap.
   "t-epi-valproate-ppp": {
     id: "t-epi-valproate-ppp",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "Valproate/topiramate safety (PPP)",
+    title: "Veiligheid van valproaat/topiramaat (PPP)",
     kind: "stat",
     target: { op: ">=", value: 1 },
     elements: [
-      { key: "at-risk", label: "On valproate/topiramate without PPP", value: 1, status: "not-met", highlightRefs: ["Epilepsy!AA6"] },
+      { key: "at-risk", label: "Op valproaat/topiramaat zonder PPP", value: 1, status: "not-met", highlightRefs: ["Epilepsy!AA6"] },
     ],
-    criterion: "Epilepsy12 KPI 8 — pregnancy prevention programme / risk-acknowledgement for females ≥12 on valproate or topiramate (research §3 B7) [7]",
+    criterion: "Epilepsy12 KPI 8 — zwangerschapspreventieprogramma / risico-erkenning voor meisjes en vrouwen ≥12 jaar die valproaat of topiramaat gebruiken (onderzoek §3 B7) [7]",
   },
 
   // === Dashboard 3 — Paediatric Major Trauma BPT (NMTR, rows A2–A11) ========
@@ -2542,7 +2542,7 @@ const trackers = {
   "t-tra-registry-25d": {
     id: "t-tra-registry-25d",
     dashboardId: "paediatric-trauma-bpt",
-    title: "Registry submission ≤25 days",
+    title: "Indiening bij het register ≤25 dagen",
     kind: "timeseries",
     target: { op: ">=", value: 0.9 },
     elements: [
@@ -2553,33 +2553,33 @@ const trackers = {
       { key: "m5", label: "dec.", value: 0.88, status: "not-met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
       { key: "m6", label: "jan.", value: 0.90, status: "met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
     ],
-    criterion: "Major Trauma BPT trigger — NMTR/TARN dataset complete and submitted within 25 days of discharge (research §3 C1) [10][12]",
+    criterion: "Trigger van de BPT ernstig trauma — NMTR/TARN-dataset volledig en ingediend binnen 25 dagen na ontslag (onderzoek §3 C1) [10][12]",
   },
   // C2 — consultant-led reception ≤5 min, eligible = Level 2 (ISS ≥16; 6 cases).
   "t-tra-consultant-5min": {
     id: "t-tra-consultant-5min",
     dashboardId: "paediatric-trauma-bpt",
-    title: "Consultant-led reception ≤5 min (Level 2)",
+    title: "Opvang onder leiding van een medisch specialist ≤5 min (niveau 2)",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Consultant ≤5 min", value: 4 / 6, status: "met", highlightRefs: ["Trauma!N2", "Trauma!O2", "Trauma!P2", "Trauma!N4", "Trauma!O4", "Trauma!P4", "Trauma!N7", "Trauma!O7", "Trauma!P7", "Trauma!N8", "Trauma!O8", "Trauma!P8"] },
-      { key: "not-met", label: "Over 5 min / not recorded", value: 2 / 6, status: "not-met", highlightRefs: ["Trauma!N3", "Trauma!O3", "Trauma!P3", "Trauma!N10", "Trauma!O10", "Trauma!P10"] },
+      { key: "met", label: "Medisch specialist ≤5 min", value: 4 / 6, status: "met", highlightRefs: ["Trauma!N2", "Trauma!O2", "Trauma!P2", "Trauma!N4", "Trauma!O4", "Trauma!P4", "Trauma!N7", "Trauma!O7", "Trauma!P7", "Trauma!N8", "Trauma!O8", "Trauma!P8"] },
+      { key: "not-met", label: "Meer dan 5 min / niet geregistreerd", value: 2 / 6, status: "not-met", highlightRefs: ["Trauma!N3", "Trauma!O3", "Trauma!P3", "Trauma!N10", "Trauma!O10", "Trauma!P10"] },
     ],
-    criterion: "Major Trauma BPT (Level 2, ISS ≥16) — consultant-led trauma team, consultant present within 5 min of arrival (research §3 C2) [10]",
+    criterion: "BPT ernstig trauma (niveau 2, ISS ≥16) — traumateam onder leiding van een medisch specialist, specialist aanwezig binnen 5 min na aankomst (onderzoek §3 C2) [10]",
   },
   // C3 — CT head ≤60 min, eligible = Level 2 head injury with GCS ≤13 (6 cases).
   "t-tra-ct-head-60min": {
     id: "t-tra-ct-head-60min",
     dashboardId: "paediatric-trauma-bpt",
-    title: "CT head ≤60 min (GCS ≤13, Level 2)",
+    title: "CT-schedel ≤60 min (GCS ≤13, niveau 2)",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Within 60 min", value: 5 / 6, status: "met", highlightRefs: ["Trauma!R2", "Trauma!S2", "Trauma!T2", "Trauma!R4", "Trauma!S4", "Trauma!T4", "Trauma!R7", "Trauma!S7", "Trauma!T7", "Trauma!R8", "Trauma!S8", "Trauma!T8", "Trauma!R10", "Trauma!S10", "Trauma!T10"] },
-      { key: "not-met", label: "Over 60 min", value: 1 / 6, status: "not-met", highlightRefs: ["Trauma!R3", "Trauma!S3", "Trauma!T3"] },
+      { key: "met", label: "Binnen 60 min", value: 5 / 6, status: "met", highlightRefs: ["Trauma!R2", "Trauma!S2", "Trauma!T2", "Trauma!R4", "Trauma!S4", "Trauma!T4", "Trauma!R7", "Trauma!S7", "Trauma!T7", "Trauma!R8", "Trauma!S8", "Trauma!T8", "Trauma!R10", "Trauma!S10", "Trauma!T10"] },
+      { key: "not-met", label: "Meer dan 60 min", value: 1 / 6, status: "not-met", highlightRefs: ["Trauma!R3", "Trauma!S3", "Trauma!T3"] },
     ],
-    criterion: "Major Trauma BPT (Level 2) — CT head within 60 min for head-injury cases with GCS ≤13 (research §3 C3) [10]",
+    criterion: "BPT ernstig trauma (niveau 2) — CT-schedel binnen 60 min voor casussen met schedelletsel en een GCS ≤13 (onderzoek §3 C3) [10]",
   },
   // C4 — tranexamic acid ≤1 h, eligible = Level 2 with TXA indicated (4 cases).
   "t-tra-txa-1h": {
