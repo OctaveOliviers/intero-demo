@@ -2414,26 +2414,26 @@ const trackers = {
   "t-dia-high-hba1c": {
     id: "t-dia-high-hba1c",
     dashboardId: "paediatric-diabetes-bpt",
-    title: "High-HbA1c (≥69) follow-up flag",
+    title: "Signalement de suivi pour HbA1c élevée (≥69)",
     kind: "stat",
     target: { op: "<=", value: 0 },
     elements: [
-      { key: "at-risk", label: "Patients with HbA1c ≥69 mmol/mol", value: 5, status: "not-met", highlightRefs: ["NPDA!T3", "NPDA!T4", "NPDA!T6", "NPDA!T7", "NPDA!T9"] },
+      { key: "at-risk", label: "Patients avec une HbA1c ≥69 mmol/mol", value: 5, status: "not-met", highlightRefs: ["NPDA!T3", "NPDA!T4", "NPDA!T6", "NPDA!T7", "NPDA!T9"] },
     ],
-    criterion: "Paediatric Diabetes BPT criterion (o)(i) — HbA1c ≥69 mmol/mol triggers escalation; flagged as revenue-at-risk (research §3 A7) [3]",
+    criterion: "Critère (o)(i) du BPT diabète pédiatrique — une HbA1c ≥69 mmol/mol déclenche une escalade de prise en charge ; signalé comme recette à risque (recherche §3 A7) [3]",
   },
   // A8 — coeliac + thyroid screening at diagnosis, cohort = newly-diagnosed T1.
   "t-dia-coeliac-thyroid": {
     id: "t-dia-coeliac-thyroid",
     dashboardId: "paediatric-diabetes-bpt",
-    title: "Coeliac + thyroid screening at diagnosis (new T1)",
+    title: "Dépistage cœliaque et thyroïdien au diagnostic (T1 nouvellement diagnostiqués)",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Both screened", value: 2 / 2, status: "met", highlightRefs: ["NPDA!AR4", "NPDA!AP4", "NPDA!AR8", "NPDA!AP8"] },
-      { key: "not-met", label: "Incomplete", value: 0, status: "not-met", highlightRefs: [] },
+      { key: "met", label: "Les deux dépistages réalisés", value: 2 / 2, status: "met", highlightRefs: ["NPDA!AR4", "NPDA!AP4", "NPDA!AR8", "NPDA!AP8"] },
+      { key: "not-met", label: "Incomplet", value: 0, status: "not-met", highlightRefs: [] },
     ],
-    criterion: "Paediatric Diabetes BPT criterion (k) subset — coeliac and thyroid screening around diagnosis for new type 1 (research §3 A8) [3][5]",
+    criterion: "Sous-ensemble du critère (k) du BPT diabète pédiatrique — dépistage de la maladie cœliaque et de la fonction thyroïdienne au moment du diagnostic pour un diabète de type 1 nouvellement diagnostiqué (recherche §3 A8) [3][5]",
   },
 
   // === Dashboard 2 — Paediatric Epilepsy BPT (Epilepsy12, rows A2–A11) ======
@@ -2441,7 +2441,7 @@ const trackers = {
   "t-epi-paediatrician-2wk": {
     id: "t-epi-paediatrician-2wk",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "Epilepsy-expert paediatrician ≤2 weeks",
+    title: "Pédiatre expert en épilepsie ≤2 semaines",
     kind: "timeseries",
     target: { op: ">=", value: 0.9 },
     elements: [
@@ -2452,46 +2452,46 @@ const trackers = {
       { key: "m5", label: "déc.", value: 0.78, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
       { key: "m6", label: "janv.", value: 0.80, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
     ],
-    criterion: "Epilepsy12 KPI 1 — seen by an epilepsy-expert consultant paediatrician within 2 weeks of referral (research §3 B1) [7]",
+    criterion: "ICP 1 d'Epilepsy12 — évaluation par un pédiatre sénior expert en épilepsie dans les 2 semaines suivant l'orientation (recherche §3 B1) [7]",
   },
   // B2 — ESN input within the first year.
   "t-epi-esn-first-year": {
     id: "t-epi-esn-first-year",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "ESN input within first year",
+    title: "Intervention infirmière spécialisée la première année",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "ESN input in year", value: 9 / 10, status: "met", highlightRefs: ["Epilepsy!J2", "Epilepsy!J3", "Epilepsy!J4", "Epilepsy!J5", "Epilepsy!J6", "Epilepsy!J8", "Epilepsy!J9", "Epilepsy!J10", "Epilepsy!J11"] },
-      { key: "not-met", label: "No ESN input", value: 1 / 10, status: "not-met", highlightRefs: ["Epilepsy!J7"] },
+      { key: "met", label: "Intervention dans l'année", value: 9 / 10, status: "met", highlightRefs: ["Epilepsy!J2", "Epilepsy!J3", "Epilepsy!J4", "Epilepsy!J5", "Epilepsy!J6", "Epilepsy!J8", "Epilepsy!J9", "Epilepsy!J10", "Epilepsy!J11"] },
+      { key: "not-met", label: "Aucune intervention", value: 1 / 10, status: "not-met", highlightRefs: ["Epilepsy!J7"] },
     ],
-    criterion: "Epilepsy12 KPI 2 — epilepsy specialist nurse input within the first year of care (research §3 B2) [3][7]",
+    criterion: "ICP 2 d'Epilepsy12 — intervention d'un infirmier spécialisé en épilepsie au cours de la première année de prise en charge (recherche §3 B2) [3][7]",
   },
   // B3 — MRI ≤6 weeks where indicated (eligible = mriIndicated Yes; 6 of 10).
   "t-epi-mri-6wk": {
     id: "t-epi-mri-6wk",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "MRI ≤6 weeks (where indicated)",
+    title: "IRM ≤6 semaines (lorsqu'elle est indiquée)",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Within 6 weeks", value: 4 / 6, status: "met", highlightRefs: ["Epilepsy!M2", "Epilepsy!N2", "Epilepsy!M3", "Epilepsy!N3", "Epilepsy!M6", "Epilepsy!N6", "Epilepsy!M10", "Epilepsy!N10"] },
-      { key: "not-met", label: "Over 6 weeks / not done", value: 2 / 6, status: "not-met", highlightRefs: ["Epilepsy!M4", "Epilepsy!N4", "Epilepsy!M8", "Epilepsy!N8"] },
+      { key: "met", label: "Dans les 6 semaines", value: 4 / 6, status: "met", highlightRefs: ["Epilepsy!M2", "Epilepsy!N2", "Epilepsy!M3", "Epilepsy!N3", "Epilepsy!M6", "Epilepsy!N6", "Epilepsy!M10", "Epilepsy!N10"] },
+      { key: "not-met", label: "Au-delà de 6 semaines / non réalisée", value: 2 / 6, status: "not-met", highlightRefs: ["Epilepsy!M4", "Epilepsy!N4", "Epilepsy!M8", "Epilepsy!N8"] },
     ],
-    criterion: "Epilepsy12 KPI 5 — MRI within 6 weeks of request where indicated; denominator = indicated cases only (research §3 B3) [7]",
+    criterion: "ICP 5 d'Epilepsy12 — IRM réalisée dans les 6 semaines suivant la demande lorsqu'elle est indiquée ; dénominateur = cas indiqués uniquement (recherche §3 B3) [7]",
   },
   // B4 — ECG in convulsive seizures (eligible = convulsive; 7 of 10).
   "t-epi-ecg-convulsive": {
     id: "t-epi-ecg-convulsive",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "ECG in convulsive seizures",
+    title: "ECG en cas de crises convulsives",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "ECG performed", value: 6 / 7, status: "met", highlightRefs: ["Epilepsy!Q2", "Epilepsy!Q3", "Epilepsy!Q5", "Epilepsy!Q8", "Epilepsy!Q9", "Epilepsy!Q11"] },
-      { key: "not-met", label: "No ECG", value: 1 / 7, status: "not-met", highlightRefs: ["Epilepsy!Q6"] },
+      { key: "met", label: "ECG réalisé", value: 6 / 7, status: "met", highlightRefs: ["Epilepsy!Q2", "Epilepsy!Q3", "Epilepsy!Q5", "Epilepsy!Q8", "Epilepsy!Q9", "Epilepsy!Q11"] },
+      { key: "not-met", label: "Aucun ECG", value: 1 / 7, status: "not-met", highlightRefs: ["Epilepsy!Q6"] },
     ],
-    criterion: "Epilepsy12 KPI 4 — ECG by first year where seizures are convulsive; denominator = convulsive cases (research §3 B4) [7]",
+    criterion: "ICP 4 d'Epilepsy12 — ECG réalisé au cours de la première année lorsque les crises sont convulsives ; dénominateur = cas convulsifs (recherche §3 B4) [7]",
   },
   // B5 — mental-health screening documented within first year.
   "t-epi-mh-screening": {
