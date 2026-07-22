@@ -492,79 +492,79 @@ const columns = {
   ],
   epilepsy: [
     // Patient / cohort
-    { key: "patient", header: "NHS number", width: 12 },                                 // B-cohort
-    { key: "dob", header: "Date of birth", width: 14 },
-    { key: "sex", header: "Sex assigned at birth", width: 18 },
-    { key: "ageAtAssessment", header: "Age at first assessment", width: 20 },
+    { key: "patient", header: "NHS-nummer", width: 12 },                                 // B-cohort
+    { key: "dob", header: "Geboortedatum", width: 14 },
+    { key: "sex", header: "Geslacht toegekend bij geboorte", width: 18 },
+    { key: "ageAtAssessment", header: "Leeftijd bij eerste beoordeling", width: 20 },
     { key: "_s1", header: "", width: 4 },
     // B1 — epilepsy-expert paediatrician within 2 weeks of referral
-    { key: "referralDate", header: "Referral date", width: 14 },
-    { key: "firstAssessmentDate", header: "First paediatrician assessment date", width: 30 },
-    { key: "expertisePaediatrician", header: "Seen by epilepsy-expert paediatrician", width: 32 },
+    { key: "referralDate", header: "Verwijsdatum", width: 14 },
+    { key: "firstAssessmentDate", header: "Datum eerste beoordeling door kinderarts", width: 30 },
+    { key: "expertisePaediatrician", header: "Gezien door kinderarts met epilepsie-expertise", width: 32 },
     { key: "_s2", header: "", width: 4 },
     // B2 — ESN input within first year
-    { key: "esnInputDate", header: "Epilepsy specialist nurse input date", width: 30 },
+    { key: "esnInputDate", header: "Datum inbreng epilepsieverpleegkundige", width: 30 },
     { key: "_s3", header: "", width: 4 },
     // B3 — MRI within 6 weeks where indicated
-    { key: "mriIndicated", header: "MRI indicated", width: 14 },
-    { key: "mriRequestDate", header: "MRI request date", width: 16 },
-    { key: "mriPerformedDate", header: "MRI performed date", width: 18 },
+    { key: "mriIndicated", header: "MRI geïndiceerd", width: 14 },
+    { key: "mriRequestDate", header: "Datum MRI-aanvraag", width: 16 },
+    { key: "mriPerformedDate", header: "Datum MRI uitgevoerd", width: 18 },
     { key: "_s4", header: "", width: 4 },
     // B4 — ECG in convulsive seizures
-    { key: "seizureType", header: "Seizure type", width: 18 },
-    { key: "ecgDate", header: "ECG date", width: 14 },
+    { key: "seizureType", header: "Type aanval", width: 18 },
+    { key: "ecgDate", header: "ECG-datum", width: 14 },
     { key: "_s5", header: "", width: 4 },
     // B5 — mental-health screening + support
-    { key: "mhScreeningDate", header: "Mental-health screening date", width: 26 },
-    { key: "mhProblemIdentified", header: "Mental-health problem identified", width: 30 },
-    { key: "mhSupportProvided", header: "Mental-health support provided", width: 28 },
+    { key: "mhScreeningDate", header: "Datum screening geestelijke gezondheid", width: 26 },
+    { key: "mhProblemIdentified", header: "Probleem geestelijke gezondheid vastgesteld", width: 30 },
+    { key: "mhSupportProvided", header: "Ondersteuning geestelijke gezondheid geboden", width: 28 },
     { key: "_s6", header: "", width: 4 },
     // B6 — comprehensive care plan by 12 months
-    { key: "carePlanDate", header: "Comprehensive care plan date", width: 26 },
+    { key: "carePlanDate", header: "Datum integraal zorgplan", width: 26 },
     { key: "_s7", header: "", width: 4 },
     // B7 — valproate/topiramate safety (PPP, females ≥12)
-    { key: "onValproate", header: "On sodium valproate", width: 18 },
-    { key: "onTopiramate", header: "On topiramate", width: 16 },
-    { key: "pppInPlace", header: "Pregnancy prevention programme in place", width: 34 },
+    { key: "onValproate", header: "Gebruikt natriumvalproaat", width: 18 },
+    { key: "onTopiramate", header: "Gebruikt topiramaat", width: 16 },
+    { key: "pppInPlace", header: "Zwangerschapspreventieprogramma aanwezig", width: 34 },
   ],
   trauma: [
     // Patient / cohort (paediatric <16 major trauma at the MTC, ≥1 AIS3+ injury)
-    { key: "patient", header: "NHS number", width: 12 },                                 // C-cohort
-    { key: "dob", header: "Date of birth", width: 14 },
-    { key: "sex", header: "Sex assigned at birth", width: 18 },
-    { key: "ageYears", header: "Age (years)", width: 12 },
+    { key: "patient", header: "NHS-nummer", width: 12 },                                 // C-cohort
+    { key: "dob", header: "Geboortedatum", width: 14 },
+    { key: "sex", header: "Geslacht toegekend bij geboorte", width: 18 },
+    { key: "ageYears", header: "Leeftijd (jaren)", width: 12 },
     { key: "iss", header: "Injury Severity Score (ISS)", width: 22 },
-    { key: "ais3plus", header: "≥1 AIS 3+ injury", width: 16 },
+    { key: "ais3plus", header: "≥1 letsel met AIS 3+", width: 16 },
     { key: "_s1", header: "", width: 4 },
     // C1 — registry submission within 25 days of discharge (the BPT trigger)
-    { key: "edArrivalDateTime", header: "ED arrival date/time", width: 22 },
-    { key: "dischargeDate", header: "Discharge date", width: 16 },
-    { key: "nmtrSubmitted", header: "NMTR case submitted", width: 20 },
-    { key: "datasetComplete", header: "NMTR dataset complete", width: 22 },
-    { key: "submissionDate", header: "NMTR submission date", width: 20 },
+    { key: "edArrivalDateTime", header: "Datum/tijd aankomst SEH", width: 22 },
+    { key: "dischargeDate", header: "Ontslagdatum", width: 16 },
+    { key: "nmtrSubmitted", header: "Casus ingediend bij NMTR", width: 20 },
+    { key: "datasetComplete", header: "NMTR-dataset volledig", width: 22 },
+    { key: "submissionDate", header: "Datum indiening NMTR", width: 20 },
     { key: "_s2", header: "", width: 4 },
     // C2 — consultant-led trauma-team reception ≤5 min (Level 2, ISS ≥16)
-    { key: "traumaTeamActivated", header: "Trauma team activated", width: 22 },
-    { key: "consultantPresent", header: "Consultant present at reception", width: 30 },
-    { key: "consultantArrivalMin", header: "Consultant arrival (min from arrival)", width: 34 },
+    { key: "traumaTeamActivated", header: "Traumateam geactiveerd", width: 22 },
+    { key: "consultantPresent", header: "Medisch specialist aanwezig bij opvang", width: 30 },
+    { key: "consultantArrivalMin", header: "Aankomst medisch specialist (min na aankomst)", width: 34 },
     { key: "_s3", header: "", width: 4 },
     // C3 — CT head ≤60 min (GCS ≤13 head injury, Level 2)
-    { key: "gcs", header: "GCS at arrival", width: 16 },
-    { key: "headInjury", header: "Head injury (AIS 1+)", width: 20 },
-    { key: "ctHeadMin", header: "CT head (min from arrival)", width: 26 },
+    { key: "gcs", header: "GCS bij aankomst", width: 16 },
+    { key: "headInjury", header: "Schedelhersenletsel (AIS 1+)", width: 20 },
+    { key: "ctHeadMin", header: "CT-schedel (min na aankomst)", width: 26 },
     { key: "_s4", header: "", width: 4 },
     // C4 — tranexamic acid ≤1 h (Level 2)
-    { key: "txaIndicated", header: "TXA indicated", width: 16 },
-    { key: "txaGiven", header: "TXA given", width: 14 },
-    { key: "txaMin", header: "TXA given (min from injury)", width: 26 },
+    { key: "txaIndicated", header: "TXA geïndiceerd", width: 16 },
+    { key: "txaGiven", header: "TXA toegediend", width: 14 },
+    { key: "txaMin", header: "TXA toegediend (min na letsel)", width: 26 },
     { key: "_s5", header: "", width: 4 },
     // C5 — airway considered ≤30 min (GCS <9, Level 1)
-    { key: "intubationConsidered", header: "Airway/intubation considered", width: 28 },
-    { key: "airwayConsideredMin", header: "Airway considered (min from arrival)", width: 34 },
+    { key: "intubationConsidered", header: "Luchtweg/intubatie overwogen", width: 28 },
+    { key: "airwayConsideredMin", header: "Luchtweg overwogen (min na aankomst)", width: 34 },
     { key: "_s6", header: "", width: 4 },
     // C6 — rehabilitation prescription (ISS ≥9, Level 1)
-    { key: "rehabNeedsAssessed", header: "Rehabilitation needs assessed", width: 28 },
-    { key: "rehabPrescriptionIssued", header: "Rehabilitation prescription issued", width: 32 },
+    { key: "rehabNeedsAssessed", header: "Revalidatiebehoefte beoordeeld", width: 28 },
+    { key: "rehabPrescriptionIssued", header: "Revalidatievoorschrift afgegeven", width: 32 },
   ],
 };
 
