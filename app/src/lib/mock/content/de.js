@@ -1832,9 +1832,9 @@ const codeMaps = {
   // displayed/evidence wording (translatable). The ECG KPI keys off whether the
   // type is convulsive.
   seizureType: {
-    Convulsive: { code: "convulsive", label: "convulsive (generalised tonic-clonic / focal to bilateral)" },
-    "Non-convulsive": { code: "non-convulsive", label: "non-convulsive (absence / focal aware)" },
-    Absence: { code: "absence", label: "absence (non-convulsive)" },
+    Convulsive: { code: "konvulsiv", label: "konvulsiv (generalisiert tonisch-klonisch / fokal zu bilateral)" },
+    "Non-convulsive": { code: "nicht konvulsiv", label: "nicht konvulsiv (Absence / fokal bewusst erlebt)" },
+    Absence: { code: "Absence", label: "Absence (nicht konvulsiv)" },
   },
 };
 
@@ -2150,9 +2150,9 @@ const blockedReason = {
   cordAgeDischargeHome:
     "CPH009 wurde an Tag 7 in das regionale Kühlungs- und Neurologiezentrum verlegt und nie von dieser Station nach Hause entlassen, sodass kein Alter bei Entlassung nach Hause dokumentiert ist (cord_ph_birth_records und der Verlegungsbericht durchsucht).",
   epilepsyMriPerformed:
-    "EPI007's MRI brain was requested but performed at the transferring unit, and the report has not yet been returned to the EHR, so no MRI performed date is recorded (searched radiology_results and the transfer summary).",
+    "Die kraniale MRT von EPI007 wurde angefordert, aber im verlegenden Haus durchgeführt, und der Befund ist noch nicht in das EHR zurückgelangt, sodass kein Durchführungsdatum der MRT dokumentiert ist (radiology_results und der Verlegungsbericht wurden durchsucht).",
   traumaConsultantArrival:
-    "TRA009 was a resuscitation-bay transfer and the consultant-arrival timestamp was not captured in the structured ED record; the trauma documentation is being retrieved, so the time from arrival cannot yet be confirmed (searched ed_trauma_receptions and the resuscitation note).",
+    "TRA009 war eine Verlegung in den Schockraum und der Zeitstempel des fachärztlichen Eintreffens wurde nicht im strukturierten Notaufnahme-Datensatz erfasst; die Traumadokumentation wird angefordert, sodass die Zeit ab Eintreffen noch nicht bestätigt werden kann (ed_trauma_receptions und die Reanimationsnotiz wurden durchsucht).",
 };
 
 // --- Timeline strings (headlines, details, think snippets, tool headlines) ---
@@ -2167,9 +2167,9 @@ const timeline = {
     inspectedSchema: "Das EHR-Schema untersucht",
     troponinResults: "Die Troponin-Befunde gelesen",
     cardiometabolicScreen: "Das kardiometabolische Screening gelesen",
-    epilepsyInvestigations: "Read the MRI and ECG records",
-    traumaReception: "Read the trauma reception times",
-    traumaInterventions: "Read the CT, TXA and airway records",
+    epilepsyInvestigations: "Die MRT- und EKG-Daten gelesen",
+    traumaReception: "Die Schockraum-Aufnahmezeiten gelesen",
+    traumaInterventions: "Die CT-, TXA- und Atemwegsdaten gelesen",
   },
   // Cord-pH population (timelineA -> cordPhPopulation).
   cord: {
@@ -2215,25 +2215,25 @@ const timeline = {
   },
   // Epilepsy12 population (timelineE -> epilepsyPopulation).
   epilepsy: {
-    mapTemplate: { headline: "Mapping the template to the EHR schema…", detail: "Resolving each Epilepsy12 column to a field in the **EHR database** before copying across the structured demographics and the first-assessment details." },
-    demographics: { headline: "Copying the demographics and referral fields…", detail: "Pulling date of birth, sex, age at first assessment, the referral date and the first paediatric assessment date straight from `patient_demographics` and `epilepsy_assessments`." },
-    clinicLetters: { headline: "Reading the epilepsy clinic letters…", detail: "Reading each child's first epilepsy clinic letter for whether the assessing paediatrician had epilepsy expertise (KPI 1) and the seizure type that drives the ECG KPI." },
-    specialistInput: { headline: "Copying the specialist-nurse and care-plan fields…", detail: "Pulling the epilepsy specialist nurse input date (KPI 2) and the comprehensive care plan date (KPI 9). Where input or a plan is not yet recorded the field carries an explicit label rather than a blank." },
-    investigations: { headline: "Copying the MRI and ECG fields…", detail: "Pulling whether an MRI was indicated and its request/performed dates (KPI 5) and the ECG date for convulsive seizures (KPI 4). Cases where an investigation is not indicated, not yet done or unobtainable carry an explicit label." },
-    mentalHealth: { headline: "Checking mental-health screening and support…", detail: "Pulling the mental-health screening date (KPI 6), then reading the screening note for whether a problem was identified and, where it was, whether support was provided (KPI 7)." },
-    medicationSafety: { headline: "Checking valproate/topiramate safety…", detail: "Pulling the valproate and topiramate prescribing flags and, for females aged 12 or over on either drug, whether a pregnancy prevention programme is in place (KPI 8, safety-critical)." },
-    finalizing: { headline: "Finalizing the audit…", detail: "All cells populated and traceable to the EHR record or the source notes." },
+    mapTemplate: { headline: "Die Vorlage dem EHR-Schema zuordnen…", detail: "Jede Epilepsy12-Spalte wird einem Feld der **EHR-Datenbank** zugeordnet, bevor die strukturierten Stammdaten und die Angaben zur Erstuntersuchung übernommen werden." },
+    demographics: { headline: "Die Stammdaten- und Überweisungsfelder übernehmen…", detail: "Geburtsdatum, Geschlecht, Alter bei der Erstuntersuchung, das Überweisungsdatum und das Datum der ersten pädiatrischen Untersuchung werden direkt aus `patient_demographics` und `epilepsy_assessments` gezogen." },
+    clinicLetters: { headline: "Die Epilepsie-Ambulanzbriefe lesen…", detail: "Der erste Epilepsie-Ambulanzbrief jedes Kindes wird daraufhin gelesen, ob die untersuchende Pädiaterin/der untersuchende Pädiater über Epilepsie-Expertise verfügte (KPI 1), und auf den Anfallstyp, der den EKG-KPI bestimmt." },
+    specialistInput: { headline: "Die Felder zu Fachpflegekraft und Behandlungsplan übernehmen…", detail: "Das Datum der Mitbetreuung durch die Epilepsie-Fachpflegekraft (KPI 2) und das Datum des umfassenden Behandlungsplans (KPI 9) werden gezogen. Wo weder Mitbetreuung noch Plan dokumentiert sind, trägt das Feld eine ausdrückliche Kennzeichnung statt eines Leerwerts." },
+    investigations: { headline: "Die MRT- und EKG-Felder übernehmen…", detail: "Es wird gezogen, ob eine MRT indiziert war, samt Anforderungs- und Durchführungsdatum (KPI 5), sowie das EKG-Datum bei konvulsiven Anfällen (KPI 4). Fälle, in denen eine Untersuchung nicht indiziert, noch nicht erfolgt oder nicht verfügbar ist, tragen eine ausdrückliche Kennzeichnung." },
+    mentalHealth: { headline: "Screening und Unterstützung der psychischen Gesundheit prüfen…", detail: "Das Datum des Screenings der psychischen Gesundheit wird gezogen (KPI 6), anschließend wird die Screening-Notiz daraufhin gelesen, ob ein Problem festgestellt wurde und, falls ja, ob Unterstützung geleistet wurde (KPI 7)." },
+    medicationSafety: { headline: "Die Sicherheit von Valproat/Topiramat prüfen…", detail: "Die Verordnungskennzeichen für Valproat und Topiramat werden gezogen und, für weibliche Personen ab 12 Jahren unter einem dieser Wirkstoffe, ob ein Schwangerschaftsverhütungsprogramm besteht (KPI 8, sicherheitskritisch)." },
+    finalizing: { headline: "Das Audit abschließen…", detail: "Alle Zellen sind befüllt und auf den EHR-Datensatz oder die Quellnotizen zurückführbar." },
   },
   // Major trauma population (timelineT -> traumaPopulation).
   trauma: {
-    mapTemplate: { headline: "Mapping the template to the EHR schema…", detail: "Resolving each NMTR column to a field in the **EHR database** before copying across the structured demographics and the injury-severity details." },
-    demographics: { headline: "Copying the demographics and injury fields…", detail: "Pulling date of birth, sex, age, the Injury Severity Score and the AIS 3+ eligibility flag straight from `patient_demographics` and the trauma registry record." },
-    registrySubmission: { headline: "Copying the registry submission fields…", detail: "Pulling the ED arrival time, discharge date and the NMTR submitted/complete flags with the submission date to check the 25-day BPT window (C1)." },
-    reception: { headline: "Copying the trauma-reception fields…", detail: "Pulling whether a trauma team was activated, whether a consultant was present and the consultant arrival time (C2, Level 2). One reception time could not be located and is flagged." },
-    investigations: { headline: "Copying the CT, TXA and airway fields…", detail: "Pulling the GCS and head-injury flag with the CT-head time (C3), the TXA indication and timing (C4) and the airway-considered time for low-GCS cases (C5). Cases where an intervention is not indicated or not eligible carry an explicit label." },
-    resusNotes: { headline: "Reading the resuscitation notes…", detail: "Reading each case's resuscitation note for whether airway management/intubation was considered as part of the primary survey (C5)." },
-    rehabilitation: { headline: "Checking the rehabilitation prescriptions…", detail: "Pulling whether rehabilitation needs were assessed, then reading the rehab/discharge note for whether a rehabilitation prescription was issued (C6, ISS ≥9)." },
-    finalizing: { headline: "Finalizing the audit…", detail: "All cells populated and traceable to the EHR record or the source notes." },
+    mapTemplate: { headline: "Die Vorlage dem EHR-Schema zuordnen…", detail: "Jede NMTR-Spalte wird einem Feld der **EHR-Datenbank** zugeordnet, bevor die strukturierten Stammdaten und die Angaben zur Verletzungsschwere übernommen werden." },
+    demographics: { headline: "Die Stammdaten- und Verletzungsfelder übernehmen…", detail: "Geburtsdatum, Geschlecht, Alter, der Injury Severity Score und das AIS-3+-Einschlusskennzeichen werden direkt aus `patient_demographics` und dem Traumaregister-Datensatz gezogen." },
+    registrySubmission: { headline: "Die Felder zur Registerübermittlung übernehmen…", detail: "Die Ankunftszeit in der Notaufnahme, das Entlassungsdatum und die NMTR-Kennzeichen für übermittelt/vollständig werden samt Übermittlungsdatum gezogen, um das 25-Tage-BPT-Fenster zu prüfen (C1)." },
+    reception: { headline: "Die Felder zur Schockraumaufnahme übernehmen…", detail: "Es wird gezogen, ob ein Trauma-Team alarmiert wurde, ob eine Fachärztin/ein Facharzt anwesend war und wann sie/er eintraf (C2, Stufe 2). Eine Aufnahmezeit konnte nicht ermittelt werden und ist markiert." },
+    investigations: { headline: "Die CT-, TXA- und Atemwegsfelder übernehmen…", detail: "Der GCS und das Kennzeichen für ein Schädel-Hirn-Trauma werden samt Zeit bis zum CT-Schädel (C3), der TXA-Indikation und -Zeit (C4) sowie dem Zeitpunkt der erwogenen Atemwegssicherung bei Fällen mit niedrigem GCS (C5) gezogen. Fälle, in denen eine Maßnahme nicht indiziert oder nicht qualifizierend ist, tragen eine ausdrückliche Kennzeichnung." },
+    resusNotes: { headline: "Die Reanimationsnotizen lesen…", detail: "Die Reanimationsnotiz jedes Falls wird daraufhin gelesen, ob Atemwegsmanagement/Intubation im Rahmen der Erstuntersuchung erwogen wurde (C5)." },
+    rehabilitation: { headline: "Die Rehabilitationsverordnungen prüfen…", detail: "Es wird gezogen, ob der Rehabilitationsbedarf erhoben wurde, anschließend wird die Rehabilitations-/Entlassungsnotiz daraufhin gelesen, ob eine Rehabilitationsverordnung ausgestellt wurde (C6, ISS ≥9)." },
+    finalizing: { headline: "Das Audit abschließen…", detail: "Alle Zellen sind befüllt und auf den EHR-Datensatz oder die Quellnotizen zurückführbar." },
   },
   // Flow openers (timelineA / timelineB / timelineC).
   flowA: {
@@ -2248,10 +2248,10 @@ const timeline = {
     reviewingTemplate: { headline: "Die Vorlage prüfen…", detail: "Das Audit **Pädiatrischer Diabetes (NPDA)** wird gegen die **EHR-Datenbank** geprüft und die Feldzuordnungen werden aufgelöst." },
   },
   flowE: {
-    reviewingTemplate: { headline: "Reviewing the template…", detail: "Reviewing the **Paediatric epilepsy (Epilepsy12)** audit against the **EHR database** and resolving the field mappings." },
+    reviewingTemplate: { headline: "Die Vorlage prüfen…", detail: "Das Audit **Pädiatrische Epilepsie (Epilepsy12)** wird gegen die **EHR-Datenbank** geprüft und die Feldzuordnungen werden aufgelöst." },
   },
   flowT: {
-    reviewingTemplate: { headline: "Reviewing the template…", detail: "Reviewing the **Paediatric major trauma (NMTR)** audit against the **EHR database** and resolving the field mappings." },
+    reviewingTemplate: { headline: "Die Vorlage prüfen…", detail: "Das Audit **Pädiatrisches schweres Trauma (NMTR)** wird gegen die **EHR-Datenbank** geprüft und die Feldzuordnungen werden aufgelöst." },
   },
   // Folded activity-line label for thinking steps.
   thinkingLabel: "Überlegt",
@@ -2278,36 +2278,36 @@ const dashboards = [
   {
     id: "paediatric-diabetes-bpt",
     auditId: "npda-lo-audit",
-    title: "Diabetes BPT",
+    title: "Diabetes-BPT",
     logo: "dash-diabetes",
-    subtitle: "NPDA · key care processes",
+    subtitle: "NPDA · zentrale Versorgungsprozesse",
     submissionDeadline: "2026-07-20",
     trackers: ["t-dia-hba1c-coverage", "t-dia-care-processes", "t-dia-mdt-contacts", "t-dia-psychology", "t-dia-dietitian", "t-dia-carb-counting", "t-dia-high-hba1c", "t-dia-coeliac-thyroid"],
   },
   {
     id: "paediatric-epilepsy-bpt",
     auditId: "epilepsy12-lo-audit",
-    title: "Epilepsy BPT",
+    title: "Epilepsie-BPT",
     logo: "dash-epilepsy",
-    subtitle: "Epilepsy12 · service KPIs",
+    subtitle: "Epilepsy12 · KPIs der Abteilung",
     submissionDeadline: "2027-01-12",
     trackers: ["t-epi-paediatrician-2wk", "t-epi-esn-first-year", "t-epi-mri-6wk", "t-epi-ecg-convulsive", "t-epi-mh-screening", "t-epi-care-plan-12mo", "t-epi-valproate-ppp"],
   },
   {
     id: "paediatric-trauma-bpt",
     auditId: "nmtr-trauma-lo-audit",
-    title: "Major Trauma BPT",
+    title: "BPT Schwerverletztenversorgung",
     logo: "dash-trauma",
-    subtitle: "NMTR · acute care standards",
-    submissionDeadline: "Submit ≤25 days of discharge",
+    subtitle: "NMTR · Standards der Akutversorgung",
+    submissionDeadline: "Einreichung ≤25 Tage nach Entlassung",
     trackers: ["t-tra-registry-25d", "t-tra-consultant-5min", "t-tra-ct-head-60min", "t-tra-txa-1h", "t-tra-airway-30min", "t-tra-rehab-prescription"],
   },
   {
     id: "cord-ph-bpt",
     auditId: "cord-ph-lo-audit",
-    title: "Cord pH Audit",
+    title: "Audit Nabelschnur-pH",
     logo: "dash-cordph",
-    subtitle: "Cord blood gas · quality at birth",
+    subtitle: "Nabelschnurblutgas · Qualität bei der Geburt",
     submissionDeadline: "2026-06-12",
     trackers: ["t-cord-paired-gases", "t-cord-ph-acidosis", "t-cord-severe-acidosis", "t-cord-base-excess", "t-cord-nicu-admission", "t-cord-dcc", "t-cord-acidosis-trend"],
   },
