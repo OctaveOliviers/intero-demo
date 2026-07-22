@@ -2585,39 +2585,39 @@ const trackers = {
   "t-tra-txa-1h": {
     id: "t-tra-txa-1h",
     dashboardId: "paediatric-trauma-bpt",
-    title: "Tranexamic acid ≤1 h (Level 2)",
+    title: "Tranexaminezuur ≤1 u (niveau 2)",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Within 1 hour", value: 3 / 4, status: "met", highlightRefs: ["Trauma!V2", "Trauma!W2", "Trauma!X2", "Trauma!V4", "Trauma!W4", "Trauma!X4", "Trauma!V8", "Trauma!W8", "Trauma!X8"] },
-      { key: "not-met", label: "Over 1 hour", value: 1 / 4, status: "not-met", highlightRefs: ["Trauma!V7", "Trauma!W7", "Trauma!X7"] },
+      { key: "met", label: "Binnen 1 uur", value: 3 / 4, status: "met", highlightRefs: ["Trauma!V2", "Trauma!W2", "Trauma!X2", "Trauma!V4", "Trauma!W4", "Trauma!X4", "Trauma!V8", "Trauma!W8", "Trauma!X8"] },
+      { key: "not-met", label: "Meer dan 1 uur", value: 1 / 4, status: "not-met", highlightRefs: ["Trauma!V7", "Trauma!W7", "Trauma!X7"] },
     ],
-    criterion: "Major Trauma BPT (Level 2) — tranexamic acid within 1 hour where indicated (research §3 C4) [10]",
+    criterion: "BPT ernstig trauma (niveau 2) — tranexaminezuur binnen 1 uur waar geïndiceerd (onderzoek §3 C4) [10]",
   },
   // C5 — airway considered ≤30 min, eligible = Level 1 GCS <9 (4 cases; all met).
   "t-tra-airway-30min": {
     id: "t-tra-airway-30min",
     dashboardId: "paediatric-trauma-bpt",
-    title: "Airway considered ≤30 min (GCS <9)",
+    title: "Luchtwegbeleid overwogen ≤30 min (GCS <9)",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Within 30 min", value: 4 / 4, status: "met", highlightRefs: ["Trauma!Z2", "Trauma!AA2", "Trauma!Z4", "Trauma!AA4", "Trauma!Z7", "Trauma!AA7", "Trauma!Z8", "Trauma!AA8"] },
-      { key: "not-met", label: "Over 30 min", value: 0, status: "not-met", highlightRefs: [] },
+      { key: "met", label: "Binnen 30 min", value: 4 / 4, status: "met", highlightRefs: ["Trauma!Z2", "Trauma!AA2", "Trauma!Z4", "Trauma!AA4", "Trauma!Z7", "Trauma!AA7", "Trauma!Z8", "Trauma!AA8"] },
+      { key: "not-met", label: "Meer dan 30 min", value: 0, status: "not-met", highlightRefs: [] },
     ],
-    criterion: "Major Trauma BPT (Level 1) — airway/intubation considered within 30 min for GCS <9 (research §3 C5) [10]",
+    criterion: "BPT ernstig trauma (niveau 1) — luchtweg/intubatie overwogen binnen 30 min bij een GCS <9 (onderzoek §3 C5) [10]",
   },
   // C6 — rehabilitation prescription, cohort = ISS ≥9 (9 cases; TRA005 is the gap).
   "t-tra-rehab-prescription": {
     id: "t-tra-rehab-prescription",
     dashboardId: "paediatric-trauma-bpt",
-    title: "Rehabilitation prescription (ISS ≥9)",
+    title: "Revalidatievoorschrift (ISS ≥9)",
     kind: "stat",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "gap", label: "ISS≥9 cases without a rehab prescription", value: 1, status: "not-met", highlightRefs: ["Trauma!AC6", "Trauma!AD6"] },
+      { key: "gap", label: "Casussen met ISS≥9 zonder revalidatievoorschrift", value: 1, status: "not-met", highlightRefs: ["Trauma!AC6", "Trauma!AD6"] },
     ],
-    criterion: "Major Trauma BPT (Level 1) — rehabilitation needs assessed and a rehabilitation prescription issued for ISS ≥9 (research §3 C6) [10]",
+    criterion: "BPT ernstig trauma (niveau 1) — revalidatiebehoefte beoordeeld en een revalidatievoorschrift afgegeven bij ISS ≥9 (onderzoek §3 C6) [10]",
   },
 
   // === Dashboard 4 — Cord pH Audit (cord blood gas, ALL sheet rows 2–10) =====
@@ -2629,40 +2629,40 @@ const trackers = {
   "t-cord-paired-gases": {
     id: "t-cord-paired-gases",
     dashboardId: "cord-ph-bpt",
-    title: "Paired cord gases sampled",
+    title: "Gepaarde navelstrengbloedgassen afgenomen",
     kind: "donut",
     target: { op: ">=", value: 0.95 },
     elements: [
-      { key: "met", label: "Valid arterial pH recorded", value: 8 / 9, status: "met", highlightRefs: ["ALL!Z2", "ALL!AA2", "ALL!Z3", "ALL!AA3", "ALL!Z5", "ALL!AA5", "ALL!Z6", "ALL!AA6", "ALL!Z7", "ALL!AA7", "ALL!Z8", "ALL!AA8", "ALL!Z9", "ALL!AA9", "ALL!Z10", "ALL!AA10"] },
-      { key: "not-met", label: "Missing / unusable", value: 1 / 9, status: "not-met", highlightRefs: ["ALL!Z4", "ALL!AA4"] },
+      { key: "met", label: "Geldige arteriële pH geregistreerd", value: 8 / 9, status: "met", highlightRefs: ["ALL!Z2", "ALL!AA2", "ALL!Z3", "ALL!AA3", "ALL!Z5", "ALL!AA5", "ALL!Z6", "ALL!AA6", "ALL!Z7", "ALL!AA7", "ALL!Z8", "ALL!AA8", "ALL!Z9", "ALL!AA9", "ALL!Z10", "ALL!AA10"] },
+      { key: "not-met", label: "Ontbrekend / onbruikbaar", value: 1 / 9, status: "not-met", highlightRefs: ["ALL!Z4", "ALL!AA4"] },
     ],
-    criterion: "Cord blood gas audit — paired (arterial + venous) cord gases sampled at birth, target ≥95% of births (research §7.1 D1)",
+    criterion: "Audit navelstrengbloedgas — gepaarde (arteriële + veneuze) navelstrengbloedgassen afgenomen bij de geboorte, doel ≥95% van de geboorten (onderzoek §7.1 D1)",
   },
   // D2 — cord arterial pH ≥7.1 (non-acidotic). Denominator = babies with a valid
   // pH (8). met = pH ≥7.1 (rows 2,5,6,7,8,9); not-met = pH <7.1 (rows 3,10).
   "t-cord-ph-acidosis": {
     id: "t-cord-ph-acidosis",
     dashboardId: "cord-ph-bpt",
-    title: "Cord arterial pH ≥7.1",
+    title: "Arteriële navelstreng-pH ≥7.1",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
       { key: "met", label: "pH ≥7.1", value: 6 / 8, status: "met", highlightRefs: ["ALL!Z2", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9"] },
-      { key: "not-met", label: "pH <7.1 (acidotic)", value: 2 / 8, status: "not-met", highlightRefs: ["ALL!Z3", "ALL!Z10"] },
+      { key: "not-met", label: "pH <7.1 (acidotisch)", value: 2 / 8, status: "not-met", highlightRefs: ["ALL!Z3", "ALL!Z10"] },
     ],
-    criterion: "Cord blood gas audit — cord arterial pH ≥7.1 at birth (non-acidotic), denominator = babies with a valid pH (research §7.1 D2)",
+    criterion: "Audit navelstrengbloedgas — arteriële navelstreng-pH ≥7.1 bij de geboorte (niet-acidotisch), noemer = baby's met een geldige pH (onderzoek §7.1 D2)",
   },
   // D3 — severe acidosis (pH <7.0). One baby: CPH009 (pH 6.98, row 10).
   "t-cord-severe-acidosis": {
     id: "t-cord-severe-acidosis",
     dashboardId: "cord-ph-bpt",
-    title: "Severe acidosis (pH <7.0)",
+    title: "Ernstige acidose (pH <7.0)",
     kind: "stat",
     target: { op: "<=", value: 0 },
     elements: [
-      { key: "at-risk", label: "Babies with cord arterial pH <7.0", value: 1, status: "not-met", highlightRefs: ["ALL!Z10"] },
+      { key: "at-risk", label: "Baby's met een arteriële navelstreng-pH <7.0", value: 1, status: "not-met", highlightRefs: ["ALL!Z10"] },
     ],
-    criterion: "Cord blood gas audit — severe metabolic acidosis (cord arterial pH <7.0) flagged for review; any case is a sentinel finding (research §7.1 D3)",
+    criterion: "Audit navelstrengbloedgas — ernstige metabole acidose (arteriële navelstreng-pH <7.0) gemarkeerd voor beoordeling; elke casus is een sentinel-bevinding (onderzoek §7.1 D3)",
   },
   // D4 — base-excess distribution (col AA). Denominator = babies with a BE value
   // (8). Healthy band BE ≥ -8 (rows 2,5,8,9) = met; worse bands not-met.
