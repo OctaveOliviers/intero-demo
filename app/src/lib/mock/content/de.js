@@ -1703,12 +1703,12 @@ const trauma = {
     airwayConsideredMin: null,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "No", e: ["fully alert with a GCS of 15, so no airway intervention was considered"] },
-      rehabPrescription: { v: "No", e: ["no rehabilitation prescription was required for this minor-injury admission" ] },
+      intubationConsidered: { v: "No", e: ["vollständig wach mit einem GCS von 15, sodass keine Atemwegsintervention erwogen wurde"] },
+      rehabPrescription: { v: "No", e: ["für diese Aufnahme mit leichter Verletzung war keine Rehabilitationsverordnung erforderlich" ] },
     },
     notes: [
-      { role: "Trauma team — Dr Olusola Bello", date: "2026-02-13", type: "resus", text: "Isolated closed forearm fracture after a playground fall. The child was fully alert with a GCS of 15, so no airway intervention was considered. No head injury and no major haemorrhage." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-17", type: "rehab", text: "Rehabilitation needs reviewed; no rehabilitation prescription was required for this minor-injury admission below the major-trauma rehabilitation threshold." },
+      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-02-13", type: "resus", text: "Isolierte geschlossene Unterarmfraktur nach einem Sturz auf dem Spielplatz. Das Kind war vollständig wach mit einem GCS von 15, sodass keine Atemwegsintervention erwogen wurde. Kein Schädel-Hirn-Trauma und keine massive Blutung." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-17", type: "rehab", text: "Rehabilitationsbedarf überprüft; für diese Aufnahme mit leichter Verletzung war keine Rehabilitationsverordnung erforderlich, da sie unterhalb des Schwellenwerts für die Rehabilitation bei schwerem Trauma lag." },
     ],
   },
 
@@ -1723,12 +1723,12 @@ const trauma = {
     airwayConsideredMin: null,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "No", e: ["the airway was maintained with a GCS of 9 and intubation was not required at this stage"] },
-      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was issued and shared with the family, GP and ongoing-care provider"] },
+      intubationConsidered: { v: "No", e: ["der Atemweg wurde bei einem GCS von 9 aufrechterhalten und eine Intubation war zu diesem Zeitpunkt nicht erforderlich"] },
+      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde ausgestellt und der Familie, dem Hausarzt und dem weiterbehandelnden Leistungserbringer übermittelt"] },
     },
     notes: [
-      { role: "Trauma team — Dr Olusola Bello", date: "2026-02-16", type: "resus", text: "Cyclist versus vehicle with a chest injury. GCS 9 on arrival; the airway was maintained with a GCS of 9 and intubation was not required at this stage. No indication for tranexamic acid." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-03-04", type: "rehab", text: "Rehabilitation needs assessed; a rehabilitation prescription was issued and shared with the family, GP and ongoing-care provider, with core components on the NMTR." },
+      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-02-16", type: "resus", text: "Radfahrer gegen Fahrzeug mit Thoraxverletzung. GCS 9 bei Ankunft; der Atemweg wurde bei einem GCS von 9 aufrechterhalten und eine Intubation war zu diesem Zeitpunkt nicht erforderlich. Keine Indikation für Tranexamsäure." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-03-04", type: "rehab", text: "Rehabilitationsbedarf beurteilt; eine Rehabilitationsverordnung wurde ausgestellt und der Familie, dem Hausarzt und dem weiterbehandelnden Leistungserbringer übermittelt, mit den Kernkomponenten im NMTR." },
     ],
   },
 
@@ -1743,12 +1743,12 @@ const trauma = {
     airwayConsideredMin: null,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "No", e: ["maintaining their own airway with a GCS of 12 and intubation was not indicated"] },
-      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was completed and shared with the family, GP and ongoing-care provider"] },
+      intubationConsidered: { v: "No", e: ["hielt den eigenen Atemweg bei einem GCS von 12 aufrecht und eine Intubation war nicht indiziert"] },
+      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde erstellt und der Familie, dem Hausarzt und dem weiterbehandelnden Leistungserbringer übermittelt"] },
     },
     notes: [
-      { role: "Trauma team — Dr Olusola Bello", date: "2026-02-19", type: "resus", text: "Fall down stairs with a minor head injury and a liver laceration. The child was maintaining their own airway with a GCS of 12 and intubation was not indicated. No major haemorrhage." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-03-01", type: "rehab", text: "Rehabilitation needs assessed; a rehabilitation prescription was completed and shared with the family, GP and ongoing-care provider." },
+      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-02-19", type: "resus", text: "Treppensturz mit einem leichten Schädel-Hirn-Trauma und einer Leberlazeration. Das Kind hielt den eigenen Atemweg bei einem GCS von 12 aufrecht und eine Intubation war nicht indiziert. Keine massive Blutung." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-03-01", type: "rehab", text: "Rehabilitationsbedarf beurteilt; eine Rehabilitationsverordnung wurde erstellt und der Familie, dem Hausarzt und dem weiterbehandelnden Leistungserbringer übermittelt." },
     ],
   },
 };
