@@ -1,6 +1,6 @@
 <script>
-  import { activeWorkbook, downloadWorkbook, runStatus } from "../stores/chat.js";
-  import { audits, currentAuditId } from "../stores/audits.js";
+  import { activeWorkbook, downloadWorkbook, tablePopulationStatus } from "../stores/chat.js";
+  import { populatedTables, currentPopulatedTableId } from "../stores/populatedTables.js";
   import { dashboardDeadlineText } from "../lib/dashboardDeadline.js";
   import { countWorkbookStatus } from "../lib/statusCounters.js";
   import {
@@ -15,18 +15,18 @@
   import ScanningEye from "./ScanningEye.svelte";
   import { _ } from "svelte-i18n";
 
-  $: currentAudit = $audits.find((a) => a.id === $currentAuditId) || null;
-  $: title = currentAudit?.title || $_("results.title");
-  $: activeRunId = $activeWorkbook?.runId || currentAudit?.runId || null;
-  $: templateDeadline = currentAudit?.submissionDeadline || null;
+  $: currentPopulatedTable = $populatedTables.find((a) => a.id === $currentPopulatedTableId) || null;
+  $: title = currentPopulatedTable?.title || $_("results.title");
+  $: activeRunId = $activeWorkbook?.tablePopulationId || currentPopulatedTable?.tablePopulationId || null;
+  $: templateDeadline = currentPopulatedTable?.submissionDeadline || null;
   // Deadline display (spec §3.2 / §7.1): render a non-date cadence string
   // verbatim (e.g. trauma's "Submit ≤25 days of discharge") instead of dropping
   // it the way date-only formatting would.
   $: deadlineSubtitle = dashboardDeadlineText(templateDeadline);
   // The eye tracks the LIVE run state, not resultViewUiState (whose
   // activityVisualState initializer is never wired to the stream): scanning +
-  // accent while this audit's run is streaming, settled green once finished.
-  $: activityRunning = $runStatus === "running";
+  // accent while this populated table's run is streaming, settled green once finished.
+  $: activityRunning = $tablePopulationStatus === "running";
   // Live status counters (doc 11 §Status counters): derived from cell
   // metadata, so they tick up during the run and down as cells are reviewed.
   $: counters = countWorkbookStatus($activeWorkbook?.cellMetadata);
@@ -35,26 +35,26 @@
   //   { mode: "single", pane: "dashboard" }  — default, full tracker dashboard
   //   { mode: "single", pane: "workbook"  }  — full workbook
   //   { mode: "split",  selection: { trackerId, elementKey } }  — dashboard L + workbook R
-  // The initial pane is the landing RULE applied to the audit selected at mount —
+  // The initial pane is the landing RULE applied to the populated table selected at mount —
   // NOT a hardcoded "dashboard". This is the create-flow fix: ResultsView mounts
   // fresh on create (it is unmounted on the home screen), and the reactive guard
-  // below cannot fire on first mount (lastAuditId already equals currentAuditId),
-  // so a hardcoded default would win. A brand-new cord-pH audit (still running,
+  // below cannot fire on first mount (lastPopulatedTableId already equals currentPopulatedTableId),
+  // so a hardcoded default would win. A brand-new cord-pH populated table (still running,
   // empty workbook) must land on its WORKBOOK here. landingPane()/its helpers are
   // function declarations (hoisted), so calling them in this initializer is safe.
-  let view = { mode: "single", pane: landingPane(auditRecord($currentAuditId)) };
+  let view = { mode: "single", pane: landingPane(populatedTableRecord($currentPopulatedTableId)) };
   // Selector-chip dropdown open/closed (single mode only, spec §3.6).
   let selectorOpen = false;
 
-  // Landing-view RULE (Piece 1): an audit opens to the WORKBOOK while its
+  // Landing-view RULE (Piece 1): a populated table opens to the WORKBOOK while its
   // dashboard has no populated metrics yet, and to the DASHBOARD once metrics are
-  // populated. A general rule (not per-audit) — a freshly created audit lands on
+  // populated. A general rule (not per-record) — a freshly created populated table lands on
   // its workbook as it populates, then on its dashboard once the run completes.
-  // Resolve the descriptor by id OR templateId so created audits (uuid id) map too.
-  function dashboardForAudit(a) {
+  // Resolve the descriptor by id OR templateId so created populatedTables (uuid id) map too.
+  function dashboardForPopulatedTable(a) {
     return a
       ? CONTENT.dashboards.find(
-          (d) => d.auditId === a.id || d.auditId === a.templateId,
+          (d) => d.templateId === a.id || d.templateId === a.templateId,
         ) || null
       : null;
   }
@@ -67,23 +67,23 @@
     const cm = a.workbook && a.workbook.cellMetadata;
     return Boolean(cm && Object.keys(cm).length > 0);
   }
-  // The landing RULE itself: DASHBOARD only once the audit's run/workbook is
+  // The landing RULE itself: DASHBOARD only once the populated table's run/workbook is
   // actually POPULATED (isPopulated) — the dashboard descriptor merely EXISTING
-  // from creation is NOT enough. So a just-created, still-empty audit → workbook;
+  // from creation is NOT enough. So a just-created, still-empty populated table → workbook;
   // it resolves to dashboard only on a later open, once isPopulated() is true.
-  function auditRecord(id) {
-    return $audits.find((x) => x.id === id) || null;
+  function populatedTableRecord(id) {
+    return $populatedTables.find((x) => x.id === id) || null;
   }
   function landingPane(a) {
-    return dashboardForAudit(a) && isPopulated(a) ? "dashboard" : "workbook";
+    return dashboardForPopulatedTable(a) && isPopulated(a) ? "dashboard" : "workbook";
   }
-  // Re-apply the rule whenever the selected audit changes (§3.1). First mount is
-  // handled by the `view` initializer above (lastAuditId starts equal to
-  // currentAuditId), so this fires only on a genuine switch between audits.
-  let lastAuditId = $currentAuditId;
-  $: if ($currentAuditId !== lastAuditId) {
-    lastAuditId = $currentAuditId;
-    view = { mode: "single", pane: landingPane(auditRecord($currentAuditId)) };
+  // Re-apply the rule whenever the selected populated table changes (§3.1). First mount is
+  // handled by the `view` initializer above (lastPopulatedTableId starts equal to
+  // currentPopulatedTableId), so this fires only on a genuine switch between populatedTables.
+  let lastPopulatedTableId = $currentPopulatedTableId;
+  $: if ($currentPopulatedTableId !== lastPopulatedTableId) {
+    lastPopulatedTableId = $currentPopulatedTableId;
+    view = { mode: "single", pane: landingPane(populatedTableRecord($currentPopulatedTableId)) };
     selectorOpen = false;
   }
 
@@ -303,7 +303,7 @@
             <button
               type="button"
               class="pane-close"
-              aria-label={$_("results.closeDashboardPane")}
+              aria-label="Close dashboard pane"
               on:click={() => closePane("dashboard")}
             >
               <Icon name="close" size={14} />
@@ -323,7 +323,7 @@
             <button
               type="button"
               class="pane-close"
-              aria-label={$_("results.closeWorkbookPane")}
+              aria-label="Close workbook pane"
               on:click={() => closePane("workbook")}
             >
               <Icon name="close" size={14} />

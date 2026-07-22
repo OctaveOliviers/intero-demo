@@ -18,12 +18,13 @@
 //   records          — { cord, chest, npda } the WHOLE record objects (human text translatable; numbers/dates/codes/ids/types not)
 //   codeMaps         — { sex, ethnicity, diabetesType, insulinRegime, cgm, yesNo, smoking, retinal, admissionDka, adhdAsd, yesNo99, leavingReason, otherMed, albuminuriaStage, thyroidTx, mentalHealthAppt, dkaTherapy } — code→label maps (labels translatable; keys/codes not)
 //   labels           — short value labels (N/A, Not recorded, Unavailable, …)
-//   auditDetail      — mock audit-detail localization (database summary + fixed-criteria labels/units)
+//   templateDetail   — mock template-detail localization (database summary + fixed-criteria labels/units)
 //   specValues       — mock parse chip VALUES (cohort defaults/options)
 //   explain          — namespace of FUNCTIONS returning the right-panel explanation strings (preserve ${…} interpolation)
 //   blockedReason    — the blocked-cell reason_detail (CPH009 age-at-discharge)
 //   timeline         — { activities, tools, thinks, summaryWords, email parsing } headline/detail/think strings keyed sensibly
 //   email            — mockSampleEmail body
+//   artifactWorkspace — Lung MOC Prep demo strings (columns, coded-value names, matrix prose, provenance, evidence, attention, notes, follow-ups, run activity, opening turn, component labels); numbers/dates/codes/ids stay in the demo logic and are composed in
 
 const blankFilters = () => ({ dateFrom: "", dateTo: "", hospitals: "", cohort: "" });
 
@@ -710,7 +711,7 @@ const cord = {
       prom: { v: "No", e: ["no prolonged rupture of membranes"] },
       rffs: { v: "No", e: ["No risk factors for sepsis"] },
       sentinel: { v: "None", e: ["no sentinel event"] },
-      dcc: { v: "Yes", e: ["delayed cord clamping for around 60 seconds", "Cord left to pulsate for about a minute before clamping"] },
+      dcc: { v: "Yes", e: ["delayed cord clamping for around 60 seconds", "cord left to pulsate for about a minute before clamping"] },
       intub: { v: "No", e: ["The baby was not intubated"] },
       compress: { v: "No", e: ["no cardiac compressions were required"] },
       drugs: { v: "None", e: ["no resuscitation drugs were given"] },
@@ -1852,14 +1853,10 @@ const labels = {
   // word for the cord record Yes/No values and for these labels.
   yes: "Yes",
   no: "No",
-  // Audit-name derivation (lib/spec.js): the scope qualifiers stripped from a
-  // template name, and how the created audit's name is then formed.
-  scopeQualifiers: ["local", "regional", "national"],
-  auditNameFormat: (base) => `${base} audit`,
 };
 
 // --- Mock audit-detail strings (criteria + summary) -------------------------
-const auditDetail = {
+const templateDetail = {
   databaseSummary: "Demographics, admissions and coded clinical events for the cohort join.",
   criteria: {
     age: { label: "Patient age", unit: "years" },
@@ -2257,8 +2254,112 @@ const timeline = {
   flowT: {
     reviewingTemplate: { headline: "Reviewing the template…", detail: "Reviewing the **Paediatric major trauma (NMTR)** audit against the **EHR database** and resolving the field mappings." },
   },
+  diabetesWorklist: {
+    creating: { headline: "Creating BPT worklist", detail: "Pinned a focused BPT risk worklist from the chat answer." },
+    scoping: { headline: "Scoping BPT worklist", detail: "Selecting only paediatric diabetes patients already identified in the traceable chat list." },
+    fetchingEvidence: "Fetching latest HbA1c and urinary ACR source evidence",
+    readingNotes: { headline: "Reading clinic notes", detail: "Checking glucose-management, DKA/admission and review evidence one patient at a time." },
+  },
   // Folded activity-line label for thinking steps.
   thinkingLabel: "Thinking",
+};
+
+const diabetesWorklist = {
+  tableTitle: "Diabetes BPT evidence worklist",
+  sheetName: "Diabetes worklist",
+  columns: [
+    { key: "patient", header: "Patient", width: 12 },
+    { key: "hba1c", header: "Latest HbA1c", width: 14 },
+    { key: "hba1cDate", header: "HbA1c recorded date / clinic visit date", width: 34 },
+    { key: "glucoseIntervention", header: "Glucose-management intervention evidence", width: 38 },
+    { key: "acr", header: "Urinary ACR result", width: 18 },
+    { key: "acrDate", header: "Urinary ACR recorded date", width: 26 },
+    { key: "admission", header: "DKA / admission evidence", width: 28 },
+    { key: "lastReview", header: "Last diabetes review", width: 22 },
+  ],
+  answer: [
+    "Summary: [12]{1} paediatric diabetes patients are in scope. 7/12 need action before the BPT submission deadline: [5]{2} have HbA1c at 70 mmol/mol or above, and [2]{3} are missing urinary ACR evidence.",
+    "",
+    "---",
+    "",
+    "**High HbA1c - intervention evidence needed**",
+    "",
+    "• Issue: these patients are above the HbA1c threshold, so BPT performance depends on documenting that a glucose-management intervention has been reviewed or agreed.",
+    "",
+    "• Patients: NPD002 HbA1c [74.0 mmol/mol]{4}; NPD003 HbA1c [81.0 mmol/mol]{5} with [DKA at new diagnosis]{6}; NPD005 HbA1c [86.0 mmol/mol]{7}; NPD006 HbA1c [92.0 mmol/mol]{8} with [recent DKA admission]{9}; NPD008 HbA1c [70.0 mmol/mol]{11}.",
+    "",
+    "• Action: diabetes CNS or consultant review, then record the intervention plan before submission.",
+    "",
+    "---",
+    "",
+    "**Missing urinary ACR evidence - care-process gap**",
+    "",
+    "• Issue: no urinary ACR result is recorded for these patients, so the annual care-process evidence is incomplete.",
+    "",
+    "• Patients: NPD007 - [no urinary ACR result]{10}; NPD010 - [no urinary ACR result]{12}.",
+    "",
+    "• Action: locate the lab result or book and record urinary ACR before submission.",
+    "",
+    "---",
+    "",
+    "Should I make a table for the diabetes audit lead that tracks the source data?",
+  ].join("\n"),
+  ask: {
+    question: "Create a table for the diabetes audit lead that tracks source data?",
+    createLabel: "Create table",
+    keepLabel: "Keep list",
+  },
+  riskListAsk: {
+    question: "Pull the patient-level traceable list?",
+    showLabel: "Show list",
+    keepLabel: "Keep summary",
+  },
+  messages: {
+    keepRiskSummary: "Keeping this as a short BPT risk summary.",
+    buildingTable: "Building the diabetes BPT risk worklist now. It will include only the 7 action-needed patients and source-backed evidence for HbA1c, ACR, glucose-management intervention, DKA/admissions, and last review.",
+    keepChatAnswer: "Keeping the diabetes reporting-risk answer in chat.",
+  },
+  activities: {
+    genericQuery: { label: "Querying the database", headline: "Reading the cited records" },
+    initial: [
+      { id: "mock-diabetes-bpt-requirements", label: "Reviewing BPT requirements", headline: "Checking which paediatric diabetes measures apply to this reporting deadline" },
+      { id: "mock-diabetes-cohort", label: "Inspecting diabetes cohort", headline: "Counting paediatric diabetes patients in the reporting year" },
+      { id: "mock-diabetes-evidence-map", label: "Mapping required evidence", headline: "Identifying the outcome and care-process fields needed for BPT submission" },
+      { id: "mock-diabetes-care-processes", label: "Querying patient evidence", headline: "Reading HbA1c, urinary ACR and clinic-note evidence for the mapped measures" },
+      { id: "mock-diabetes-admissions", label: "Checking admission notes", headline: "Looking for DKA admissions linked to the action-needed patients" },
+      { id: "mock-diabetes-bpt-gap", label: "Assessing BPT gap", headline: "Grouping patients by missing evidence and recommended follow-up" },
+    ],
+    riskList: { label: "Checking BPT risk evidence", headline: "Reading HbA1c, ACR and admission evidence" },
+    table: [
+      { id: "mock-diabetes-worklist-table", label: "Preparing source-backed table", headline: "Creating the diabetes audit lead worklist" },
+      { id: "mock-diabetes-worklist-columns", label: "Resolving evidence columns", headline: "Mapping HbA1c, ACR, glucose-management, admission and review evidence" },
+      { id: "mock-diabetes-worklist-population", label: "Starting table population", headline: "Launching live population for the 7 action-needed patients" },
+    ],
+  },
+  citations: {
+    cohort: { explanation: "count of paediatric diabetes patients in the reporting cohort", denominatorLabel: "patients in reporting cohort", completenessLabel: "patients counted" },
+    highHba1c: { explanation: "count of diabetes patients with HbA1c at or above 70 mmol/mol", denominatorLabel: "high HbA1c patients", completenessLabel: "HbA1c values checked" },
+    missingAcr: { explanation: "count of diabetes patients missing urinary ACR evidence", denominatorLabel: "missing ACR patients", completenessLabel: "ACR fields checked" },
+    hba1c: (code) => `latest HbA1c value for ${code}`,
+    dkaNewDiagnosis: (code) => `admission note documenting DKA at new diagnosis for ${code}`,
+    recentDka: (code) => `admission note documenting recent DKA admission for ${code}`,
+    urinaryAcr: (code) => `urinary ACR lookup for ${code}`,
+  },
+  evidence: {
+    dkaNewDiagnosis: "diabetic ketoacidosis (DKA) at the time of new diagnosis",
+    recentDka: "diabetic ketoacidosis (DKA) following an intercurrent illness",
+  },
+  cell: {
+    noneRecorded: "None recorded",
+    patientExplanation: (code) => `${code} is in the paediatric diabetes reporting cohort for this period.`,
+    hba1cDate: (code) => `The clinic observation panel records the HbA1c date for ${code}.`,
+    glucoseIntervention: (code) => `The diabetes clinic note records glucose-management intervention evidence for ${code}.`,
+    acrDate: (code) => `The clinic observation panel records the urinary ACR date for ${code}.`,
+    acrDateMissing: (code) => `No urinary ACR result is recorded for ${code}, so there is no urinary ACR recorded date.`,
+    dkaAdmission: (code) => `The admission note records a diabetes-related DKA admission for ${code}.`,
+    noAdmission: (code) => `No diabetes-related admission is recorded for ${code} in the audit-year hospital admission lookup.`,
+    lastReview: (code) => `The annual review note records the latest diabetes review for ${code}.`,
+  },
 };
 
 // --- Sample doctor's email (Flow B) -----------------------------------------
@@ -2275,13 +2376,13 @@ Dr Mark Alvarez
 Emergency Medicine`;
 
 // --- Tracked-dashboard descriptors (home cards §2.2 + left panel §4) ---------
-// Three paediatric BPT dashboards. Each opens a seeded audit via selectAudit().
+// Three paediatric BPT dashboards. Each opens a seeded audit via selectPopulatedTable().
 // `trackers` lists ids into the `trackers` map below. Numbers/ids/refs/kinds are
 // logic and identical across packs; title/subtitle strings stay English verbatim.
 const dashboards = [
   {
     id: "paediatric-diabetes-bpt",
-    auditId: "npda-lo-audit",
+    templateId: "npda-lo-audit",
     title: "Diabetes BPT",
     logo: "dash-diabetes",
     subtitle: "NPDA · key care processes",
@@ -2290,7 +2391,7 @@ const dashboards = [
   },
   {
     id: "paediatric-epilepsy-bpt",
-    auditId: "epilepsy12-lo-audit",
+    templateId: "epilepsy12-lo-audit",
     title: "Epilepsy BPT",
     logo: "dash-epilepsy",
     subtitle: "Epilepsy12 · service KPIs",
@@ -2299,7 +2400,7 @@ const dashboards = [
   },
   {
     id: "paediatric-trauma-bpt",
-    auditId: "nmtr-trauma-lo-audit",
+    templateId: "nmtr-trauma-lo-audit",
     title: "Major Trauma BPT",
     logo: "dash-trauma",
     subtitle: "NMTR · acute care standards",
@@ -2308,7 +2409,7 @@ const dashboards = [
   },
   {
     id: "cord-ph-bpt",
-    auditId: "cord-ph-lo-audit",
+    templateId: "cord-ph-lo-audit",
     title: "Cord pH Audit",
     logo: "dash-cordph",
     subtitle: "Cord blood gas · quality at birth",
@@ -2732,6 +2833,513 @@ const trackers = {
   },
 };
 
+// --- Artifact-workspace demo (Lung MOC Prep) --------------------------------
+// EVERY human-readable string of the Annexe 55 lung-MOC artifact-workspace demo.
+// The logic (src/lib/artifactWorkspaceDemo.js, src/stores/artifactWorkspaceDemo.js
+// and the src/components/artifact-workspace/* components) keeps the invariants —
+// patient ids, ISO dates, numbers, TNM strings, UICC stage groups, Annexe 55 code
+// NUMBERS, ECOG scores, lab values, ids/keys and SQL — and composes each displayed
+// value from a translatable name here + the invariant token in logic. Coded values
+// render as `name (code NN)`: the NAME localises, the NUMBER comes from logic via
+// the `coded` helper (so the literal word "code" localises but the number never does).
+const artifactWorkspace = {
+  // Matrix column headers (Annexe 55 field names).
+  columns: {
+    patient: "Patient",
+    histology: "Histology",
+    ecog: "ECOG",
+    tnm: "TNM",
+    stage: "Stage",
+    pdl1: "PD-L1 TPS",
+    egfr: "EGFR",
+    ngs: "NGS/Molecular",
+    treatment: "Treatment",
+    mocNotes: "MOC Notes",
+  },
+
+  // Coded-value composition: `name (code NN)`. Name localises; the code number is
+  // passed in from logic. The literal word "code" lives here so it can localise.
+  coded: (name, code) => `${name} (code ${code})`,
+
+  // Histology column names (field 6 · diagnostic histology + behaviour).
+  histology: {
+    adenocarcinoma: "Adenocarcinoma",
+    squamousCell: "Squamous cell",
+    nsclcNos: "NSCLC, NOS",
+    smallCellSclc: "Small cell (SCLC)",
+  },
+
+  // ECOG labels (field 3 · WHO/ECOG score). Rendered `label (score)`; the score
+  // number is invariant and lives in logic.
+  ecog: {
+    fullyActive: "Fully active",
+    ambulatory: "Ambulatory",
+    selfCareOnly: "Self-care only",
+    scored: (label, score) => `${label} (${score})`,
+  },
+
+  // Stage column: the numbered UICC groups (IVA, IIIB, …) are invariant and stay
+  // in logic; only the SCLC prose descriptor localises.
+  stage: {
+    extensive: "Extensive stage",
+  },
+
+  // Matrix prose values (words, not codes) and mixed-value templates. The code
+  // number / percentage / genomic token is always interpolated from logic.
+  values: {
+    missing: "Missing",
+    pending: "Pending",
+    complete: "Complete",
+    negative: "Negative",
+    na: "N/A",
+    naSquamous: "N/A (squamous)",
+    naEarlyStage: "N/A (early stage)",
+    naSclc: "N/A (SCLC)",
+    insufficientTissue: "Insufficient tissue (repeat requested)",
+    completeWith: (marker) => `Complete (${marker})`,
+    positiveWith: (variant) => `Positive (${variant})`,
+    conflicting: (a, b) => `Conflicting (${a} vs ${b})`,
+    // Blocked-cell reason details surfaced in the evidence panel status. The
+    // status matching itself (missing / pending / insufficient tissue / n/a) is
+    // logic that keys off the English value and stays in the demo module.
+    missingReasonDetail: "No source document found for this field.",
+    insufficientTissueReasonDetail: "Sample had insufficient tissue for this test; a repeat biopsy was requested.",
+  },
+
+  // Treatment column names (field 10 · coded chronology). Each renders through
+  // `coded`; dates inside a name are invariant and interpolated in logic.
+  treatment: {
+    pembrolizumabStarted: "Pembrolizumab, started",
+    concurrentChemoRtCompleted: "Concurrent chemo-RT, completed",
+    noConsolidationImmunotherapy: "no consolidation immunotherapy",
+    documented: "documented",
+    carboPaclitaxelPembrolizumab: "Carbo/paclitaxel + pembrolizumab",
+    osimertinibStarted: "Osimertinib, started",
+    surgeryPlanned: "Surgery planned — awaiting surgical planning",
+    notYetStarted: "Not yet started — workup incomplete",
+    alectinibStarted: "Alectinib, started",
+    concurrentChemoRtOngoing: "Concurrent chemo-RT, ongoing",
+    carboEtoposideAtezolizumab: "Carbo/etoposide + atezolizumab",
+  },
+
+  // Clinical note-type labels, shared across interpreted-cell notes, conflict
+  // sources and precedent facts.
+  noteLabels: {
+    oncologyConsult: "Oncology consult note",
+    oncologyTreatment: "Oncology treatment note",
+    mdtOutcome: "MDT outcome note",
+    radiationOncologyCompletion: "Radiation oncology completion note",
+    thoracicSurgeryClinic: "Thoracic surgery clinic note",
+    oncologyClinic: "Oncology clinic note",
+    radiationOncologyProgress: "Radiation oncology progress note",
+    oncologyNote: "Oncology note",
+    oncologyFollowUp: "Oncology follow-up note",
+    radiologyNote: "Radiology note",
+    pathologyReport: "Pathology report",
+    molecularPathologyReread: "Molecular pathology re-read",
+  },
+
+  // Histology-cell evidence: the Annexe 55 provenance block (fields 2, 4, 5, 7).
+  // Coded names render through `coded`; lobe/laterality/differentiation names and
+  // biopsy procedure names localise, the code numbers and dates stay in logic.
+  provenance: {
+    heading: "Annexe 55 provenance",
+    oldResult: "Old result",
+    labels: {
+      baseOfDiagnosis: "Base of diagnosis",
+      localisationLaterality: "Localisation · laterality",
+      differentiationGrade: "Differentiation grade",
+      biopsy: "Biopsy",
+      petct: "PET-CT",
+    },
+    baseOfDiagnosis: {
+      histologyOfPrimary: "Histology of primary",
+      cytology: "Cytology",
+    },
+    lobes: {
+      rightUpperLobe: "Right upper lobe",
+      leftUpperLobe: "Left upper lobe",
+      leftLowerLobe: "Left lower lobe",
+      rightLowerLobe: "Right lower lobe",
+    },
+    laterality: {
+      left: "Left",
+      right: "Right",
+    },
+    differentiation: {
+      well: "Well differentiated",
+      moderately: "Moderately differentiated",
+      poorly: "Poorly differentiated",
+      unknown: "Unknown",
+    },
+    biopsyProcedures: {
+      ctGuidedLung: "CT-guided lung",
+      bronchoscopy: "bronchoscopy",
+      pleural: "pleural",
+      vatsWedge: "VATS wedge",
+    },
+    // `{lobe} · {laterality (code n)}` — the middot is punctuation, from logic.
+    localisation: (lobe, lateralityCoded) => `${lobe} · ${lateralityCoded}`,
+    // `{ISO date} ({procedure})` — the date is invariant, from logic.
+    biopsyValue: (date, procedure) => `${date} (${procedure})`,
+    biopsyAgeDetail: (date, days) => `Biopsy ${date} is ${days} days old — old result.`,
+  },
+
+  // Evidence side panel (both the fixture-built evidence and the component chrome).
+  evidence: {
+    selectedCell: "Selected cell",
+    mocNote: "MOC note",
+    interpretedExplanation: (columnTitle, rowId, noteLabel, date) =>
+      `The ${columnTitle} value was extracted from free text in ${rowId}'s ${noteLabel} (${date}).`,
+    directExplanation: (columnTitle, concept, rowId) =>
+      `The ${columnTitle} value is read from the ${concept} source linked to patient ${rowId}.`,
+    mocNoteExplanation: (rowId) => `Written to MOC Notes from a follow-up conversation about ${rowId}.`,
+    conflictResolvedNote: (acceptedValue, acceptedLabel, rejectedValue, rejectedLabel, date) =>
+      `PD-L1 conflict resolved: ${acceptedValue} (${acceptedLabel}) accepted over ${rejectedValue} (${rejectedLabel}), confirmed ${date}.`,
+    // ArtifactEvidence.svelte chrome.
+    conflictHeading: "Conflicting sources",
+    conflictHint: "Both readings are kept on file. Accept the value to use for this cell.",
+    selected: "Selected",
+    notSelected: "Not selected",
+    use: (value) => `Use ${value}`,
+    using: (value) => `Using ${value}`,
+    useFrom: (value, label) => `Use ${value} from ${label}`,
+    blockNote: "Note",
+    blockReferences: "References",
+    blockSource: "Source",
+    blockQuery: "Query",
+    blockReport: "Report",
+    close: "Close evidence",
+  },
+
+  // The DB concept descriptor rendered in the direct-cell explanation ("…read
+  // from the {concept} source…"), keyed by column id. Localises the human-facing
+  // descriptor; the SQL `concept_name` token stays in logic (FIELD_SOURCES), so
+  // the query text is language-invariant while the sentence localises.
+  fieldSourceConcepts: {
+    histology: "histology",
+    tnm: "TNM classification",
+    pdl1: "PD-L1 TPS",
+    egfr: "EGFR mutation",
+    ngs: "NGS panel",
+    treatment: "current treatment",
+    mocNotes: "MOC discussion note",
+  },
+
+  // The two attention-list lines shown in the opening turn. Ids, code numbers,
+  // stage groups, dates and percentages are interpolated from logic.
+  attention: {
+    flagMissing: "Missing",
+    flagConflicting: "Conflicting",
+    l3402Label: (id, stage) => `${id} (stage ${stage}, unresectable)`,
+    l3402Detail: (chemoCode, rtDate, immunoCode) =>
+      `concurrent chemo-RT (code ${chemoCode}) completed ${rtDate}, but no consolidation immunotherapy (code ${immunoCode}) line is documented. Durvalumab consolidation is the guideline follow-on after chemo-RT and is COM-monitored for reimbursement — worth confirming whether the window has passed.`,
+    l3404Label: (id, stage) => `${id} (stage ${stage})`,
+    l3404Detail: (pathologyValue, rereadValue) =>
+      `PD-L1 TPS conflicting: pathology report reads ${pathologyValue}, molecular pathology re-read reads ${rereadValue}. Treatment choice may hinge on which is used.`,
+  },
+
+  // Source-document bodies + verbatim quote substrings for the L-3404 PD-L1
+  // conflict. Percentages inside the prose are invariant, kept verbatim here.
+  conflict: {
+    pdl1: {
+      pathology: {
+        quotes: ["Tumor Proportion Score 60%"],
+        body: "PD-L1 (22C3 assay): Tumor Proportion Score 60%.",
+      },
+      reread: {
+        quotes: ["Tumor Proportion Score 10%", "repeat testing recommended if treatment-decision-critical"],
+        body: "Re-review of PD-L1 IHC at second reader's request: Tumor Proportion Score 10%. Heterogeneous staining noted; repeat testing recommended if treatment-decision-critical.",
+      },
+    },
+  },
+
+  // Clinical note prose behind every interpreted (yellow) cell, keyed
+  // "rowId:columnId". `quotes` are verbatim substrings of `body`. The note label
+  // and date are held in logic (label -> noteLabels; date invariant).
+  interpretedNotes: {
+    "L-3401:ecog": {
+      quotes: ["ECOG performance status 1"],
+      body: "Reviewed in clinic ahead of systemic therapy. ECOG performance status 1: symptomatic from cough but fully ambulatory and self-caring. Fit for immunotherapy.",
+    },
+    "L-3401:stage": {
+      quotes: ["staged as cT2 cN3 cM1b, UICC stage IVA"],
+      body: "Staging investigations now complete. CT and PET demonstrate a 4.2cm RUL primary with multi-station mediastinal and contralateral nodal disease, plus a single adrenal metastasis; staged as cT2 cN3 cM1b, UICC stage IVA. Molecular results reviewed with the patient; systemic therapy options discussed.",
+    },
+    "L-3401:treatment": {
+      quotes: ["Pembrolizumab monotherapy started today"],
+      body: "PD-L1 TPS 80%, no actionable driver on NGS beyond KRAS G12C. Pembrolizumab monotherapy started today, cycle 1 administered without complication. Plan: continue 3-weekly, restaging CT after cycle 3.",
+    },
+    "L-3402:ecog": {
+      quotes: ["ECOG performance status 1"],
+      body: "Fit for radical concurrent chemo-radiotherapy: ECOG performance status 1, ambulatory and independent in daily activities, adequate organ function on baseline bloods.",
+    },
+    "L-3402:stage": {
+      quotes: ["stage IIIB (cT4 cN2 cM0) and not resectable"],
+      body: "MDT review of imaging and EBUS results: bulky mediastinal nodal disease with contralateral nodal involvement. Thoracic surgery review concludes the disease is stage IIIB (cT4 cN2 cM0) and not resectable. Consensus plan: concurrent chemo-radiotherapy with curative intent.",
+    },
+    "L-3402:treatment": {
+      quotes: ["Concurrent chemo-radiotherapy completed today", "no consolidation immunotherapy order placed"],
+      body: "Concurrent chemo-radiotherapy completed today: 60 Gy in 30 fractions with weekly carboplatin/paclitaxel, tolerated with grade 1 oesophagitis. PD-L1 result outstanding at completion; no consolidation immunotherapy order placed at this time. For medical oncology follow-up.",
+    },
+    "L-3403:ecog": {
+      quotes: ["Performance status ECOG 1"],
+      body: "Pleural fluid cytology confirms squamous cell carcinoma. Performance status ECOG 1: symptomatic with exertional breathlessness but ambulatory and self-caring. For first-line systemic therapy.",
+    },
+    "L-3403:stage": {
+      quotes: ["malignant pleural effusion — cM1a disease, UICC stage IVA"],
+      body: "Pleural fluid cytology from the 2026-05-28 aspiration is positive for malignant cells consistent with squamous cell carcinoma, confirming a malignant pleural effusion — cM1a disease, UICC stage IVA. Performance status ECOG 1. For first-line systemic therapy.",
+    },
+    "L-3403:treatment": {
+      quotes: ["carboplatin/paclitaxel with pembrolizumab"],
+      body: "Cycle 2 of carboplatin/paclitaxel with pembrolizumab administered today. Tolerating treatment well apart from grade 1 fatigue; pleural effusion clinically stable, no re-accumulation requiring drainage.",
+    },
+    "L-3404:ecog": {
+      quotes: ["ECOG performance status 0"],
+      body: "Despite osseous metastases the patient remains ECOG performance status 0: fully active, able to carry on all pre-disease activity without restriction. For EGFR-directed targeted therapy.",
+    },
+    "L-3404:stage": {
+      quotes: ["multiple osseous metastases", "cM1c disease, UICC stage IVB"],
+      body: "PET-CT and MRI spine confirm multiple osseous metastases (T8 vertebral body, left ilium) in addition to the lung primary: cM1c disease, UICC stage IVB. Commenced on analgesia; bone-protective agent discussed. EGFR exon 19 deletion positive — for targeted therapy.",
+    },
+    "L-3404:treatment": {
+      quotes: ["Osimertinib 80mg once daily started today"],
+      body: "EGFR exon 19 deletion confirmed on tissue NGS. Osimertinib 80mg once daily started today after baseline ECG and bloods. Counselled on rash, diarrhoea and QTc monitoring; first response assessment in 6 weeks.",
+    },
+    "L-3405:ecog": {
+      quotes: ["ECOG performance status 0"],
+      body: "Well patient with an incidentally-found nodule. ECOG performance status 0: fully active, asymptomatic, no functional limitation. Fit for lobectomy.",
+    },
+    "L-3405:stage": {
+      quotes: ["pathological stage IA (pT1b pN0 cM0), resectable disease"],
+      body: "Solitary 2.1cm right upper lobe nodule, PET-avid, with no nodal or distant disease: pathological stage IA (pT1b pN0 cM0), resectable disease. Wedge resection histology confirms adenocarcinoma with clear margins on the diagnostic specimen. Referred to thoracic surgery for definitive resection planning.",
+    },
+    "L-3405:treatment": {
+      quotes: ["awaiting surgical planning"],
+      body: "Reviewed in thoracic surgery clinic. Pulmonary function adequate for lobectomy (FEV1 92% predicted). Currently awaiting surgical planning and pre-operative anaesthetic assessment; aiming to list within 4 weeks.",
+    },
+    "L-3406:ecog": {
+      quotes: ["ECOG performance status 2"],
+      body: "ECOG performance status 2: symptomatic, up and about more than half the waking day and capable of self-care but unable to work. Treatment intensity to be weighed against performance status at MOC.",
+    },
+    "L-3406:stage": {
+      quotes: ["stage IIIA (cT3 cN2 cM0) and unresectable"],
+      body: "EBUS confirms N2 nodal involvement (stations 4R and 7). MDT consensus: the disease is stage IIIA (cT3 cN2 cM0) and unresectable; not a surgical candidate. Plan depends on repeat biopsy adequacy for molecular profiling.",
+    },
+    "L-3406:treatment": {
+      quotes: ["Treatment has not yet started"],
+      body: "Treatment has not yet started. The initial sample had insufficient tissue for the NGS panel; repeat bronchoscopic biopsy requested before finalising the systemic plan. PD-L1 and EGFR also outstanding. To be re-discussed at MOC once results return.",
+    },
+    "L-3407:ecog": {
+      quotes: ["ECOG performance status 1"],
+      body: "Newly diagnosed with brain metastases but neurologically intact. ECOG performance status 1: ambulatory and self-caring, no steroid requirement. Started on CNS-penetrant targeted therapy.",
+    },
+    "L-3407:stage": {
+      quotes: ["cM1c disease, UICC stage IVB, with brain metastases"],
+      body: "MRI brain (2026-05-26) demonstrates three enhancing metastases, largest 14mm in the right frontal lobe: cM1c disease, UICC stage IVB, with brain metastases. Asymptomatic, no steroid requirement. ALK rearrangement identified on NGS — CNS-penetrant targeted therapy preferred over radiotherapy up front.",
+    },
+    "L-3407:treatment": {
+      quotes: ["Alectinib 600mg twice daily started today (2026-05-30)"],
+      body: "ALK rearrangement confirmed. Alectinib 600mg twice daily started today (2026-05-30) with intracranial disease left unirradiated given expected CNS activity. Baseline LFTs and CK normal; surveillance brain MRI planned at 3 and 6 weeks.",
+    },
+    "L-3408:ecog": {
+      quotes: ["ECOG performance status 1"],
+      body: "ECOG performance status 1: symptomatic but ambulatory and independent, suitable for radical concurrent chemo-radiotherapy. PD-L1 70%; consolidation immunotherapy to be considered on completion.",
+    },
+    "L-3408:stage": {
+      quotes: ["stage IIIB (cT4 cN2 cM0), unresectable"],
+      body: "Restaging after bronchoscopic biopsy: contralateral mediastinal nodal involvement makes this stage IIIB (cT4 cN2 cM0), unresectable. MDT recommends concurrent chemo-radiotherapy with consolidation immunotherapy to be considered on completion, PD-L1 70%.",
+    },
+    "L-3408:treatment": {
+      quotes: ["Concurrent chemo-radiotherapy ongoing"],
+      body: "Concurrent chemo-radiotherapy ongoing: fraction 18 of 30 delivered with weekly carboplatin/paclitaxel. Grade 1 oesophagitis managed with soluble analgesia; no treatment interruptions to date. On track to complete 2026-07-22.",
+    },
+    "L-3409:ecog": {
+      quotes: ["ECOG performance status 1"],
+      body: "Small cell lung cancer with a rapid tempo of disease. ECOG performance status 1: symptomatic but ambulatory and self-caring. For first-line chemo-immunotherapy without delay.",
+    },
+    "L-3409:stage": {
+      quotes: ["extensive stage disease"],
+      body: "Small cell lung cancer confirmed on bronchoscopic biopsy. Staging CT shows hepatic metastases and contralateral hilar nodes: extensive stage disease. ECOG 1. For first-line chemo-immunotherapy without delay given pace of disease.",
+    },
+    "L-3409:treatment": {
+      quotes: ["carboplatin/etoposide with atezolizumab"],
+      body: "Cycle 1 of carboplatin/etoposide with atezolizumab administered today. Anti-emetics and G-CSF support prescribed. Plan: 4 cycles then maintenance atezolizumab; response CT after cycle 2.",
+    },
+  },
+
+  // Follow-up A precedent cases (L-2894, L-3011). Stage groups, ids, day/week
+  // counts are interpolated from logic; source bodies/quotes are verbatim.
+  precedent: {
+    l2894Situation: (stage, refId) =>
+      `stage ${stage} unresectable, chemo-RT completed, PD-L1 still pending at RT completion (same situation as ${refId})`,
+    l3011Situation: (stage) => `stage ${stage} unresectable, chemo-RT completed`,
+    l2894Action: (days) => `Durvalumab started once PD-L1 resulted, ${days} days after RT completion.`,
+    l2894Outcome: (weeks) => `Still on durvalumab at ${weeks} weeks; no progression on most recent CT.`,
+    l3011Action: "Declined consolidation durvalumab, citing side-effect concerns.",
+    l3011Outcome: (weeks) => `Managed on surveillance; stable disease at ${weeks}-week follow-up CT.`,
+    sources: {
+      l2894Action: {
+        quotes: ["Durvalumab cycle 1 administered today, 18 days post chemo-RT completion"],
+        body: "Durvalumab cycle 1 administered today, 18 days post chemo-RT completion. PD-L1 TPS 45% confirmed prior to initiation.",
+      },
+      l2894Outcome: {
+        quotes: ["No evidence of progression on most recent CT chest/abdomen"],
+        body: "Patient continues durvalumab consolidation, now 7 weeks from initiation. No evidence of progression on most recent CT chest/abdomen (2026-06-10). Tolerating treatment well, no significant toxicity.",
+      },
+      l3011Action: {
+        quotes: ["patient declines immunotherapy at this time citing concerns about side effects"],
+        body: "Discussed consolidation durvalumab with patient; patient declines immunotherapy at this time citing concerns about side effects. Will continue surveillance imaging.",
+      },
+      l3011Outcome: {
+        quotes: ["Stable disease compared to prior study"],
+        body: "CT chest/abdomen: Stable disease compared to prior study dated 2026-05-10. No new lesions. Post-treatment changes in the right upper lobe, unchanged.",
+      },
+    },
+  },
+
+  // Follow-up B brain-MRI series (L-3407). Report label, per-scan labels and the
+  // short date-axis labels (chart ticks) localise; ISO dates, week counts,
+  // measurements and the report bodies/quotes are verbatim.
+  mri: {
+    reportLabel: "MRI Brain with contrast",
+    labelBaseline: "Baseline",
+    labelInterim: (weeks) => `Interim (${weeks} weeks)`,
+    labelLatest: (weeks) => `Latest (${weeks} weeks)`,
+    scans: {
+      baseline: {
+        short: "26 May",
+        quotes: ["Sum of target lesion diameters 31mm", "Three enhancing metastases identified"],
+        body: "CLINICAL HISTORY: NSCLC, ALK-rearranged, newly diagnosed, staging brain MRI prior to alectinib initiation.\nFINDINGS: Three enhancing metastases identified. Right frontal lesion measures 14mm. Left parietal lesion measures 11mm. Cerebellar lesion measures 6mm. Sum of target lesion diameters 31mm. No hemorrhage or hydrocephalus.\nIMPRESSION: Three brain metastases, largest 14mm, consistent with known NSCLC primary.",
+      },
+      interim: {
+        short: "16 Jun",
+        quotes: ["Sum of target lesion diameters 20mm, down from 31mm at baseline (65% of baseline)"],
+        body: "CLINICAL HISTORY: NSCLC, ALK-rearranged, s/p 3 weeks alectinib for known brain metastases.\nCOMPARISON: Brain MRI 2026-05-26.\nFINDINGS: Right frontal lesion now measures 9mm (previously 14mm). Left parietal lesion now measures 7mm (previously 11mm). Cerebellar lesion now measures 4mm (previously 6mm). Sum of target lesion diameters 20mm, down from 31mm at baseline (65% of baseline). No new intracranial lesions.\nIMPRESSION: Interval decrease in size of all three known brain metastases; no new lesions.",
+      },
+      latest: {
+        short: "5 Jul",
+        quotes: ["Sum of target lesion diameters 11mm, down from 31mm at baseline (35% of baseline)", "Cerebellar lesion previously measuring 4mm is no longer visible"],
+        body: "CLINICAL HISTORY: NSCLC, ALK-rearranged, s/p 5 weeks alectinib for known brain metastases.\nCOMPARISON: Brain MRI 2026-06-16.\nFINDINGS: Right frontal lesion now measures 6mm (previously 9mm). Left parietal lesion now measures 5mm (previously 7mm). Cerebellar lesion previously measuring 4mm is no longer visible. Sum of target lesion diameters 11mm, down from 31mm at baseline (35% of baseline). No new intracranial lesions.\nIMPRESSION: Continued interval decrease in size of two remaining brain metastases; cerebellar lesion resolved; no new lesions.",
+      },
+    },
+  },
+
+  // Inline chart titles for Follow-up B.
+  charts: {
+    targetLesionBurden: "Target lesion burden",
+    visibleBrainLesions: "Visible brain lesions",
+  },
+
+  // Scripted follow-up turns. `prompt` is the doctor's question; `reply` the agent
+  // lead-in; `activity` the streamed lines; `noteText` the MOC-notes write-back.
+  // Counts, ids, percentages, day/week values and dates are interpolated from logic.
+  followUps: {
+    a: {
+      prompt: "Any similar cases before?",
+      reply: (count) => `${count} similar cases this quarter:`,
+      activity: [
+        "Searching prior lung MOC records for stage III unresectable cases.",
+        "Found 2 comparable patients treated this quarter.",
+        "Pulling their consolidation decisions and follow-up outcomes.",
+      ],
+      noteText: (count, id1, days, weeks1, id2, weeks2) =>
+        `Precedent (${count} cases): ${id1} — durvalumab started D+${days}, stable at ${weeks1}wk. ${id2} — declined, stable at ${weeks2}wk surveillance.`,
+    },
+    b: {
+      prompt: "Response so far?",
+      reply: (count, date) => `${count} brain MRIs on file since Alectinib started ${date}.`,
+      activity: [
+        "Locating L-3407's brain MRI series since Alectinib started.",
+        "Comparing target-lesion measurements across the three scans.",
+        "Computing the response trend.",
+      ],
+      noteText: (pctSequence, scanCount, weeks) =>
+        `Brain MRI response: ${pctSequence} of target lesion burden over ${scanCount} scans, ${weeks} weeks on treatment.`,
+    },
+  },
+  // Fallback activity lines while a follow-up with no scripted activity streams.
+  genericFollowUpActivity: ["Reading the linked records.", "Pulling the relevant values."],
+
+  // Streamed opening-run activity lines (the store's timed controller). Codes,
+  // ids, percentages and counts are interpolated from logic.
+  run: {
+    template: (templateName) => `Recognized your ${templateName} template — reusing it for tomorrow's list.`,
+    agenda: (patients) => `Loading the ${patients} patients on tomorrow's MOC agenda.`,
+    structured: "Reading structured fields: histology, TNM classification and biomarkers.",
+    ecog: "Extracting ECOG performance status from oncology notes.",
+    stage: "Synthesising the UICC stage group from each patient's TNM.",
+    treatment: "Extracting current treatment from medication orders and notes.",
+    conflicts: "Cross-checking biomarker sources for conflicts.",
+    flag3404: (pathologyValue, rereadValue) =>
+      `Flagged L-3404 — PD-L1 conflict (pathology ${pathologyValue} vs re-read ${rereadValue}).`,
+    flag3402: (chemoCode, immunoCode) =>
+      `Flagged L-3402 — chemo-RT (code ${chemoCode}) complete, no consolidation immunotherapy (code ${immunoCode}) documented.`,
+    ready: (ready, total) => `Evidence ready for ${ready} of ${total} patients.`,
+  },
+
+  // Opening turn (ThreadView). "Annexe 55" is the invariant schema name and stays
+  // in logic; the surrounding prose segments localise. Patient/complete counts are
+  // interpolated from logic. `templateName` is the reusable-template display name.
+  templateName: "Lung MOC Prep",
+  artifactTitle: "Lung MOC evidence matrix",
+  chipPopulating: "populating…",
+  chipReady: "ready",
+  opening: {
+    usingYour: "Using your",
+    templateColumnsAre: "template — its columns are the",
+    registrationFields: (patients, complete) =>
+      `registration fields. ${patients} patients on tomorrow's list. The registry data is complete for ${complete} of them. Two need a look before the meeting:`,
+  },
+  agentSurfaceHint: "I can surface any value on this list from its source — select a cell in the matrix and ask.",
+
+  // Follow-up MOC-notes question (product AskUserQuestion shape) + chips.
+  followUpQuestion: (rowId) => `Add this to MOC Notes for ${rowId}?`,
+  addToMocNotes: "Add to MOC Notes",
+  skip: "Skip",
+  followUpAddedConfirm: (rowId) => `Added to MOC Notes for ${rowId} ✓`,
+  followUpSource: "source ↗",
+  followUpSourceAria: (label, date) => `Open source: ${label}, ${date}`,
+
+  // Attention list container label.
+  attentionListLabel: "Needs a look before the meeting",
+
+  // Chart point aria-label (Follow-up B). Value + point label from logic.
+  chartPointAria: (title, value, pointLabel) => `${title}: ${value} on ${pointLabel} — open source report`,
+
+  // Cell metadata explanations surfaced by the spreadsheet cell inspector.
+  cellMeta: {
+    direct: (columnTitle, rowId) => `${columnTitle} for ${rowId}.`,
+    interpreted: (columnTitle, rowId) => `${columnTitle} for ${rowId}, extracted from free-text notes.`,
+  },
+
+  // ArtifactBox.svelte tab & control labels.
+  box: {
+    resizeHandle: "Drag to resize artifact",
+    closeTab: (tabTitle) => `Close ${tabTitle}`,
+    sendContext: (count) => `Send selected context (${count})`,
+    addContext: "Add artifact context",
+    send: "Send",
+    showChat: "Show chat",
+    expandArtifact: "Expand artifact",
+    closeArtifact: "Close artifact",
+    contextNote: "Context note",
+    askAboutOne: "this cell",
+    askAboutMany: (count) => `these ${count} cells`,
+    askPlaceholder: (target) => `Ask about ${target}…`,
+    addToContext: "Add to context",
+  },
+
+  // ContextChip.svelte pill labels.
+  contextChip: {
+    listLabel: "Attached context",
+    detailLabel: "Context detail",
+    remove: "Remove context",
+    oneCell: "1 cell",
+    manyCells: (count) => `${count} cells`,
+  },
+};
+
 export default {
   databases,
   ehrDatabaseName,
@@ -2742,12 +3350,14 @@ export default {
   records: { cord, chest, npda, epilepsy, trauma },
   codeMaps,
   labels,
-  auditDetail,
+  templateDetail,
   specValues,
   explain,
   blockedReason,
   timeline,
+  diabetesWorklist,
   email,
   dashboards,
   trackers,
+  artifactWorkspace,
 };

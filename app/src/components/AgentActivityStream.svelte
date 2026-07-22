@@ -13,18 +13,39 @@
   import { _ } from "svelte-i18n";
 
   export let events = [];
-  export let runStatus = "idle";
+  export let tablePopulationStatus = "idle";
   export let startedAt = null; // epoch ms
   export let endedAt = null; // epoch ms
   export let stopping = false;
   export let onStop = () => {};
+  // "box" (RightPanel, doc 11): the whole stream lives in one gray box with a
+  // stop control. "inline" (chat thread): the folded state is a bare muted line
+  // — timer · one-liner · caret — with NO box and NO stop control (the thread's
+  // composer owns stop); expanding opens the scrollable log box below the line.
+  export let variant = "box";
+  // When set, the box folds itself to its one-line summary once the run ends.
+  export let collapseOnDone = false;
+  // When set, the box starts folded (just the header line) even while running;
+  // the user opens the log explicitly. Initial value only.
+  export let startCollapsed = false;
 
-  let collapsed = false; // default expanded while a run is active, so you can follow along
+  let collapsed = startCollapsed; // otherwise default expanded while a run is active, so you can follow along
+  let wasRunning = false;
   let logEl = null;
   let pinnedToBottom = true;
   const BOTTOM_THRESHOLD = 24; // px from the bottom that still counts as "at the bottom"
 
-  $: running = runStatus === "running";
+  $: running = tablePopulationStatus === "running";
+
+  // Fold to the summary line when the run finishes (opt-in).
+  $: {
+    if (running) {
+      wasRunning = true;
+    } else if (wasRunning) {
+      wasRunning = false;
+      if (collapseOnDone) collapsed = true;
+    }
+  }
 
   // --- Elapsed timer: ticks every second while running, frozen once terminal ---
   let now = Date.now();
@@ -63,9 +84,9 @@
     ? $_("activity.finalizing")
     : running
       ? latest?.label || firstWords(latest?.headline) || $_("activity.working")
-      : runStatus === "error"
-        ? $_("activity.runFailed")
-        : runStatus === "stopped"
+      : tablePopulationStatus === "error"
+        ? $_("activity.tablePopulationFailed")
+        : tablePopulationStatus === "stopped"
           ? $_("activity.stopped")
           : events.length
             ? $_("activity.completed")
@@ -141,21 +162,23 @@
   }
 </script>
 
-<div class="activity-box" class:collapsed>
+<div class="activity-box" class:collapsed class:inline={variant === "inline"}>
   <div class="box-header">
-    <button
-      type="button"
-      class="stop-btn"
-      on:click|stopPropagation={onStop}
-      disabled={!running || stopping}
-      title={$_("activity.stopRun")}
-      aria-label={$_("activity.stopRun")}
-    >
-      <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">
-        <rect x="2" y="1.5" width="2.6" height="9" rx="0.6" />
-        <rect x="7.4" y="1.5" width="2.6" height="9" rx="0.6" />
-      </svg>
-    </button>
+    {#if variant === "box" && (running || stopping)}
+      <button
+        type="button"
+        class="stop-btn"
+        on:click|stopPropagation={onStop}
+        disabled={stopping}
+        title={$_("activity.stopTablePopulation")}
+        aria-label={$_("activity.stopTablePopulation")}
+      >
+        <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">
+          <rect x="2" y="1.5" width="2.6" height="9" rx="0.6" />
+          <rect x="7.4" y="1.5" width="2.6" height="9" rx="0.6" />
+        </svg>
+      </button>
+    {/if}
 
     <button
       type="button"
@@ -222,6 +245,36 @@
     border-radius: var(--radius-md);
     background: var(--color-surface-muted);
     border: 1px solid var(--color-border);
+    overflow: hidden;
+  }
+
+  /* Inline (chat thread) variant: folded = a bare, quiet line on the thread
+     background — no box. The caret hugs the end of the one-liner and points
+     right; expanding rotates it down and opens the log box below the line. */
+  .activity-box.inline {
+    border: none;
+    background: transparent;
+    border-radius: 0;
+    overflow: visible;
+  }
+  .inline .box-header {
+    padding: var(--space-1) 0;
+  }
+  .inline .now-line {
+    flex: 0 1 auto;
+    color: var(--color-text-secondary);
+  }
+  .inline .chevron {
+    transform: rotate(-90deg);
+  }
+  .inline .chevron.open {
+    transform: rotate(0deg);
+  }
+  .inline .log-wrap {
+    margin-top: var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-muted);
     overflow: hidden;
   }
 
@@ -332,8 +385,10 @@
     margin-top: 6px;
     background: var(--color-text-muted);
   }
+  /* Neutral, not accent: the accent is reserved for interactive/traceable
+     affordances; a log bullet is informational chrome. */
   .is-tool .dot {
-    background: var(--color-accent);
+    background: var(--color-text-secondary);
   }
   .is-thinking .dot {
     background: var(--color-warning);

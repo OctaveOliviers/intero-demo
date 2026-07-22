@@ -5,7 +5,7 @@ import { getDeadlineSubtitle } from "./deadlineSubtitle.js";
 import { LOCALE_TAG } from "../i18n/index.js";
 
 // Full localized deadline SENTENCE (countdown-aware for dates, verbatim cadence
-// otherwise) — used by the audit-page subtitle.
+// otherwise) — used by the template-detail subtitle.
 export function dashboardDeadlineText(submissionDeadline) {
   if (!submissionDeadline) return null;
   const subtitle = getDeadlineSubtitle(submissionDeadline);

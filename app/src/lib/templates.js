@@ -1,7 +1,7 @@
 import { writable } from "svelte/store";
-import { listAudits } from "./api.js";
+import { listTemplates } from "./api.js";
 
-// All audits come from the server API (var-backed in stage 1).
+// All templates come from the server API (var-backed in stage 1).
 // This store is the single source of truth for the home screen.
 export const templates = writable([]);
 export const templatesLoading = writable(false);
@@ -11,9 +11,9 @@ const DEFAULT_FILTERS = { dateFrom: "", dateTo: "", hospitals: "", cohort: "" };
 export async function refreshTemplates() {
   templatesLoading.set(true);
   try {
-    const audits = await listAudits();
+    const items = await listTemplates();
     templates.set(
-      audits.map((a) => ({
+      items.map((a) => ({
         ...a,
         id: a.id,
         name: a.name,

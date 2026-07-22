@@ -7,7 +7,7 @@
 //   1. startRunStream({resume:true}) seeds the sink from what's on screen, so a
 //      live cell_update lands on top of the snapshot instead of clearing it
 //      (and a fresh, non-resume start still resets prior state).
-//   2. openWorkbook reconnects only when the backend's authoritative runStatus
+//   2. openWorkbook reconnects only when the backend's authoritative tablePopulationStatus
 //      says the run is still live — never for a finished run.
 //
 // Driven through the REAL stores, with EventSource + fetch stubbed at the
@@ -20,24 +20,24 @@ import { get } from "svelte/store";
 globalThis.__INTERO_MOCK_ENV = { VITE_MOCK: "false" };
 
 import {
-  audits,
-  currentAuditId,
+  populatedTables,
+  currentPopulatedTableId,
   activeStream,
-  startAudit,
-  setAuditRunId,
-  setAuditStatus,
-  syncAuditActivity,
-  syncAuditWorkbook,
-  resetAuditHistory,
-} from "./audits.js";
+  startTablePopulation,
+  setPopulatedTablePopulationId,
+  setPopulatedTableStatus,
+  syncPopulatedTableActivity,
+  syncPopulatedTableWorkbook,
+  resetPopulatedTableHistory,
+} from "./populatedTables.js";
 import {
   startRunStream,
   openWorkbook,
   activeWorkbook,
   activity,
-  runStatus,
+  tablePopulationStatus,
 } from "./chat.js";
-import { selectAudit } from "./navigation.js";
+import { selectPopulatedTable } from "./navigation.js";
 
 // Minimal EventSource stand-in: records every instance and lets a test push
 // SSE frames through onmessage / trip onerror.
@@ -59,9 +59,9 @@ class FakeEventSource {
 }
 globalThis.EventSource = FakeEventSource;
 
-function snapshotWorkbook(runId) {
+function snapshotWorkbook(tablePopulationId) {
   return {
-    runId,
+    tablePopulationId,
     sheets: [
       { name: "ALL", data: [["Code", "Delivery"], ["P1", null]], meta: { columns: [{}, {}] } },
     ],
@@ -71,17 +71,17 @@ function snapshotWorkbook(runId) {
 }
 
 function reset() {
-  resetAuditHistory();
+  resetPopulatedTableHistory();
   activeStream.set(null);
   FakeEventSource.instances.length = 0;
 }
 
 test("resume seeds the sink so a live cell_update lands on top of the snapshot", () => {
   reset();
-  const id = startAudit({ id: "npda", name: "NPDA" }, {});
-  setAuditRunId(id, "r1");
-  syncAuditWorkbook(id, snapshotWorkbook("r1"));
-  syncAuditActivity(id, [{ type: "activity", headline: "Earlier work." }]);
+  const id = startTablePopulation({ id: "npda", name: "NPDA" }, {});
+  setPopulatedTablePopulationId(id, "r1");
+  syncPopulatedTableWorkbook(id, snapshotWorkbook("r1"));
+  syncPopulatedTableActivity(id, [{ type: "activity", headline: "Earlier work." }]);
   activeStream.set(null);
 
   startRunStream("r1", id, { resume: true });
@@ -106,29 +106,29 @@ test("resume seeds the sink so a live cell_update lands on top of the snapshot",
 test("starting a new stream tears down the prior one (single active stream)", () => {
   reset();
   // Run A is streaming live.
-  const a = startAudit({ id: "audit-a", name: "A" }, {});
-  setAuditRunId(a, "rA");
+  const a = startTablePopulation({ id: "audit-a", name: "A" }, {});
+  setPopulatedTablePopulationId(a, "rA");
   startRunStream("rA", a);
   const sourceA = FakeEventSource.instances.at(-1);
   assert.equal(sourceA.closed, false, "A's stream is open");
 
   // Opening run B (e.g. a resumed in-flight run) must close A's source rather
   // than orphan it under the shared activeSource global.
-  const b = startAudit({ id: "audit-b", name: "B" }, {});
-  setAuditRunId(b, "rB");
+  const b = startTablePopulation({ id: "audit-b", name: "B" }, {});
+  setPopulatedTablePopulationId(b, "rB");
   startRunStream("rB", b, { resume: true });
 
   assert.equal(sourceA.closed, true, "A's stream was torn down when B started");
   assert.equal(FakeEventSource.instances.at(-1).closed, false, "B's stream is open");
-  assert.equal(get(activeStream).runId, "rB", "activeStream now tracks B");
+  assert.equal(get(activeStream).tablePopulationId, "rB", "activeStream now tracks B");
 });
 
 test("a fresh (non-resume) start resets the prior snapshot and activity", () => {
   reset();
-  const id = startAudit({ id: "npda", name: "NPDA" }, {});
-  setAuditRunId(id, "r1");
-  syncAuditWorkbook(id, snapshotWorkbook("r1"));
-  syncAuditActivity(id, [{ type: "activity", headline: "Stale." }]);
+  const id = startTablePopulation({ id: "npda", name: "NPDA" }, {});
+  setPopulatedTablePopulationId(id, "r1");
+  syncPopulatedTableWorkbook(id, snapshotWorkbook("r1"));
+  syncPopulatedTableActivity(id, [{ type: "activity", headline: "Stale." }]);
 
   startRunStream("r1", id); // no resume
 
@@ -138,9 +138,9 @@ test("a fresh (non-resume) start resets the prior snapshot and activity", () => 
 
 test("on resume, a stream error settles to completed without discarding the snapshot", () => {
   reset();
-  const id = startAudit({ id: "npda", name: "NPDA" }, {});
-  setAuditRunId(id, "r1");
-  syncAuditWorkbook(id, snapshotWorkbook("r1"));
+  const id = startTablePopulation({ id: "npda", name: "NPDA" }, {});
+  setPopulatedTablePopulationId(id, "r1");
+  syncPopulatedTableWorkbook(id, snapshotWorkbook("r1"));
   activeStream.set(null);
 
   startRunStream("r1", id, { resume: true });
@@ -148,36 +148,36 @@ test("on resume, a stream error settles to completed without discarding the snap
   // run is reattached; a resume must read that as "no longer live", not a fail.
   FakeEventSource.instances.at(-1).emit({ type: "error", message: "run already finished" });
 
-  assert.equal(get(runStatus), "completed", "resume settles the spinner to completed");
+  assert.equal(get(tablePopulationStatus), "completed", "resume settles the spinner to completed");
   assert.ok(get(activeWorkbook), "snapshot preserved through the resume error");
 });
 
-test("openWorkbook reconnects only when the backend reports the run is still live", async () => {
-  // A live run (runStatus in_progress) → reconnect; a finished run → no stream.
-  for (const { runId, runStatus: status, expectStream } of [
-    { runId: "live1", runStatus: "in_progress", expectStream: true },
-    { runId: "done1", runStatus: "complete", expectStream: false },
+test("openWorkbook reconnects only when the backend reports the population is still live", async () => {
+  // A live population (`status.json` writes `running`) → reconnect; a finished population → no stream.
+  for (const { tablePopulationId, tablePopulationStatus: status, expectStream } of [
+    { tablePopulationId: "live1", tablePopulationStatus: "running", expectStream: true },
+    { tablePopulationId: "done1", tablePopulationStatus: "completed", expectStream: false },
   ]) {
     reset();
     globalThis.fetch = async () => ({
       ok: true,
       status: 200,
-      json: async () => ({ ...snapshotWorkbook(runId), runStatus: status }),
+      json: async () => ({ ...snapshotWorkbook(tablePopulationId), tablePopulationStatus: status }),
     });
 
-    const id = startAudit({ id: `a-${runId}`, name: runId }, {});
-    setAuditRunId(id, runId);
+    const id = startTablePopulation({ id: `a-${tablePopulationId}`, name: tablePopulationId }, {});
+    setPopulatedTablePopulationId(id, tablePopulationId);
     // History hydrates everything as "completed" — the local flag is NOT the
-    // signal; the backend runStatus is. Set it wrong on purpose to prove that.
-    setAuditStatus(id, "completed");
+    // signal; the backend tablePopulationStatus is. Set it wrong on purpose to prove that.
+    setPopulatedTableStatus(id, "completed");
     activeStream.set(null);
 
-    await openWorkbook(runId);
+    await openWorkbook(tablePopulationId);
 
     assert.equal(
       FakeEventSource.instances.length,
       expectStream ? 1 : 0,
-      `runStatus=${status} should ${expectStream ? "" : "not "}reconnect`,
+      `tablePopulationStatus=${status} should ${expectStream ? "" : "not "}reconnect`,
     );
     // Settle any stream we opened so it can't leak into the next iteration.
     if (expectStream) FakeEventSource.instances.at(-1).emit({ type: "error", message: "x" });
@@ -186,9 +186,9 @@ test("openWorkbook reconnects only when the backend reports the run is still liv
   delete globalThis.fetch;
 });
 
-test("selecting a run from the sidebar recovers it from the backend and reconnects a live run", async () => {
+test("selecting a table population from the sidebar recovers it from the backend and reconnects a live population", async () => {
   // The user's real gesture: sign out / close the browser / come back later,
-  // then pick a run in the sidebar. selectAudit must re-fetch the state.db
+  // then pick a table population in the sidebar. selectPopulatedTable must re-fetch the state.db
   // snapshot AND reconnect the live stream — without it, the grid would sit on
   // the stale localStorage copy while the backend keeps writing cells.
   reset();
@@ -198,26 +198,26 @@ test("selecting a run from the sidebar recovers it from the backend and reconnec
     return {
       ok: true,
       status: 200,
-      json: async () => ({ ...snapshotWorkbook("rLive"), runStatus: "in_progress" }),
+      json: async () => ({ ...snapshotWorkbook("rLive"), tablePopulationStatus: "running" }),
     };
   };
 
-  // A run hydrated from server history after a fresh session: no workbook on
+  // A table population hydrated from server history after a fresh session: no workbook on
   // screen, status "completed" (history always hydrates that way), not streaming.
-  const id = startAudit({ id: "a-live", name: "Live" }, {});
-  setAuditRunId(id, "rLive");
-  setAuditStatus(id, "completed");
-  syncAuditWorkbook(id, null);
+  const id = startTablePopulation({ id: "a-live", name: "Live" }, {});
+  setPopulatedTablePopulationId(id, "rLive");
+  setPopulatedTableStatus(id, "completed");
+  syncPopulatedTableWorkbook(id, null);
   activeStream.set(null);
 
-  selectAudit(id);
-  // selectAudit fires openWorkbook fire-and-forget; flush the async fetch chain.
+  selectPopulatedTable(id);
+  // selectPopulatedTable fires openWorkbook fire-and-forget; flush the async fetch chain.
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.equal(fetched, 1, "sidebar select re-fetched the /workbook snapshot");
   assert.ok(get(activeWorkbook), "snapshot populated the grid on open");
   assert.equal(get(activeWorkbook).sheets[0].data[1][0], "P1", "every state.db cell is shown");
-  assert.equal(FakeEventSource.instances.length, 1, "still-live run reconnected the stream");
+  assert.equal(FakeEventSource.instances.length, 1, "still-live population reconnected the stream");
 
   // Remaining streamed events land live on the recovered grid.
   FakeEventSource.instances.at(-1).emit({
@@ -231,21 +231,21 @@ test("selecting a run from the sidebar recovers it from the backend and reconnec
   delete globalThis.fetch;
 });
 
-test("selecting a finished run from the sidebar recovers the grid but opens no stream", async () => {
+test("selecting a finished population from the sidebar recovers the grid but opens no stream", async () => {
   reset();
   globalThis.fetch = async () => ({
     ok: true,
     status: 200,
-    json: async () => ({ ...snapshotWorkbook("rDone"), runStatus: "complete" }),
+    json: async () => ({ ...snapshotWorkbook("rDone"), tablePopulationStatus: "completed" }),
   });
 
-  const id = startAudit({ id: "a-done", name: "Done" }, {});
-  setAuditRunId(id, "rDone");
-  setAuditStatus(id, "completed");
-  syncAuditWorkbook(id, null);
+  const id = startTablePopulation({ id: "a-done", name: "Done" }, {});
+  setPopulatedTablePopulationId(id, "rDone");
+  setPopulatedTableStatus(id, "completed");
+  syncPopulatedTableWorkbook(id, null);
   activeStream.set(null);
 
-  selectAudit(id);
+  selectPopulatedTable(id);
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.ok(get(activeWorkbook), "finished run still recovers its full grid from state.db");

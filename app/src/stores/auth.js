@@ -1,9 +1,14 @@
-import { writable } from "svelte/store";
+import { writable, derived } from "svelte/store";
 import { authMe, AuthError } from "../lib/api.js";
 
 // Single source of truth for frontend auth session state.
 export const authStatus = writable("booting"); // booting | authenticated | unauthenticated
 export const authUser = writable(null);
+
+// The caller's role ("admin" | "clinician" | "agent"), resolved server-side and
+// carried on the /api/auth/me response. Null until authenticated. Nav is NOT
+// gated by this yet — it only exposes the role for later role-aware rendering.
+export const userRole = derived(authUser, ($authUser) => $authUser?.role ?? null);
 
 let bootstrapInFlight = null;
 

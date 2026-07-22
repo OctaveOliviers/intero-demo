@@ -1,11 +1,15 @@
 <script>
   import { onMount } from "svelte";
-  import { listMyRuns } from "./lib/api.js";
+  import { listMyTablePopulations } from "./lib/api.js";
   import { isMockMode } from "./lib/mock.js";
-  import { seededDashboardAuditRecords } from "./lib/mockData.js";
-  import { mergeServerRunHistory, seedMockDashboardRecords } from "./stores/audits.js";
+  import { seededDashboardPopulatedTableRecords } from "./lib/mockData.js";
+  import {
+    mergeServerTablePopulationHistory,
+    seedMockDashboardRecords,
+  } from "./stores/populatedTables.js";
   import { resultViewUiState } from "./stores/resultViewUi.js";
-  import { currentView } from "./stores/navigation.js";
+  import { currentView, openThreadView } from "./stores/navigation.js";
+  import { startNewChat } from "./stores/threads.js";
   import { authStatus, authUser, bootstrapSession, setAuthenticated } from "./stores/auth.js";
   import LeftPanel from "./components/LeftPanel.svelte";
   import Login from "./components/Login.svelte";
@@ -16,6 +20,7 @@
   import { _ } from "svelte-i18n";
 
   let indexingStarted = false;
+  let chatDefaulted = false;
   let historyHydratingFor = null;
   let pendingHistoryUserKey = null;
   let lastHistoryUserKey = null;
@@ -32,6 +37,25 @@
     indexingStarted = true;
   }
 
+  // Default landing = a fresh chat (the user's choice). On first sign-in, switch
+  // to the chat view and open
+  // the PENDING landing (the clean centered composer) — NO thread is persisted
+  // until the first message is sent (startNewChat just flags the landing;
+  // sendFirstMessage mints the thread).
+  $: if ($authStatus === "authenticated" && !chatDefaulted) {
+    chatDefaulted = true;
+    openThreadView();
+    startNewChat();
+  }
+
+  // Reset the one-shot fresh-chat flag when the session ends, so the next user
+  // signing in on this same tab gets the intended clean-composer landing instead
+  // of inheriting chatDefaulted=true (which would skip startNewChat and drop them
+  // on home). LeftPanel.handleLogout clears the previous user's thread/table state.
+  $: if ($authStatus === "unauthenticated" && chatDefaulted) {
+    chatDefaulted = false;
+  }
+
   async function hydrateHistoryForUser(userKey) {
     if (!userKey) return;
     if (historyHydratingFor) {
@@ -40,15 +64,15 @@
     }
     historyHydratingFor = userKey;
     try {
-      const rows = await listMyRuns();
+      const rows = await listMyTablePopulations();
       const activeUserKey = $authUser?.id || $authUser?.username || null;
       // Ignore stale responses from a previous user session.
       if ($authStatus === "authenticated" && activeUserKey === userKey) {
-        mergeServerRunHistory(rows);
+        mergeServerTablePopulationHistory(rows);
       }
     } catch (err) {
       // Non-fatal for app shell; keep local history and continue.
-      console.warn("Could not hydrate run history:", err);
+      console.warn("Could not hydrate table-population history:", err);
     } finally {
       historyHydratingFor = null;
       const queued = pendingHistoryUserKey;
@@ -67,13 +91,13 @@
       pendingHistoryUserKey = null;
     } else if (userKey !== lastHistoryUserKey) {
       lastHistoryUserKey = userKey;
-      if (isMockMode("audits")) seedMockDashboardRecords(seededDashboardAuditRecords());
+      if (isMockMode("templates")) seedMockDashboardRecords(seededDashboardPopulatedTableRecords());
       void hydrateHistoryForUser(userKey);
     }
   }
 
   // No mirror layer: the live run views in chat.js are DERIVED from the
-  // per-audit records (single-run-store refactor, T3) — there is nothing to
+  // per-populated-table records (single-run-store refactor, T3) — there is nothing to
   // keep in sync here.
 
   function handleMouseDown() {
@@ -92,7 +116,9 @@
     isResizing = false;
   }
 
-  $: panelOpen = $currentView === "results" && $resultViewUiState.rightPanelOpen;
+  $: panelOpen =
+    ($currentView === "results" || $currentView === "thread") &&
+    $resultViewUiState.rightPanelOpen;
 </script>
 
 <svelte:window on:mousemove={handleMouseMove} on:mouseup={handleMouseUp} />

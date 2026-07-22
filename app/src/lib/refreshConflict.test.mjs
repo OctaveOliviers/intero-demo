@@ -2,29 +2,29 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { handleRefreshConflict } from "./refreshConflict.js";
 
-test("RUN_EXECUTION_ACTIVE resumes by reconnecting stream", () => {
+test("TABLE_POPULATION_ACTIVE resumes by reconnecting stream", () => {
   const calls = [];
-  const reconnect = (runId, auditId) => calls.push({ runId, auditId });
-  const out = handleRefreshConflict("RUN_EXECUTION_ACTIVE", "run-123", "audit-456", reconnect);
-  assert.deepEqual(out, { status: "resumed", runId: "run-123" });
-  assert.deepEqual(calls, [{ runId: "run-123", auditId: "audit-456" }]);
+  const reconnect = (tablePopulationId, populatedTableId) => calls.push({ tablePopulationId, populatedTableId });
+  const out = handleRefreshConflict("TABLE_POPULATION_ACTIVE", "tp-123", "audit-456", reconnect);
+  assert.deepEqual(out, { status: "resumed", tablePopulationId: "tp-123" });
+  assert.deepEqual(calls, [{ tablePopulationId: "tp-123", populatedTableId: "audit-456" }]);
 });
 
-test("RUN_NOT_FOUND remains a user-facing error", () => {
+test("TABLE_POPULATION_NOT_FOUND remains a user-facing error", () => {
   assert.throws(
-    () => handleRefreshConflict("RUN_NOT_FOUND", "run-123", "audit-456", () => {}),
-    /Run not found/,
+    () => handleRefreshConflict("TABLE_POPULATION_NOT_FOUND", "tp-123", "audit-456", () => {}),
+    /Table population not found/,
   );
 });
 
-test("RUN_NOT_REFRESHABLE remains a user-facing error", () => {
+test("TABLE_POPULATION_NOT_REFRESHABLE remains a user-facing error", () => {
   assert.throws(
-    () => handleRefreshConflict("RUN_NOT_REFRESHABLE", "run-123", "audit-456", () => {}),
+    () => handleRefreshConflict("TABLE_POPULATION_NOT_REFRESHABLE", "tp-123", "audit-456", () => {}),
     /not refreshable/,
   );
 });
 
 test("unknown refresh conflict code is left to caller", () => {
-  const out = handleRefreshConflict("SOME_NEW_CODE", "run-123", "audit-456", () => {});
+  const out = handleRefreshConflict("SOME_NEW_CODE", "tp-123", "audit-456", () => {});
   assert.equal(out, null);
 });

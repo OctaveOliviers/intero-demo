@@ -1,5 +1,5 @@
 // The mock run timelines must speak the SAME strict-v2 wire contract as the
-// real backend (docs/mvp/contracts/runtime-events.schema.json). Every step's
+// real backend (specs/product/contracts/runtime-events.schema.json). Every step's
 // event is validated against the schema, and each flow's event order must
 // match doc 5 §Streaming:
 //   activity* -> workbook_created -> (activity | cell_update)* -> review_summary -> done
@@ -16,7 +16,7 @@ import { buildTimeline } from "./mockData.js";
 
 const schema = JSON.parse(
   readFileSync(
-    new URL("../../../docs/mvp/contracts/runtime-events.schema.json", import.meta.url),
+    new URL("../../../specs/product/contracts/runtime-events.schema.json", import.meta.url),
     "utf8",
   ),
 );
@@ -25,7 +25,10 @@ const schema = JSON.parse(
 const ajv = new Ajv2020({ strict: false });
 const validate = ajv.compile(schema);
 
-const FLOWS = ["A", "B", "C"];
+// "TBL" is the Issue-2 thread-spawned table run (a compact cord-pH timeline);
+// "DW" is the focused diabetes worklist spawned from chat. Both must satisfy
+// the SAME schema + ordering contract as the other flows.
+const FLOWS = ["A", "B", "C", "DW", "TBL"];
 
 for (const flow of FLOWS) {
   test(`flow ${flow}: every mock timeline event validates against runtime-events.schema.json`, () => {

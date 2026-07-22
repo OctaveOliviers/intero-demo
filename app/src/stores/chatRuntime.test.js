@@ -7,47 +7,47 @@ import {
   activity,
   activeWorkbook,
   activeCommand,
-  runStatus,
+  tablePopulationStatus,
   isSubmitting,
   error,
   resetChatRuntime,
 } from "./chat.js";
 import {
-  audits,
-  currentAuditId,
+  populatedTables,
+  currentPopulatedTableId,
   activeStream,
-  startAudit,
-  syncAuditActivity,
-  syncAuditReviewSummary,
-  syncAuditWorkbook,
-  resetAuditHistory,
-} from "./audits.js";
+  startTablePopulation,
+  syncPopulatedTableActivity,
+  syncPopulatedTableReviewSummary,
+  syncPopulatedTableWorkbook,
+  resetPopulatedTableHistory,
+} from "./populatedTables.js";
 
-test("resetChatRuntime clears transients; resetAuditHistory clears the derived views", () => {
-  const id = startAudit({ id: "t", name: "Cord pH" }, {});
-  syncAuditActivity(id, [{ type: "activity", headline: "Preparing workbook." }]);
-  syncAuditReviewSummary(id, { type: "review_summary", totals: { cells: 1 } });
-  syncAuditWorkbook(id, { runId: "r1", sheets: [], cellMetadata: {} });
+test("resetChatRuntime clears transients; resetPopulatedTableHistory clears the derived views", () => {
+  const id = startTablePopulation({ id: "t", name: "Cord pH" }, {});
+  syncPopulatedTableActivity(id, [{ type: "activity", headline: "Preparing workbook." }]);
+  syncPopulatedTableReviewSummary(id, { type: "review_summary", totals: { cells: 1 } });
+  syncPopulatedTableWorkbook(id, { tablePopulationId: "r1", sheets: [], cellMetadata: {} });
   activeCommand.set({ command: "run" });
   isSubmitting.set(true);
   error.set("boom");
 
   resetChatRuntime();
 
-  // Transients cleared; the audit record (and its derived views) survive a
-  // runtime reset — they are wiped by resetAuditHistory (the logout path).
+  // Transients cleared; the populated-table record (and its derived views) survive a
+  // runtime reset — they are wiped by resetPopulatedTableHistory (the logout path).
   assert.equal(get(activeCommand), null);
   assert.equal(get(isSubmitting), false);
   assert.equal(get(error), null);
   assert.equal(get(activeStream), null);
   assert.equal(get(activity).length, 1);
 
-  resetAuditHistory();
+  resetPopulatedTableHistory();
 
   assert.equal(get(reviewSummary), null);
   assert.deepEqual(get(activity), []);
   assert.equal(get(activeWorkbook), null);
-  assert.equal(get(runStatus), "idle");
-  assert.deepEqual(get(audits), []);
-  assert.equal(get(currentAuditId), null);
+  assert.equal(get(tablePopulationStatus), "idle");
+  assert.deepEqual(get(populatedTables), []);
+  assert.equal(get(currentPopulatedTableId), null);
 });

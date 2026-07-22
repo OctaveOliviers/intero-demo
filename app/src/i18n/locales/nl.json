@@ -5,6 +5,8 @@
   "common": {
     "rename": "Naam wijzigen",
     "delete": "Verwijderen",
+    "pin": "Vastzetten",
+    "unpin": "Losmaken",
     "cancel": "Annuleren",
     "close": "Sluiten",
     "apply": "Toepassen",
@@ -20,7 +22,13 @@
     "cloneToLocal": "Naar lokaal kopiëren",
     "optional": "(optioneel)",
     "download": "Downloaden",
-    "remove": "{label} verwijderen"
+    "remove": "{label} verwijderen",
+    "back": "Terug",
+    "skip": "Overslaan",
+    "submit": "Versturen",
+    "next": "Volgende",
+    "send": "Versturen",
+    "loading": "Laden…"
   },
   "level": {
     "national": "Landelijk",
@@ -46,18 +54,39 @@
   "leftPanel": {
     "collapseSidebar": "Zijbalk inklappen",
     "expandSidebar": "Zijbalk uitklappen",
-    "newAudit": "Nieuwe audit",
-    "searchAudits": "Audits zoeken",
+    "newThread": "Nieuwe thread",
+    "newChat": "Nieuwe chat",
+    "search": "Zoeken",
+    "dataLibrary": "Dataset",
     "templates": "Sjablonen",
     "databases": "Databases",
     "noMatches": "Geen resultaten",
-    "noAudits": "Nog geen audits",
     "feedback": "Feedback",
     "settings": "Instellingen",
     "signOut": "Afmelden",
     "signingOut": "Bezig met afmelden…",
     "deleteConfirm": "Deze analyse verwijderen? Hiermee worden de uitvoering en alle bijbehorende gegevens definitief verwijderd.",
-    "deleteFailed": "Kan de analyse niet verwijderen. Probeer het opnieuw."
+    "deleteFailed": "Kan de analyse niet verwijderen. Probeer het opnieuw.",
+    "pinnedArtifacts": "Vastgezette artefacten",
+    "tables": "Tabellen",
+    "threads": "Chats",
+    "searchTables": "Tabellen zoeken",
+    "searchChats": "Chats zoeken",
+    "allTemplates": "Alle sjablonen",
+    "noTables": "Nog geen tabellen",
+    "noChats": "Nog geen chats",
+    "noTableMatches": "Geen overeenkomende tabellen",
+    "noChatMatches": "Geen overeenkomende chats",
+    "tableReady": "Klaar – nog niet geopend",
+    "statusBuilding": "Bezig met bouwen…",
+    "statusReady": "Klaar",
+    "statusBlocked": "Geblokkeerd",
+    "statusQueued": "In wachtrij",
+    "deleteChatConfirm": "Deze chat verwijderen? Hiermee wordt het gesprek definitief verwijderd.",
+    "deleteTableConfirm": "Deze tabel verwijderen? Hiermee wordt deze definitief verwijderd.",
+    "renameChatPrompt": "Deze chat hernoemen:",
+    "renameTablePrompt": "Deze tabel hernoemen:",
+    "deleteChatFailed": "Kan de chat niet verwijderen. Probeer het opnieuw."
   },
   "home": {
     "heading": "Wat wilt u weten?",
@@ -71,13 +100,26 @@
     "stopReading": "Lezen stoppen",
     "readingRequest": "Uw verzoek wordt gelezen…",
     "indexingTemplate": "Sjabloon wordt geïndexeerd…",
-    "availableAudits": "Beschikbare audits",
+    "availableTemplates": "Beschikbare sjablonen",
     "removeFile": "Bestand verwijderen",
     "templatesLoading": "Sjablonen worden nog geladen. Probeer het zo opnieuw.",
-    "parseError": "Er is iets misgegaan bij het lezen van uw verzoek."
+    "parseError": "Er is iets misgegaan bij het lezen van uw verzoek.",
+    "attachContext": "Dataset of sjabloon toevoegen",
+    "attachedContext": "Toegevoegde context",
+    "datasets": "Datasets",
+    "noDatasets": "Geen datasets",
+    "noTemplates": "Geen sjablonen",
+    "noChatOpen": "Geen chat geopend. Start een nieuwe chat om te beginnen.",
+    "attachmentsError": "Kan bijlagen niet laden.",
+    "sourceLabel": "Bron {number}",
+    "openEvidenceFor": "Bewijs openen voor {text}",
+    "openEvidenceSource": "Bewijs openen voor bron {number}",
+    "scopeTitle": "Bereik van dit antwoord",
+    "questionProgress": "Vraag {current} van {total}",
+    "other": "Anders"
   },
   "results": {
-    "title": "Auditresultaten",
+    "title": "Resultaten",
     "downloadWorkbook": "Werkmap downloaden",
     "workbookNotReady": "Werkmap nog niet gereed",
     "inclusionCriteria": "Inclusiecriteria",
@@ -93,9 +135,7 @@
     "toggleInclusion": "Paneel inclusiecriteria in-/uitschakelen",
     "toggleActivity": "Activiteitspaneel in-/uitschakelen",
     "countersAria": "Statustellers van de uitvoering",
-    "openReviewSummary": "Controleoverzicht openen",
-    "closeDashboardPane": "Dashboardvenster sluiten",
-    "closeWorkbookPane": "Werkboekvenster sluiten"
+    "openReviewSummary": "Controleoverzicht openen"
   },
   "rightPanel": {
     "closePanel": "Paneel sluiten",
@@ -107,7 +147,7 @@
     "sourceNote": "Bronnotitie",
     "sourceNotes": "Bronnotities",
     "result": "Resultaat",
-    "resultMeta": "{rows, plural, one {# rij} other {# rijen}} · {ms} ms",
+    "resultMeta": "{rows, plural, one {# rij} other {# rijen}}",
     "agentActivity": "Agentactiviteit",
     "reviewSummary": "Controleoverzicht",
     "cells": "Cellen",
@@ -135,11 +175,11 @@
   "activity": {
     "finalizing": "Afronden…",
     "working": "Bezig…",
-    "runFailed": "Uitvoering mislukt",
+    "tablePopulationFailed": "Tabelpopulatie mislukt",
     "stopped": "Gestopt",
     "completed": "Voltooid",
     "noActivityYet": "Nog geen activiteit",
-    "stopRun": "Uitvoering stoppen en samenvatting schrijven",
+    "stopTablePopulation": "Tabelpopulatie stoppen en samenvatting schrijven",
     "expand": "Agentactiviteit uitklappen",
     "collapse": "Agentactiviteit inklappen",
     "showLess": "Minder tonen",
@@ -150,6 +190,15 @@
   },
   "spreadsheetChip": {
     "download": "Downloaden"
+  },
+  "tableInspector": {
+    "openTitle": "Tabel openen",
+    "fallbackTitle": "Tabel",
+    "running": "Tabel wordt gemaakt…",
+    "done": "Tabel klaar — openen",
+    "error": "Deze tabel kon niet worden afgerond",
+    "queued": "In wachtrij — nog niet gestart",
+    "openCta": "Openen →"
   },
   "noteEvidence": {
     "empty": "Geen notitietekst teruggegeven voor deze rij."
@@ -169,7 +218,33 @@
   "settings": {
     "title": "Instellingen",
     "language": "Taal",
-    "languageHint": "Wijzigt de interface en de demogegevens. De app wordt opnieuw geladen om dit toe te passen."
+    "languageHint": "Wijzigt de interface en de demogegevens. De app wordt opnieuw geladen om dit toe te passen.",
+    "general": "Algemeen",
+    "usersRoles": "Gebruikers en rollen",
+    "sourceDatabases": "Brondatabases",
+    "managedByIt": "Gebruikersaccounts en rollen worden beheerd door IT — bewerken volgt binnenkort.",
+    "colName": "Naam",
+    "colUsername": "Gebruikersnaam",
+    "colRole": "Rol",
+    "colStatus": "Status",
+    "statusActive": "Actief",
+    "statusResetPending": "Reset in afwachting",
+    "statusInactive": "Inactief",
+    "loadingUsers": "Gebruikers laden…",
+    "noUsers": "Nog geen gebruikers.",
+    "usersLoadError": "Kan gebruikers niet laden.",
+    "loadingDatabases": "Databases laden…",
+    "noDatabases": "Nog geen brondatabases.",
+    "databasesLoadError": "Kan databases niet laden.",
+    "uploadDatabase": "Database uploaden",
+    "uploadStarted": "Uploaden gestart — indexeren op de achtergrond.",
+    "uploadFailed": "Uploaden mislukt.",
+    "renamePrompt": "Nieuwe naam voor deze database",
+    "renameFailed": "Hernoemen mislukt.",
+    "reindexStarted": "Herindexeren gestart.",
+    "reindexFailed": "Herindexeren mislukt.",
+    "deleteConfirm": "Deze brondatabase verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    "deleteFailed": "Verwijderen mislukt."
   },
   "database": {
     "back": "‹ Databases",
@@ -194,21 +269,20 @@
     "databasesTitle": "Databases",
     "loadingDatabases": "Databases worden geladen…",
     "noDatabases": "Geen databases gevonden. Voeg een database toe om te beginnen.",
+    "dataLibraryTitle": "Dataset",
+    "loadingDatasets": "Datasets laden…",
+    "noDatasets": "Nog geen datasets. Maak er een om de database tot een patiëntengroep te beperken.",
     "errXlsxOnly": "Alleen .xlsx- en .xlsm-bestanden worden ondersteund.",
     "errDbOnly": "Alleen .sqlite-, .sqlite3- en .db-bestanden worden ondersteund.",
-    "cloned": "„{name}” gekopieerd naar lokale audits.",
+    "cloned": "„{name}” gekopieerd naar lokale sjablonen.",
     "renameDbPrompt": "Database hernoemen",
-    "removeDbConfirm": "„{name}” uit de catalogus verwijderen? Het SQLite-bestand op de schijf wordt niet verwijderd.",
-    "addTemplateTitle": "Audittemplate toevoegen",
-    "addTemplateHint": "Sleep een Excel-bestand (.xlsx) hierheen of klik om te bladeren",
-    "addDatabaseTitle": "Database toevoegen",
-    "addDatabaseHint": "Sleep een SQLite-bestand (.sqlite / .db) hierheen of klik om te bladeren"
+    "removeDbConfirm": "„{name}” uit de catalogus verwijderen? Het SQLite-bestand op de schijf wordt niet verwijderd."
   },
   "template": {
     "indexingHelp": "Uw spreadsheet wordt gelezen zodat de agent de kolommen en structuur leert.\nDit duurt enkele seconden — u kunt deze openen zodra deze gereed is.",
     "selectDatabase": "Selecteer een database…",
     "noDatabases": "Geen geïndexeerde databases beschikbaar",
-    "renamePrompt": "Audit hernoemen",
+    "renamePrompt": "Sjabloon hernoemen",
     "deleteConfirm": "„{name}” verwijderen? Dit kan niet ongedaan worden gemaakt.",
     "renameFailed": "Naam wijzigen mislukt: {error}",
     "deleteFailed": "Verwijderen mislukt: {error}",
@@ -226,20 +300,19 @@
       "dateTo": "bijv. 2024-12-31",
       "hospitals": "bijv. Royal Infirmary, Western General",
       "cohort": "bijv. pediatrisch"
-    },
-    "auditOptions": "Auditopties"
+    }
   },
-  "audit": {
+  "templateDetail": {
     "back": "‹ Sjablonen",
-    "loadingDetail": "Auditdetails worden geladen…",
+    "loadingDetail": "Sjabloondetails worden geladen…",
     "inclusionCriteria": "Inclusiecriteria",
-    "noCriteriaYet": "Nog geen inclusiecriteria — koppel een database aan deze audit om het cohort te definiëren.",
+    "noCriteriaYet": "Nog geen inclusiecriteria — koppel een database aan dit sjabloon om het cohort te definiëren.",
     "noFixedCriteria": "Geen vaste inclusiecriteria — elk patiëntdossier valt binnen de scope.",
     "removeCriterion": "{label} verwijderen",
     "databases": "Databases",
-    "noDatabasePaired": "Er is nog geen database aan deze audit gekoppeld.",
+    "noDatabasePaired": "Er is nog geen database aan dit sjabloon gekoppeld.",
     "template": "Sjabloon",
-    "pairDatabaseHint": "Koppel een database aan deze audit om te zien hoe elk veld wordt ingevuld.",
+    "pairDatabaseHint": "Koppel een database aan dit sjabloon om te zien hoe elk veld wordt ingevuld.",
     "metrics": "Metrics tracked"
   },
   "spec": {
@@ -302,12 +375,22 @@
     "initialRun": "Eerste uitvoering",
     "refreshN": "Vernieuwing {n}"
   },
-  "tracker": {
-    "noData": "Geen gegevens",
-    "unsupportedChart": "Niet-ondersteunde grafiek",
-    "noTrackers": "Geen indicatoren voor dit dashboard.",
-    "submissionDeadline": "Inzendtermijn: {date}",
-    "target": "Streefwaarde {value}",
-    "donutChart": "Ringdiagram"
+  "sharing": {
+    "share": "Delen",
+    "shareTitle": "“{title}” delen",
+    "colleagueLabel": "Delen met",
+    "colleaguePlaceholder": "Collega toevoegen…",
+    "noColleagues": "Geen collega's om mee te delen.",
+    "noColleagueMatches": "Geen overeenkomende collega's.",
+    "editHint": "Personen die u toevoegt kunnen deze {type} bewerken.",
+    "messageLabel": "Bericht",
+    "messagePlaceholder": "Korte notitie toevoegen…",
+    "diabetesBptMessage": "Hoi Aanya. Zeven patiënten hebben actie nodig voordat we de diabetes-BPT kunnen indienen: vijf hebben HbA1c-interventiebewijs nodig en bij twee ontbreekt urine-ACR-bewijs. Hier is de brononderbouwde bewijstabel. Kun je het bewijs beoordelen en de gaten sluiten?",
+    "done": "Gereed",
+    "revoke": "Toegang voor {name} verwijderen",
+    "loadingGrantees": "Laden…",
+    "typeNounDataset": "dataset",
+    "typeNounTemplate": "sjabloon",
+    "typeNounTable": "tabel"
   }
 }

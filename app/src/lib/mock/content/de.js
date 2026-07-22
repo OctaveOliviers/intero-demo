@@ -18,12 +18,516 @@
 //   records          — { cord, chest, npda } the WHOLE record objects (human text translatable; numbers/dates/codes/ids/types not)
 //   codeMaps         — { sex, ethnicity, diabetesType, insulinRegime, cgm, yesNo, smoking, retinal, admissionDka, adhdAsd, yesNo99, leavingReason, otherMed, albuminuriaStage, thyroidTx, mentalHealthAppt, dkaTherapy } — code→label maps (labels translatable; keys/codes not)
 //   labels           — short value labels (N/A, Not recorded, Unavailable, …)
-//   auditDetail      — mock audit-detail localization (database summary + fixed-criteria labels/units)
+//   templateDetail   — mock template-detail localization (database summary + fixed-criteria labels/units)
 //   specValues       — mock parse chip VALUES (cohort defaults/options)
 //   explain          — namespace of FUNCTIONS returning the right-panel explanation strings (preserve ${…} interpolation)
 //   blockedReason    — the blocked-cell reason_detail (CPH009 age-at-discharge)
 //   timeline         — { activities, tools, thinks, summaryWords, email parsing } headline/detail/think strings keyed sensibly
 //   email            — mockSampleEmail body
+
+// German translation of the artifactWorkspace namespace (#358). Mirrors the English
+// pack's shape exactly (same keys, nesting, order, function signatures and ${…}
+// interpolation positions); only human-readable words are translated. Language-
+// invariant tokens (patient ids, ISO dates, numbers, TNM, UICC stage groups, Annexe
+// 55 codes, ECOG scores, biomarker/drug tokens, "Annexe 55") stay byte-identical to
+// en.js. Each `quotes[i]` is a verbatim substring of its sibling translated `body`.
+const artifactWorkspace = {
+  // Matrix column headers (Annexe 55 field names).
+  columns: {
+    patient: "Patient",
+    histology: "Histologie",
+    ecog: "ECOG",
+    tnm: "TNM",
+    stage: "Stadium",
+    pdl1: "PD-L1 TPS",
+    egfr: "EGFR",
+    ngs: "NGS/Molekular",
+    treatment: "Behandlung",
+    mocNotes: "MOC-Notizen",
+  },
+
+  // Coded-value composition: `name (code NN)`. Name localises; the code number is
+  // passed in from logic. The literal word "code" lives here so it can localise.
+  coded: (name, code) => `${name} (Code ${code})`,
+
+  // Histology column names (field 6 · diagnostic histology + behaviour).
+  histology: {
+    adenocarcinoma: "Adenokarzinom",
+    squamousCell: "Plattenepithel-Ca",
+    nsclcNos: "NSCLC, NOS",
+    smallCellSclc: "Kleinzellig (SCLC)",
+  },
+
+  // ECOG labels (field 3 · WHO/ECOG score). Rendered `label (score)`; the score
+  // number is invariant and lives in logic.
+  ecog: {
+    fullyActive: "Voll aktiv",
+    ambulatory: "Gehfähig",
+    selfCareOnly: "Nur Selbstversorgung",
+    scored: (label, score) => `${label} (${score})`,
+  },
+
+  // Stage column: the numbered UICC groups (IVA, IIIB, …) are invariant and stay
+  // in logic; only the SCLC prose descriptor localises.
+  stage: {
+    extensive: "Ausgedehntes Stadium",
+  },
+
+  // Matrix prose values (words, not codes) and mixed-value templates. The code
+  // number / percentage / genomic token is always interpolated from logic.
+  values: {
+    missing: "Fehlt",
+    pending: "Ausstehend",
+    complete: "Vollständig",
+    negative: "Negativ",
+    na: "n.z.",
+    naSquamous: "n.z. (Plattenepithel)",
+    naEarlyStage: "n.z. (frühes Stadium)",
+    naSclc: "n.z. (SCLC)",
+    insufficientTissue: "Unzureichendes Gewebe (Wiederholung angefordert)",
+    completeWith: (marker) => `Vollständig (${marker})`,
+    positiveWith: (variant) => `Positiv (${variant})`,
+    conflicting: (a, b) => `Widersprüchlich (${a} vs ${b})`,
+    // Blocked-cell reason details surfaced in the evidence panel status. The
+    // status matching itself (missing / pending / insufficient tissue / n/a) is
+    // logic that keys off the English value and stays in the demo module.
+    missingReasonDetail: "Kein Quelldokument für dieses Feld gefunden.",
+    insufficientTissueReasonDetail: "Die Probe enthielt unzureichendes Gewebe für diese Untersuchung; eine erneute Biopsie wurde angefordert.",
+  },
+
+  // Treatment column names (field 10 · coded chronology). Each renders through
+  // `coded`; dates inside a name are invariant and interpolated in logic.
+  treatment: {
+    pembrolizumabStarted: "Pembrolizumab, begonnen",
+    concurrentChemoRtCompleted: "Simultane Radiochemotherapie, abgeschlossen",
+    noConsolidationImmunotherapy: "keine Konsolidierungs-Immuntherapie",
+    documented: "dokumentiert",
+    carboPaclitaxelPembrolizumab: "Carbo/paclitaxel + pembrolizumab",
+    osimertinibStarted: "Osimertinib, begonnen",
+    surgeryPlanned: "Operation geplant — chirurgische Planung ausstehend",
+    notYetStarted: "Noch nicht begonnen — Abklärung unvollständig",
+    alectinibStarted: "Alectinib, begonnen",
+    concurrentChemoRtOngoing: "Simultane Radiochemotherapie, laufend",
+    carboEtoposideAtezolizumab: "Carbo/etoposide + atezolizumab",
+  },
+
+  // Clinical note-type labels, shared across interpreted-cell notes, conflict
+  // sources and precedent facts.
+  noteLabels: {
+    oncologyConsult: "Onkologische Konsilnotiz",
+    oncologyTreatment: "Onkologische Behandlungsnotiz",
+    mdtOutcome: "MDT-Ergebnisnotiz",
+    radiationOncologyCompletion: "Strahlentherapie-Abschlussnotiz",
+    thoracicSurgeryClinic: "Thoraxchirurgische Ambulanznotiz",
+    oncologyClinic: "Onkologische Ambulanznotiz",
+    radiationOncologyProgress: "Strahlentherapie-Verlaufsnotiz",
+    oncologyNote: "Onkologische Notiz",
+    oncologyFollowUp: "Onkologische Verlaufsnotiz",
+    radiologyNote: "Radiologische Notiz",
+    pathologyReport: "Pathologiebefund",
+    molecularPathologyReread: "Molekularpathologische Nachbefundung",
+  },
+
+  // Histology-cell evidence: the Annexe 55 provenance block (fields 2, 4, 5, 7).
+  // Coded names render through `coded`; lobe/laterality/differentiation names and
+  // biopsy procedure names localise, the code numbers and dates stay in logic.
+  provenance: {
+    heading: "Annexe 55 Herkunft",
+    oldResult: "Altes Ergebnis",
+    labels: {
+      baseOfDiagnosis: "Diagnosegrundlage",
+      localisationLaterality: "Lokalisation · Lateralität",
+      differentiationGrade: "Differenzierungsgrad",
+      biopsy: "Biopsie",
+      petct: "PET-CT",
+    },
+    baseOfDiagnosis: {
+      histologyOfPrimary: "Histologie des Primärtumors",
+      cytology: "Zytologie",
+    },
+    lobes: {
+      rightUpperLobe: "Rechter Oberlappen",
+      leftUpperLobe: "Linker Oberlappen",
+      leftLowerLobe: "Linker Unterlappen",
+      rightLowerLobe: "Rechter Unterlappen",
+    },
+    laterality: {
+      left: "Links",
+      right: "Rechts",
+    },
+    differentiation: {
+      well: "Gut differenziert",
+      moderately: "Mäßig differenziert",
+      poorly: "Schlecht differenziert",
+      unknown: "Unbekannt",
+    },
+    biopsyProcedures: {
+      ctGuidedLung: "CT-gesteuerte Lunge",
+      bronchoscopy: "Bronchoskopie",
+      pleural: "pleural",
+      vatsWedge: "VATS-Keilresektion",
+    },
+    // `{lobe} · {laterality (code n)}` — the middot is punctuation, from logic.
+    localisation: (lobe, lateralityCoded) => `${lobe} · ${lateralityCoded}`,
+    // `{ISO date} ({procedure})` — the date is invariant, from logic.
+    biopsyValue: (date, procedure) => `${date} (${procedure})`,
+    biopsyAgeDetail: (date, days) => `Biopsie vom ${date} ist ${days} Tage alt — altes Ergebnis.`,
+  },
+
+  // Evidence side panel (both the fixture-built evidence and the component chrome).
+  evidence: {
+    selectedCell: "Ausgewählte Zelle",
+    mocNote: "MOC-Notiz",
+    interpretedExplanation: (columnTitle, rowId, noteLabel, date) =>
+      `Der Wert ${columnTitle} wurde aus dem Freitext in der ${noteLabel} von ${rowId} (${date}) extrahiert.`,
+    directExplanation: (columnTitle, concept, rowId) =>
+      `Der Wert ${columnTitle} wird aus der Quelle ${concept} gelesen, die mit Patient ${rowId} verknüpft ist.`,
+    mocNoteExplanation: (rowId) => `In die MOC-Notizen aus einem Anschlussgespräch über ${rowId} geschrieben.`,
+    conflictResolvedNote: (acceptedValue, acceptedLabel, rejectedValue, rejectedLabel, date) =>
+      `PD-L1-Konflikt gelöst: ${acceptedValue} (${acceptedLabel}) gegenüber ${rejectedValue} (${rejectedLabel}) akzeptiert, bestätigt ${date}.`,
+    // ArtifactEvidence.svelte chrome.
+    conflictHeading: "Widersprüchliche Quellen",
+    conflictHint: "Beide Befunde bleiben aktenkundig. Akzeptieren Sie den für diese Zelle zu verwendenden Wert.",
+    selected: "Ausgewählt",
+    notSelected: "Nicht ausgewählt",
+    use: (value) => `${value} verwenden`,
+    using: (value) => `${value} verwendet`,
+    useFrom: (value, label) => `${value} aus ${label} verwenden`,
+    blockNote: "Notiz",
+    blockReferences: "Referenzen",
+    blockSource: "Quelle",
+    blockQuery: "Abfrage",
+    blockReport: "Bericht",
+    close: "Nachweis schließen",
+  },
+
+  // The DB concept descriptor rendered in the direct-cell explanation ("…read
+  // from the {concept} source…"), keyed by column id. Localises the human-facing
+  // descriptor; the SQL `concept_name` token stays in logic (FIELD_SOURCES), so
+  // the query text is language-invariant while the sentence localises.
+  fieldSourceConcepts: {
+    histology: "Histologie",
+    tnm: "TNM-Klassifikation",
+    pdl1: "PD-L1 TPS",
+    egfr: "EGFR-Mutation",
+    ngs: "NGS-Panel",
+    treatment: "aktuelle Behandlung",
+    mocNotes: "MOC-Besprechungsnotiz",
+  },
+
+  // The two attention-list lines shown in the opening turn. Ids, code numbers,
+  // stage groups, dates and percentages are interpolated from logic.
+  attention: {
+    flagMissing: "Fehlt",
+    flagConflicting: "Widersprüchlich",
+    l3402Label: (id, stage) => `${id} (Stadium ${stage}, nicht resektabel)`,
+    l3402Detail: (chemoCode, rtDate, immunoCode) =>
+      `simultane Radiochemotherapie (Code ${chemoCode}) am ${rtDate} abgeschlossen, aber keine Konsolidierungs-Immuntherapie (Code ${immunoCode}) dokumentiert. Die Durvalumab-Konsolidierung ist die leitliniengerechte Folgetherapie nach Radiochemotherapie und wird für die Kostenerstattung COM-überwacht — es lohnt sich zu prüfen, ob das Zeitfenster verstrichen ist.`,
+    l3404Label: (id, stage) => `${id} (Stadium ${stage})`,
+    l3404Detail: (pathologyValue, rereadValue) =>
+      `PD-L1 TPS widersprüchlich: Pathologiebefund zeigt ${pathologyValue}, molekularpathologische Nachbefundung zeigt ${rereadValue}. Die Behandlungswahl kann davon abhängen, welcher Wert verwendet wird.`,
+  },
+
+  // Source-document bodies + verbatim quote substrings for the L-3404 PD-L1
+  // conflict. Percentages inside the prose are invariant, kept verbatim here.
+  conflict: {
+    pdl1: {
+      pathology: {
+        quotes: ["Tumor Proportion Score 60%"],
+        body: "PD-L1 (22C3 assay): Tumor Proportion Score 60%.",
+      },
+      reread: {
+        quotes: ["Tumor Proportion Score 10%", "Wiederholungstestung empfohlen, falls behandlungsentscheidend"],
+        body: "Nachbefundung der PD-L1-IHC auf Wunsch des Zweitbefunders: Tumor Proportion Score 10%. Heterogene Anfärbung festgestellt; Wiederholungstestung empfohlen, falls behandlungsentscheidend.",
+      },
+    },
+  },
+
+  // Clinical note prose behind every interpreted (yellow) cell, keyed
+  // "rowId:columnId". `quotes` are verbatim substrings of `body`. The note label
+  // and date are held in logic (label -> noteLabels; date invariant).
+  interpretedNotes: {
+    "L-3401:ecog": {
+      quotes: ["ECOG-Performance-Status 1"],
+      body: "Ambulant vor systemischer Therapie beurteilt. ECOG-Performance-Status 1: symptomatisch durch Husten, aber voll gehfähig und selbstversorgend. Geeignet für Immuntherapie.",
+    },
+    "L-3401:stage": {
+      quotes: ["eingestuft als cT2 cN3 cM1b, UICC-Stadium IVA"],
+      body: "Staging-Untersuchungen jetzt abgeschlossen. CT und PET zeigen einen 4.2cm großen Primärtumor im rechten Oberlappen mit mediastinaler Lymphknotenbeteiligung mehrerer Stationen und kontralateraler Lymphknotenbeteiligung sowie eine solitäre Nebennierenmetastase; eingestuft als cT2 cN3 cM1b, UICC-Stadium IVA. Molekulare Ergebnisse mit dem Patienten besprochen; systemische Therapieoptionen erörtert.",
+    },
+    "L-3401:treatment": {
+      quotes: ["Pembrolizumab-Monotherapie heute begonnen"],
+      body: "PD-L1 TPS 80%, kein therapierbarer Treiber im NGS außer KRAS G12C. Pembrolizumab-Monotherapie heute begonnen, Zyklus 1 komplikationslos verabreicht. Plan: Fortführung alle 3 Wochen, Restaging-CT nach Zyklus 3.",
+    },
+    "L-3402:ecog": {
+      quotes: ["ECOG-Performance-Status 1"],
+      body: "Geeignet für radikale simultane Radiochemotherapie: ECOG-Performance-Status 1, gehfähig und in den täglichen Aktivitäten selbstständig, adäquate Organfunktion in der Ausgangslaborkontrolle.",
+    },
+    "L-3402:stage": {
+      quotes: ["Stadium IIIB (cT4 cN2 cM0) und nicht resektabel"],
+      body: "MDT-Beurteilung der Bildgebung und der EBUS-Ergebnisse: ausgedehnte mediastinale Lymphknotenbeteiligung mit kontralateralem Befall. Die thoraxchirurgische Beurteilung kommt zu dem Schluss, dass die Erkrankung Stadium IIIB (cT4 cN2 cM0) und nicht resektabel ist. Konsensplan: simultane Radiochemotherapie in kurativer Absicht.",
+    },
+    "L-3402:treatment": {
+      quotes: ["Simultane Radiochemotherapie heute abgeschlossen", "keine Konsolidierungs-Immuntherapie angeordnet"],
+      body: "Simultane Radiochemotherapie heute abgeschlossen: 60 Gy in 30 Fraktionen mit wöchentlichem carboplatin/paclitaxel, toleriert mit Grad-1-Ösophagitis. PD-L1-Ergebnis bei Abschluss ausstehend; derzeit keine Konsolidierungs-Immuntherapie angeordnet. Zur medizinisch-onkologischen Nachsorge.",
+    },
+    "L-3403:ecog": {
+      quotes: ["Performance-Status ECOG 1"],
+      body: "Pleuraflüssigkeitszytologie bestätigt ein Plattenepithelkarzinom. Performance-Status ECOG 1: symptomatisch mit belastungsabhängiger Atemnot, aber gehfähig und selbstversorgend. Zur systemischen Erstlinientherapie.",
+    },
+    "L-3403:stage": {
+      quotes: ["malignen Pleuraerguss — cM1a-Erkrankung, UICC-Stadium IVA"],
+      body: "Die Pleuraflüssigkeitszytologie aus der Punktion vom 2026-05-28 ist positiv für maligne Zellen vereinbar mit einem Plattenepithelkarzinom und bestätigt einen malignen Pleuraerguss — cM1a-Erkrankung, UICC-Stadium IVA. Performance-Status ECOG 1. Zur systemischen Erstlinientherapie.",
+    },
+    "L-3403:treatment": {
+      quotes: ["carboplatin/paclitaxel mit pembrolizumab"],
+      body: "Zyklus 2 von carboplatin/paclitaxel mit pembrolizumab heute verabreicht. Behandlung wird bis auf eine Grad-1-Fatigue gut vertragen; Pleuraerguss klinisch stabil, keine erneute Flüssigkeitsansammlung, die eine Drainage erfordert.",
+    },
+    "L-3404:ecog": {
+      quotes: ["ECOG-Performance-Status 0"],
+      body: "Trotz ossärer Metastasen bleibt der Patient bei ECOG-Performance-Status 0: voll aktiv, in der Lage, alle Aktivitäten wie vor der Erkrankung ohne Einschränkung fortzuführen. Zur EGFR-gerichteten zielgerichteten Therapie.",
+    },
+    "L-3404:stage": {
+      quotes: ["multiple ossäre Metastasen", "cM1c-Erkrankung, UICC-Stadium IVB"],
+      body: "PET-CT und MRT der Wirbelsäule bestätigen multiple ossäre Metastasen (Wirbelkörper T8, linkes Ilium) zusätzlich zum Lungenprimärtumor: cM1c-Erkrankung, UICC-Stadium IVB. Analgesie begonnen; knochenprotektives Mittel besprochen. EGFR exon 19 deletion positiv — zur zielgerichteten Therapie.",
+    },
+    "L-3404:treatment": {
+      quotes: ["Osimertinib 80mg einmal täglich heute begonnen"],
+      body: "EGFR exon 19 deletion im Gewebe-NGS bestätigt. Osimertinib 80mg einmal täglich heute begonnen nach Ausgangs-EKG und Laborkontrolle. Aufklärung über Hautausschlag, Diarrhö und QTc-Überwachung; erste Ansprechbeurteilung in 6 Wochen.",
+    },
+    "L-3405:ecog": {
+      quotes: ["ECOG-Performance-Status 0"],
+      body: "Gesunder Patient mit einem zufällig entdeckten Rundherd. ECOG-Performance-Status 0: voll aktiv, asymptomatisch, keine funktionelle Einschränkung. Geeignet für Lobektomie.",
+    },
+    "L-3405:stage": {
+      quotes: ["pathologisches Stadium IA (pT1b pN0 cM0), resektable Erkrankung"],
+      body: "Solitärer 2.1cm großer Rundherd im rechten Oberlappen, PET-avid, ohne Lymphknoten- oder Fernmetastasen: pathologisches Stadium IA (pT1b pN0 cM0), resektable Erkrankung. Die Histologie der Keilresektion bestätigt ein Adenokarzinom mit tumorfreien Rändern am diagnostischen Präparat. Überweisung an die Thoraxchirurgie zur definitiven Resektionsplanung.",
+    },
+    "L-3405:treatment": {
+      quotes: ["Wartet derzeit auf die chirurgische Planung"],
+      body: "In der thoraxchirurgischen Ambulanz beurteilt. Lungenfunktion für eine Lobektomie ausreichend (FEV1 92% des Solls). Wartet derzeit auf die chirurgische Planung und die präoperative anästhesiologische Beurteilung; Ziel ist die OP-Anmeldung innerhalb von 4 Wochen.",
+    },
+    "L-3406:ecog": {
+      quotes: ["ECOG-Performance-Status 2"],
+      body: "ECOG-Performance-Status 2: symptomatisch, mehr als die Hälfte des Tages auf den Beinen und zur Selbstversorgung fähig, aber arbeitsunfähig. Die Behandlungsintensität ist im MOC gegen den Performance-Status abzuwägen.",
+    },
+    "L-3406:stage": {
+      quotes: ["Stadium IIIA (cT3 cN2 cM0) und nicht resektabel"],
+      body: "EBUS bestätigt N2-Lymphknotenbeteiligung (Stationen 4R und 7). MDT-Konsens: die Erkrankung ist Stadium IIIA (cT3 cN2 cM0) und nicht resektabel; kein Kandidat für eine Operation. Der Plan hängt von der Eignung der erneuten Biopsie für die molekulare Profilierung ab.",
+    },
+    "L-3406:treatment": {
+      quotes: ["Die Behandlung hat noch nicht begonnen"],
+      body: "Die Behandlung hat noch nicht begonnen. Die initiale Probe enthielt unzureichendes Gewebe für das NGS-Panel; erneute bronchoskopische Biopsie vor Festlegung des systemischen Plans angefordert. PD-L1 und EGFR stehen ebenfalls noch aus. Erneute Besprechung im MOC, sobald die Ergebnisse vorliegen.",
+    },
+    "L-3407:ecog": {
+      quotes: ["ECOG-Performance-Status 1"],
+      body: "Neu diagnostizierte Hirnmetastasen, aber neurologisch intakt. ECOG-Performance-Status 1: gehfähig und selbstversorgend, kein Steroidbedarf. Beginn einer ZNS-gängigen zielgerichteten Therapie.",
+    },
+    "L-3407:stage": {
+      quotes: ["cM1c-Erkrankung, UICC-Stadium IVB, mit Hirnmetastasen"],
+      body: "MRT des Schädels (2026-05-26) zeigt drei kontrastmittelaufnehmende Metastasen, die größte 14mm im rechten Frontallappen: cM1c-Erkrankung, UICC-Stadium IVB, mit Hirnmetastasen. Asymptomatisch, kein Steroidbedarf. ALK-Rearrangement im NGS nachgewiesen — ZNS-gängige zielgerichtete Therapie gegenüber primärer Radiotherapie bevorzugt.",
+    },
+    "L-3407:treatment": {
+      quotes: ["Alectinib 600mg zweimal täglich heute begonnen (2026-05-30)"],
+      body: "ALK-Rearrangement bestätigt. Alectinib 600mg zweimal täglich heute begonnen (2026-05-30), wobei die intrakranielle Erkrankung angesichts der erwarteten ZNS-Aktivität unbestrahlt belassen wurde. Ausgangs-LFTs und CK normal; Überwachungs-MRT des Schädels für Woche 3 und 6 geplant.",
+    },
+    "L-3408:ecog": {
+      quotes: ["ECOG-Performance-Status 1"],
+      body: "ECOG-Performance-Status 1: symptomatisch, aber gehfähig und selbstständig, geeignet für eine radikale simultane Radiochemotherapie. PD-L1 70%; Konsolidierungs-Immuntherapie nach Abschluss zu erwägen.",
+    },
+    "L-3408:stage": {
+      quotes: ["Stadium IIIB (cT4 cN2 cM0), nicht resektabel"],
+      body: "Restaging nach bronchoskopischer Biopsie: die kontralaterale mediastinale Lymphknotenbeteiligung macht dies zu Stadium IIIB (cT4 cN2 cM0), nicht resektabel. Das MDT empfiehlt eine simultane Radiochemotherapie mit nach Abschluss zu erwägender Konsolidierungs-Immuntherapie, PD-L1 70%.",
+    },
+    "L-3408:treatment": {
+      quotes: ["Simultane Radiochemotherapie laufend"],
+      body: "Simultane Radiochemotherapie laufend: Fraktion 18 von 30 mit wöchentlichem carboplatin/paclitaxel appliziert. Grad-1-Ösophagitis mit löslicher Analgesie behandelt; bislang keine Behandlungsunterbrechungen. Voraussichtlicher Abschluss am 2026-07-22.",
+    },
+    "L-3409:ecog": {
+      quotes: ["ECOG-Performance-Status 1"],
+      body: "Kleinzelliges Lungenkarzinom mit rasch fortschreitendem Verlauf. ECOG-Performance-Status 1: symptomatisch, aber gehfähig und selbstversorgend. Zur unverzüglichen Erstlinien-Chemo-Immuntherapie.",
+    },
+    "L-3409:stage": {
+      quotes: ["Erkrankung im ausgedehnten Stadium"],
+      body: "Kleinzelliges Lungenkarzinom durch bronchoskopische Biopsie bestätigt. Staging-CT zeigt Lebermetastasen und kontralaterale hiläre Lymphknoten: Erkrankung im ausgedehnten Stadium. ECOG 1. Zur unverzüglichen Erstlinien-Chemo-Immuntherapie angesichts der Krankheitsdynamik.",
+    },
+    "L-3409:treatment": {
+      quotes: ["carboplatin/etoposide mit atezolizumab"],
+      body: "Zyklus 1 von carboplatin/etoposide mit atezolizumab heute verabreicht. Antiemetika und G-CSF-Unterstützung verordnet. Plan: 4 Zyklen, dann Erhaltungstherapie mit atezolizumab; Ansprech-CT nach Zyklus 2.",
+    },
+  },
+
+  // Follow-up A precedent cases (L-2894, L-3011). Stage groups, ids, day/week
+  // counts are interpolated from logic; source bodies/quotes are verbatim.
+  precedent: {
+    l2894Situation: (stage, refId) =>
+      `Stadium ${stage} nicht resektabel, Radiochemotherapie abgeschlossen, PD-L1 bei RT-Abschluss noch ausstehend (gleiche Situation wie ${refId})`,
+    l3011Situation: (stage) => `Stadium ${stage} nicht resektabel, Radiochemotherapie abgeschlossen`,
+    l2894Action: (days) => `Durvalumab begonnen, sobald PD-L1 vorlag, ${days} Tage nach RT-Abschluss.`,
+    l2894Outcome: (weeks) => `Nach ${weeks} Wochen weiterhin unter durvalumab; keine Progression im jüngsten CT.`,
+    l3011Action: "Konsolidierung mit durvalumab abgelehnt, unter Verweis auf Bedenken wegen Nebenwirkungen.",
+    l3011Outcome: (weeks) => `Überwachungsstrategie; stabile Erkrankung im Verlaufs-CT nach ${weeks} Wochen.`,
+    sources: {
+      l2894Action: {
+        quotes: ["Durvalumab Zyklus 1 heute verabreicht, 18 Tage nach Abschluss der Radiochemotherapie"],
+        body: "Durvalumab Zyklus 1 heute verabreicht, 18 Tage nach Abschluss der Radiochemotherapie. PD-L1 TPS 45% vor Beginn bestätigt.",
+      },
+      l2894Outcome: {
+        quotes: ["Kein Anhalt für eine Progression im jüngsten CT Thorax/Abdomen"],
+        body: "Der Patient setzt die durvalumab-Konsolidierung fort, nun 7 Wochen nach Beginn. Kein Anhalt für eine Progression im jüngsten CT Thorax/Abdomen (2026-06-10). Behandlung wird gut vertragen, keine signifikante Toxizität.",
+      },
+      l3011Action: {
+        quotes: ["der Patient lehnt die Immuntherapie derzeit ab und verweist auf Bedenken wegen Nebenwirkungen"],
+        body: "Konsolidierung mit durvalumab mit dem Patienten besprochen; der Patient lehnt die Immuntherapie derzeit ab und verweist auf Bedenken wegen Nebenwirkungen. Fortführung der Überwachungsbildgebung.",
+      },
+      l3011Outcome: {
+        quotes: ["stabile Erkrankung im Vergleich zur Voruntersuchung"],
+        body: "CT Thorax/Abdomen: stabile Erkrankung im Vergleich zur Voruntersuchung vom 2026-05-10. Keine neuen Läsionen. Posttherapeutische Veränderungen im rechten Oberlappen, unverändert.",
+      },
+    },
+  },
+
+  // Follow-up B brain-MRI series (L-3407). Report label, per-scan labels and the
+  // short date-axis labels (chart ticks) localise; ISO dates, week counts,
+  // measurements and the report bodies/quotes are verbatim.
+  mri: {
+    reportLabel: "MRT des Schädels mit Kontrastmittel",
+    labelBaseline: "Ausgangsbefund",
+    labelInterim: (weeks) => `Zwischenbefund (${weeks} Wochen)`,
+    labelLatest: (weeks) => `Aktueller Befund (${weeks} Wochen)`,
+    scans: {
+      baseline: {
+        short: "26. Mai",
+        quotes: ["Summe der Zielläsionsdurchmesser 31mm", "Drei kontrastmittelaufnehmende Metastasen nachgewiesen"],
+        body: "KLINISCHE ANGABEN: NSCLC, ALK-rearrangiert, neu diagnostiziert, Staging-MRT des Schädels vor Beginn von alectinib.\nBEFUNDE: Drei kontrastmittelaufnehmende Metastasen nachgewiesen. Rechte frontale Läsion misst 14mm. Linke parietale Läsion misst 11mm. Zerebelläre Läsion misst 6mm. Summe der Zielläsionsdurchmesser 31mm. Keine Blutung oder Hydrozephalus.\nBEURTEILUNG: Drei Hirnmetastasen, größte 14mm, vereinbar mit bekanntem NSCLC-Primärtumor.",
+      },
+      interim: {
+        short: "16. Juni",
+        quotes: ["Summe der Zielläsionsdurchmesser 20mm, gegenüber 31mm zum Ausgangswert reduziert (65% des Ausgangswerts)"],
+        body: "KLINISCHE ANGABEN: NSCLC, ALK-rearrangiert, Z. n. 3 Wochen alectinib bei bekannten Hirnmetastasen.\nVERGLEICH: MRT des Schädels 2026-05-26.\nBEFUNDE: Rechte frontale Läsion misst nun 9mm (zuvor 14mm). Linke parietale Läsion misst nun 7mm (zuvor 11mm). Zerebelläre Läsion misst nun 4mm (zuvor 6mm). Summe der Zielläsionsdurchmesser 20mm, gegenüber 31mm zum Ausgangswert reduziert (65% des Ausgangswerts). Keine neuen intrakraniellen Läsionen.\nBEURTEILUNG: Größenabnahme aller drei bekannten Hirnmetastasen im Intervall; keine neuen Läsionen.",
+      },
+      latest: {
+        short: "5. Juli",
+        quotes: ["Summe der Zielläsionsdurchmesser 11mm, gegenüber 31mm zum Ausgangswert reduziert (35% des Ausgangswerts)", "Zerebelläre Läsion, zuvor 4mm messend, ist nicht mehr sichtbar"],
+        body: "KLINISCHE ANGABEN: NSCLC, ALK-rearrangiert, Z. n. 5 Wochen alectinib bei bekannten Hirnmetastasen.\nVERGLEICH: MRT des Schädels 2026-06-16.\nBEFUNDE: Rechte frontale Läsion misst nun 6mm (zuvor 9mm). Linke parietale Läsion misst nun 5mm (zuvor 7mm). Zerebelläre Läsion, zuvor 4mm messend, ist nicht mehr sichtbar. Summe der Zielläsionsdurchmesser 11mm, gegenüber 31mm zum Ausgangswert reduziert (35% des Ausgangswerts). Keine neuen intrakraniellen Läsionen.\nBEURTEILUNG: Fortgesetzte Größenabnahme der zwei verbleibenden Hirnmetastasen im Intervall; zerebelläre Läsion zurückgebildet; keine neuen Läsionen.",
+      },
+    },
+  },
+
+  // Inline chart titles for Follow-up B.
+  charts: {
+    targetLesionBurden: "Zielläsionslast",
+    visibleBrainLesions: "Sichtbare Hirnläsionen",
+  },
+
+  // Scripted follow-up turns. `prompt` is the doctor's question; `reply` the agent
+  // lead-in; `activity` the streamed lines; `noteText` the MOC-notes write-back.
+  // Counts, ids, percentages, day/week values and dates are interpolated from logic.
+  followUps: {
+    a: {
+      prompt: "Gab es früher ähnliche Fälle?",
+      reply: (count) => `${count} ähnliche Fälle in diesem Quartal:`,
+      activity: [
+        "Durchsuche frühere Lungen-MOC-Akten nach nicht resektablen Fällen im Stadium III.",
+        "2 vergleichbare, in diesem Quartal behandelte Patienten gefunden.",
+        "Rufe deren Konsolidierungsentscheidungen und Verlaufsergebnisse ab.",
+      ],
+      noteText: (count, id1, days, weeks1, id2, weeks2) =>
+        `Präzedenzfälle (${count} Fälle): ${id1} — durvalumab an D+${days} begonnen, stabil nach ${weeks1} Wo. ${id2} — abgelehnt, stabil nach ${weeks2} Wo. unter Überwachung.`,
+    },
+    b: {
+      prompt: "Spricht die Erkrankung bisher an?",
+      reply: (count, date) => `${count} Schädel-MRT dokumentiert seit Beginn von Alectinib am ${date}.`,
+      activity: [
+        "Lokalisiere die Schädel-MRT-Serie von L-3407 seit Beginn von Alectinib.",
+        "Vergleiche die Zielläsionsmessungen über die drei Untersuchungen.",
+        "Berechne den Ansprechtrend.",
+      ],
+      noteText: (pctSequence, scanCount, weeks) =>
+        `Schädel-MRT-Ansprechen: ${pctSequence} der Zielläsionslast über ${scanCount} Untersuchungen, ${weeks} Wochen unter Behandlung.`,
+    },
+  },
+  // Fallback activity lines while a follow-up with no scripted activity streams.
+  genericFollowUpActivity: ["Lese die verknüpften Akten.", "Rufe die relevanten Werte ab."],
+
+  // Streamed opening-run activity lines (the store's timed controller). Codes,
+  // ids, percentages and counts are interpolated from logic.
+  run: {
+    template: (templateName) => `Ihre Vorlage ${templateName} erkannt — wird für die morgige Liste wiederverwendet.`,
+    agenda: (patients) => `Lade die ${patients} Patienten der morgigen MOC-Agenda.`,
+    structured: "Lese strukturierte Felder: Histologie, TNM-Klassifikation und Biomarker.",
+    ecog: "Extrahiere den ECOG-Performance-Status aus onkologischen Notizen.",
+    stage: "Leite die UICC-Stadiengruppe aus dem TNM jedes Patienten ab.",
+    treatment: "Extrahiere die aktuelle Behandlung aus Medikationsanordnungen und Notizen.",
+    conflicts: "Prüfe Biomarker-Quellen auf Widersprüche.",
+    flag3404: (pathologyValue, rereadValue) =>
+      `L-3404 markiert — PD-L1-Konflikt (Pathologie ${pathologyValue} vs Nachbefundung ${rereadValue}).`,
+    flag3402: (chemoCode, immunoCode) =>
+      `L-3402 markiert — Radiochemotherapie (Code ${chemoCode}) abgeschlossen, keine Konsolidierungs-Immuntherapie (Code ${immunoCode}) dokumentiert.`,
+    ready: (ready, total) => `Nachweise für ${ready} von ${total} Patienten bereit.`,
+  },
+
+  // Opening turn (ThreadView). "Annexe 55" is the invariant schema name and stays
+  // in logic; the surrounding prose segments localise. Patient/complete counts are
+  // interpolated from logic. `templateName` is the reusable-template display name.
+  templateName: "Lungen-MOC-Vorbereitung",
+  artifactTitle: "Lungen-MOC-Evidenzmatrix",
+  chipPopulating: "wird befüllt…",
+  chipReady: "bereit",
+  opening: {
+    usingYour: "Verwende Ihre Vorlage",
+    templateColumnsAre: "— ihre Spalten sind die",
+    registrationFields: (patients, complete) =>
+      `Registrierungsfelder. ${patients} Patienten auf der morgigen Liste. Die Registerdaten sind für ${complete} von ihnen vollständig. Zwei sollten vor der Besprechung geprüft werden:`,
+  },
+  agentSurfaceHint: "Ich kann jeden Wert dieser Liste aus seiner Quelle anzeigen — wählen Sie eine Zelle in der Matrix und fragen Sie.",
+
+  // Follow-up MOC-notes question (product AskUserQuestion shape) + chips.
+  followUpQuestion: (rowId) => `Dies zu den MOC-Notizen für ${rowId} hinzufügen?`,
+  addToMocNotes: "Zu MOC-Notizen hinzufügen",
+  skip: "Überspringen",
+  followUpAddedConfirm: (rowId) => `Zu MOC-Notizen für ${rowId} hinzugefügt ✓`,
+  followUpSource: "Quelle ↗",
+  followUpSourceAria: (label, date) => `Quelle öffnen: ${label}, ${date}`,
+
+  // Attention list container label.
+  attentionListLabel: "Vor der Besprechung zu prüfen",
+
+  // Chart point aria-label (Follow-up B). Value + point label from logic.
+  chartPointAria: (title, value, pointLabel) => `${title}: ${value} am ${pointLabel} — Quellbericht öffnen`,
+
+  // Cell metadata explanations surfaced by the spreadsheet cell inspector.
+  cellMeta: {
+    direct: (columnTitle, rowId) => `${columnTitle} für ${rowId}.`,
+    interpreted: (columnTitle, rowId) => `${columnTitle} für ${rowId}, aus Freitext-Notizen extrahiert.`,
+  },
+
+  // ArtifactBox.svelte tab & control labels.
+  box: {
+    resizeHandle: "Zum Ändern der Größe ziehen",
+    closeTab: (tabTitle) => `${tabTitle} schließen`,
+    sendContext: (count) => `Ausgewählten Kontext senden (${count})`,
+    addContext: "Artefakt-Kontext hinzufügen",
+    send: "Senden",
+    showChat: "Chat anzeigen",
+    expandArtifact: "Artefakt erweitern",
+    closeArtifact: "Artefakt schließen",
+    contextNote: "Kontextnotiz",
+    askAboutOne: "diese Zelle",
+    askAboutMany: (count) => `diese ${count} Zellen`,
+    askPlaceholder: (target) => `Frage über ${target}…`,
+    addToContext: "Zum Kontext hinzufügen",
+  },
+
+  // ContextChip.svelte pill labels.
+  contextChip: {
+    listLabel: "Angehängter Kontext",
+    detailLabel: "Kontextdetail",
+    remove: "Kontext entfernen",
+    oneCell: "1 Zelle",
+    manyCells: (count) => `${count} Zellen`,
+  },
+};
 
 const blankFilters = () => ({ dateFrom: "", dateTo: "", hospitals: "", cohort: "" });
 
@@ -195,68 +699,68 @@ const catalog = [
       },
       {
         id: "epilepsy12-lo-audit",
-        name: "Pädiatrische Epilepsie",
-        category: "Nationale Audits",
+        name: "Paediatric epilepsy",
+        category: "National audits",
         fileName: "epilepsy12-audit.xlsx",
         submissionDeadline: "2027-01-12",
         description:
-          "Epilepsy12 — nationales klinisches Audit zu Anfällen und Epilepsien bei Kindern und Jugendlichen: KPIs des ersten Versorgungsjahres zu fachärztlicher Beurteilung, Diagnostik, Screening der psychischen Gesundheit und Medikationssicherheit.",
+          "Epilepsy12 — National Clinical Audit of Seizures and Epilepsies for children and young people: first-year-of-care KPIs covering specialist review, investigations, mental-health screening and medication safety.",
         columns: [
-          "NHS-Nummer",
-          "Geburtsdatum",
-          "Bei Geburt zugewiesenes Geschlecht",
-          "Alter bei Erstbeurteilung",
-          "Überweisungsdatum",
-          "Datum der ersten pädiatrischen Beurteilung",
-          "Von epilepsieerfahrenem Pädiater beurteilt",
-          "Datum der Einbindung der Epilepsie-Fachpflegekraft",
-          "MRI indiziert",
-          "Datum der MRI-Anforderung",
-          "Datum der MRI-Durchführung",
-          "Anfallstyp",
-          "ECG-Datum",
-          "Datum des Screenings der psychischen Gesundheit",
-          "Psychisches Problem festgestellt",
-          "Psychische Unterstützung geleistet",
-          "Datum des umfassenden Behandlungsplans",
-          "Unter Natriumvalproat",
-          "Unter Topiramat",
-          "Schwangerschaftsverhütungsprogramm vorhanden",
+          "NHS number",
+          "Date of birth",
+          "Sex assigned at birth",
+          "Age at first assessment",
+          "Referral date",
+          "First paediatrician assessment date",
+          "Seen by epilepsy-expert paediatrician",
+          "Epilepsy specialist nurse input date",
+          "MRI indicated",
+          "MRI request date",
+          "MRI performed date",
+          "Seizure type",
+          "ECG date",
+          "Mental-health screening date",
+          "Mental-health problem identified",
+          "Mental-health support provided",
+          "Comprehensive care plan date",
+          "On sodium valproate",
+          "On topiramate",
+          "Pregnancy prevention programme in place",
         ],
       },
       {
         id: "nmtr-trauma-lo-audit",
-        name: "Pädiatrisches schweres Trauma",
-        category: "Nationale Audits",
+        name: "Paediatric major trauma",
+        category: "National audits",
         fileName: "nmtr-trauma-audit.xlsx",
-        submissionDeadline: "Einreichung ≤25 Tage nach Entlassung",
+        submissionDeadline: "Submit ≤25 days of discharge",
         description:
-          "National Major Trauma Registry (NMTR, ehemals TARN) — BPT für pädiatrisches schweres Trauma: fallbezogene Registermeldung und Versorgungsstandards der Akutphase (oberärztlich geführte Schockraumaufnahme, Schädel-CT, Tranexamsäure, Atemweg, Rehabilitationsverordnung).",
+          "National Major Trauma Registry (NMTR, formerly TARN) — paediatric major-trauma BPT: per-case registry submission and acute-phase care standards (consultant-led reception, CT head, tranexamic acid, airway, rehabilitation prescription).",
         columns: [
-          "NHS-Nummer",
-          "Geburtsdatum",
-          "Bei Geburt zugewiesenes Geschlecht",
-          "Alter (Jahre)",
-          "Verletzungsschwere-Score (ISS)",
-          "≥1 Verletzung mit AIS 3+",
-          "Datum/Uhrzeit der Ankunft in der Notaufnahme",
-          "Entlassungsdatum",
-          "NMTR-Fall übermittelt",
-          "NMTR-Datensatz vollständig",
-          "NMTR-Übermittlungsdatum",
-          "Traumateam aktiviert",
-          "Oberarzt bei Schockraumaufnahme anwesend",
-          "Eintreffen des Oberarztes (Min. ab Ankunft)",
-          "GCS bei Ankunft",
-          "Kopfverletzung (AIS 1+)",
-          "Schädel-CT (Min. ab Ankunft)",
-          "TXA indiziert",
-          "TXA verabreicht",
-          "TXA verabreicht (Min. ab Verletzung)",
-          "Atemweg/Intubation erwogen",
-          "Atemweg erwogen (Min. ab Ankunft)",
-          "Rehabilitationsbedarf erhoben",
-          "Rehabilitationsverordnung ausgestellt",
+          "NHS number",
+          "Date of birth",
+          "Sex assigned at birth",
+          "Age (years)",
+          "Injury Severity Score (ISS)",
+          "≥1 AIS 3+ injury",
+          "ED arrival date/time",
+          "Discharge date",
+          "NMTR case submitted",
+          "NMTR dataset complete",
+          "NMTR submission date",
+          "Trauma team activated",
+          "Consultant present at reception",
+          "Consultant arrival (min from arrival)",
+          "GCS at arrival",
+          "Head injury (AIS 1+)",
+          "CT head (min from arrival)",
+          "TXA indicated",
+          "TXA given",
+          "TXA given (min from injury)",
+          "Airway/intubation considered",
+          "Airway considered (min from arrival)",
+          "Rehabilitation needs assessed",
+          "Rehabilitation prescription issued",
         ],
       },
     ],
@@ -492,79 +996,79 @@ const columns = {
   ],
   epilepsy: [
     // Patient / cohort
-    { key: "patient", header: "NHS-Nummer", width: 12 },                                 // B-cohort
-    { key: "dob", header: "Geburtsdatum", width: 14 },
-    { key: "sex", header: "Bei Geburt zugewiesenes Geschlecht", width: 18 },
-    { key: "ageAtAssessment", header: "Alter bei Erstbeurteilung", width: 20 },
+    { key: "patient", header: "NHS number", width: 12 },                                 // B-cohort
+    { key: "dob", header: "Date of birth", width: 14 },
+    { key: "sex", header: "Sex assigned at birth", width: 18 },
+    { key: "ageAtAssessment", header: "Age at first assessment", width: 20 },
     { key: "_s1", header: "", width: 4 },
     // B1 — epilepsy-expert paediatrician within 2 weeks of referral
-    { key: "referralDate", header: "Überweisungsdatum", width: 14 },
-    { key: "firstAssessmentDate", header: "Datum der ersten pädiatrischen Beurteilung", width: 30 },
-    { key: "expertisePaediatrician", header: "Von epilepsieerfahrenem Pädiater beurteilt", width: 32 },
+    { key: "referralDate", header: "Referral date", width: 14 },
+    { key: "firstAssessmentDate", header: "First paediatrician assessment date", width: 30 },
+    { key: "expertisePaediatrician", header: "Seen by epilepsy-expert paediatrician", width: 32 },
     { key: "_s2", header: "", width: 4 },
     // B2 — ESN input within first year
-    { key: "esnInputDate", header: "Datum der Einbindung der Epilepsie-Fachpflegekraft", width: 30 },
+    { key: "esnInputDate", header: "Epilepsy specialist nurse input date", width: 30 },
     { key: "_s3", header: "", width: 4 },
     // B3 — MRI within 6 weeks where indicated
-    { key: "mriIndicated", header: "MRI indiziert", width: 14 },
-    { key: "mriRequestDate", header: "Datum der MRI-Anforderung", width: 16 },
-    { key: "mriPerformedDate", header: "Datum der MRI-Durchführung", width: 18 },
+    { key: "mriIndicated", header: "MRI indicated", width: 14 },
+    { key: "mriRequestDate", header: "MRI request date", width: 16 },
+    { key: "mriPerformedDate", header: "MRI performed date", width: 18 },
     { key: "_s4", header: "", width: 4 },
     // B4 — ECG in convulsive seizures
-    { key: "seizureType", header: "Anfallstyp", width: 18 },
-    { key: "ecgDate", header: "ECG-Datum", width: 14 },
+    { key: "seizureType", header: "Seizure type", width: 18 },
+    { key: "ecgDate", header: "ECG date", width: 14 },
     { key: "_s5", header: "", width: 4 },
     // B5 — mental-health screening + support
-    { key: "mhScreeningDate", header: "Datum des Screenings der psychischen Gesundheit", width: 26 },
-    { key: "mhProblemIdentified", header: "Psychisches Problem festgestellt", width: 30 },
-    { key: "mhSupportProvided", header: "Psychische Unterstützung geleistet", width: 28 },
+    { key: "mhScreeningDate", header: "Mental-health screening date", width: 26 },
+    { key: "mhProblemIdentified", header: "Mental-health problem identified", width: 30 },
+    { key: "mhSupportProvided", header: "Mental-health support provided", width: 28 },
     { key: "_s6", header: "", width: 4 },
     // B6 — comprehensive care plan by 12 months
-    { key: "carePlanDate", header: "Datum des umfassenden Behandlungsplans", width: 26 },
+    { key: "carePlanDate", header: "Comprehensive care plan date", width: 26 },
     { key: "_s7", header: "", width: 4 },
     // B7 — valproate/topiramate safety (PPP, females ≥12)
-    { key: "onValproate", header: "Unter Natriumvalproat", width: 18 },
-    { key: "onTopiramate", header: "Unter Topiramat", width: 16 },
-    { key: "pppInPlace", header: "Schwangerschaftsverhütungsprogramm vorhanden", width: 34 },
+    { key: "onValproate", header: "On sodium valproate", width: 18 },
+    { key: "onTopiramate", header: "On topiramate", width: 16 },
+    { key: "pppInPlace", header: "Pregnancy prevention programme in place", width: 34 },
   ],
   trauma: [
     // Patient / cohort (paediatric <16 major trauma at the MTC, ≥1 AIS3+ injury)
-    { key: "patient", header: "NHS-Nummer", width: 12 },                                 // C-cohort
-    { key: "dob", header: "Geburtsdatum", width: 14 },
-    { key: "sex", header: "Bei Geburt zugewiesenes Geschlecht", width: 18 },
-    { key: "ageYears", header: "Alter (Jahre)", width: 12 },
-    { key: "iss", header: "Verletzungsschwere-Score (ISS)", width: 22 },
-    { key: "ais3plus", header: "≥1 Verletzung mit AIS 3+", width: 16 },
+    { key: "patient", header: "NHS number", width: 12 },                                 // C-cohort
+    { key: "dob", header: "Date of birth", width: 14 },
+    { key: "sex", header: "Sex assigned at birth", width: 18 },
+    { key: "ageYears", header: "Age (years)", width: 12 },
+    { key: "iss", header: "Injury Severity Score (ISS)", width: 22 },
+    { key: "ais3plus", header: "≥1 AIS 3+ injury", width: 16 },
     { key: "_s1", header: "", width: 4 },
     // C1 — registry submission within 25 days of discharge (the BPT trigger)
-    { key: "edArrivalDateTime", header: "Datum/Uhrzeit der Ankunft in der Notaufnahme", width: 22 },
-    { key: "dischargeDate", header: "Entlassungsdatum", width: 16 },
-    { key: "nmtrSubmitted", header: "NMTR-Fall übermittelt", width: 20 },
-    { key: "datasetComplete", header: "NMTR-Datensatz vollständig", width: 22 },
-    { key: "submissionDate", header: "NMTR-Übermittlungsdatum", width: 20 },
+    { key: "edArrivalDateTime", header: "ED arrival date/time", width: 22 },
+    { key: "dischargeDate", header: "Discharge date", width: 16 },
+    { key: "nmtrSubmitted", header: "NMTR case submitted", width: 20 },
+    { key: "datasetComplete", header: "NMTR dataset complete", width: 22 },
+    { key: "submissionDate", header: "NMTR submission date", width: 20 },
     { key: "_s2", header: "", width: 4 },
     // C2 — consultant-led trauma-team reception ≤5 min (Level 2, ISS ≥16)
-    { key: "traumaTeamActivated", header: "Traumateam aktiviert", width: 22 },
-    { key: "consultantPresent", header: "Oberarzt bei Schockraumaufnahme anwesend", width: 30 },
-    { key: "consultantArrivalMin", header: "Eintreffen des Oberarztes (Min. ab Ankunft)", width: 34 },
+    { key: "traumaTeamActivated", header: "Trauma team activated", width: 22 },
+    { key: "consultantPresent", header: "Consultant present at reception", width: 30 },
+    { key: "consultantArrivalMin", header: "Consultant arrival (min from arrival)", width: 34 },
     { key: "_s3", header: "", width: 4 },
     // C3 — CT head ≤60 min (GCS ≤13 head injury, Level 2)
-    { key: "gcs", header: "GCS bei Ankunft", width: 16 },
-    { key: "headInjury", header: "Kopfverletzung (AIS 1+)", width: 20 },
-    { key: "ctHeadMin", header: "Schädel-CT (Min. ab Ankunft)", width: 26 },
+    { key: "gcs", header: "GCS at arrival", width: 16 },
+    { key: "headInjury", header: "Head injury (AIS 1+)", width: 20 },
+    { key: "ctHeadMin", header: "CT head (min from arrival)", width: 26 },
     { key: "_s4", header: "", width: 4 },
     // C4 — tranexamic acid ≤1 h (Level 2)
-    { key: "txaIndicated", header: "TXA indiziert", width: 16 },
-    { key: "txaGiven", header: "TXA verabreicht", width: 14 },
-    { key: "txaMin", header: "TXA verabreicht (Min. ab Verletzung)", width: 26 },
+    { key: "txaIndicated", header: "TXA indicated", width: 16 },
+    { key: "txaGiven", header: "TXA given", width: 14 },
+    { key: "txaMin", header: "TXA given (min from injury)", width: 26 },
     { key: "_s5", header: "", width: 4 },
     // C5 — airway considered ≤30 min (GCS <9, Level 1)
-    { key: "intubationConsidered", header: "Atemweg/Intubation erwogen", width: 28 },
-    { key: "airwayConsideredMin", header: "Atemweg erwogen (Min. ab Ankunft)", width: 34 },
+    { key: "intubationConsidered", header: "Airway/intubation considered", width: 28 },
+    { key: "airwayConsideredMin", header: "Airway considered (min from arrival)", width: 34 },
     { key: "_s6", header: "", width: 4 },
     // C6 — rehabilitation prescription (ISS ≥9, Level 1)
-    { key: "rehabNeedsAssessed", header: "Rehabilitationsbedarf erhoben", width: 28 },
-    { key: "rehabPrescriptionIssued", header: "Rehabilitationsverordnung ausgestellt", width: 32 },
+    { key: "rehabNeedsAssessed", header: "Rehabilitation needs assessed", width: 28 },
+    { key: "rehabPrescriptionIssued", header: "Rehabilitation prescription issued", width: 32 },
   ],
 };
 
@@ -1340,14 +1844,14 @@ const epilepsy = {
     mhScreeningDate: "2025-04-01", carePlanDate: "2025-11-15",
     onValproate: "No", onTopiramate: "No", pppInPlace: null,
     i: {
-      expertise: { v: "Yes", e: ["Vom pädiatrischen Oberarzt mit Expertise in Epilepsie"] },
-      seizureType: { v: "Convulsive", e: ["generalisierte tonisch-klonische (konvulsive) Anfälle"] },
-      mhProblem: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
-      mhSupport: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
+      expertise: { v: "Yes", e: ["Seen by the consultant paediatrician with expertise in epilepsy"] },
+      seizureType: { v: "Convulsive", e: ["generalised tonic-clonic (convulsive) seizures"] },
+      mhProblem: { v: "No", e: ["no mental-health problem was identified"] },
+      mhSupport: { v: "No", e: ["no mental-health problem was identified"] },
     },
     notes: [
-      { role: "Pädiatrische Neurologie — Dr Helen Marsh", date: "2025-01-20", type: "epilepsy_clinic", text: "Vom pädiatrischen Oberarzt mit Expertise in Epilepsie bei der Erstbeurteilung nach der Überweisung gesehen. Anamnestisch bestehen generalisierte tonisch-klonische (konvulsive) Anfälle. Ein MRI des Schädels und ein ECG wurden veranlasst." },
-      { role: "Epilepsie — Screening der psychischen Gesundheit", date: "2025-04-01", type: "mh_screening", text: "Screening der psychischen Gesundheit mit dem vereinbarten Fragebogen durchgeführt; zu diesem Zeitpunkt im ersten Versorgungsjahr wurde kein Problem der psychischen Gesundheit festgestellt." },
+      { role: "Paediatric Neurology — Dr Helen Marsh", date: "2025-01-20", type: "epilepsy_clinic", text: "Seen by the consultant paediatrician with expertise in epilepsy at the first assessment after referral. The history is consistent with generalised tonic-clonic (convulsive) seizures. An MRI brain and an ECG were arranged." },
+      { role: "Epilepsy MH screening", date: "2025-04-01", type: "mh_screening", text: "Mental-health screening completed using the agreed questionnaire; no mental-health problem was identified at this point in the first year of care." },
     ],
   },
 
@@ -1361,14 +1865,14 @@ const epilepsy = {
     mhScreeningDate: "2025-05-02", carePlanDate: "2025-12-20",
     onValproate: "Yes", onTopiramate: "No", pppInPlace: "Yes",
     i: {
-      expertise: { v: "Yes", e: ["Vom epilepsieerfahrenen pädiatrischen Oberarzt"] },
-      seizureType: { v: "Convulsive", e: ["fokale Anfälle mit Übergang in bilaterale konvulsive Aktivität"] },
-      mhProblem: { v: "Yes", e: ["das Screening ergab eine niedergedrückte Stimmung und Angst"] },
-      mhSupport: { v: "Yes", e: ["an das Team für psychische Gesundheit überwiesen, und Unterstützung wurde im ersten Versorgungsjahr geleistet"] },
+      expertise: { v: "Yes", e: ["Reviewed by the epilepsy-expert consultant paediatrician"] },
+      seizureType: { v: "Convulsive", e: ["focal seizures with evolution to bilateral convulsive activity"] },
+      mhProblem: { v: "Yes", e: ["screening identified low mood and anxiety"] },
+      mhSupport: { v: "Yes", e: ["referred to the mental-health team and support was provided"] },
     },
     notes: [
-      { role: "Pädiatrische Neurologie — Dr Helen Marsh", date: "2025-02-12", type: "epilepsy_clinic", text: "Vom epilepsieerfahrenen pädiatrischen Oberarzt innerhalb von zwei Wochen nach der Überweisung kontrolliert. Es handelt sich um fokale Anfälle mit Übergang in bilaterale konvulsive Aktivität. Behandlungsbeginn mit Natriumvalproat; als Frau im gebärfähigen Alter wurde ein Schwangerschaftsverhütungsprogramm eingerichtet und dokumentiert." },
-      { role: "Epilepsie — Screening der psychischen Gesundheit", date: "2025-05-02", type: "mh_screening", text: "Screening der psychischen Gesundheit durchgeführt; das Screening ergab eine niedergedrückte Stimmung und Angst. Sie wurde an das Team für psychische Gesundheit überwiesen, und Unterstützung wurde im ersten Versorgungsjahr geleistet." },
+      { role: "Paediatric Neurology — Dr Helen Marsh", date: "2025-02-12", type: "epilepsy_clinic", text: "Reviewed by the epilepsy-expert consultant paediatrician within two weeks of referral. Events are focal seizures with evolution to bilateral convulsive activity. Started on sodium valproate; as a female of child-bearing potential a pregnancy prevention programme was put in place and documented." },
+      { role: "Epilepsy MH screening", date: "2025-05-02", type: "mh_screening", text: "Mental-health screening completed; screening identified low mood and anxiety. She was referred to the mental-health team and support was provided within the first year of care." },
     ],
   },
 
@@ -1382,14 +1886,14 @@ const epilepsy = {
     mhScreeningDate: "2025-06-05", carePlanDate: "2026-01-10",
     onValproate: "No", onTopiramate: "Yes", pppInPlace: "Yes",
     i: {
-      expertise: { v: "Yes", e: ["Vom pädiatrischen Oberarzt mit Expertise in Epilepsie"] },
-      seizureType: { v: "Non-convulsive", e: ["typische Absencen (nicht-konvulsive Anfälle)"] },
-      mhProblem: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
-      mhSupport: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
+      expertise: { v: "Yes", e: ["Seen by the consultant paediatrician with expertise in epilepsy"] },
+      seizureType: { v: "Non-convulsive", e: ["typical absence (non-convulsive) seizures"] },
+      mhProblem: { v: "No", e: ["no mental-health problem was identified"] },
+      mhSupport: { v: "No", e: ["no mental-health problem was identified"] },
     },
     notes: [
-      { role: "Pädiatrische Neurologie — Dr Helen Marsh", date: "2025-03-10", type: "epilepsy_clinic", text: "Vom pädiatrischen Oberarzt mit Expertise in Epilepsie gesehen. Semiologisch liegen typische Absencen (nicht-konvulsive Anfälle) vor, sodass kein ECG indiziert war. Ein MRI des Schädels wurde angefordert. Behandlungsbeginn mit Topiramat; als Frau im gebärfähigen Alter wurde ein Schwangerschaftsverhütungsprogramm eingerichtet." },
-      { role: "Epilepsie — Screening der psychischen Gesundheit", date: "2025-06-05", type: "mh_screening", text: "Screening der psychischen Gesundheit mit dem vereinbarten Fragebogen durchgeführt; es wurde kein Problem der psychischen Gesundheit festgestellt." },
+      { role: "Paediatric Neurology — Dr Helen Marsh", date: "2025-03-10", type: "epilepsy_clinic", text: "Seen by the consultant paediatrician with expertise in epilepsy. The semiology is of typical absence (non-convulsive) seizures, so no ECG was indicated. An MRI brain was requested. Commenced on topiramate; as a female of child-bearing potential a pregnancy prevention programme was put in place." },
+      { role: "Epilepsy MH screening", date: "2025-06-05", type: "mh_screening", text: "Mental-health screening completed using the agreed questionnaire; no mental-health problem was identified." },
     ],
   },
 
@@ -1403,14 +1907,14 @@ const epilepsy = {
     mhScreeningDate: "2025-05-10", carePlanDate: "2025-12-01",
     onValproate: "No", onTopiramate: "No", pppInPlace: null,
     i: {
-      expertise: { v: "Yes", e: ["Beurteilung durch den epilepsieerfahrenen Pädiater"] },
-      seizureType: { v: "Convulsive", e: ["generalisierte tonisch-klonische (konvulsive) Anfälle"] },
-      mhProblem: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
-      mhSupport: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
+      expertise: { v: "Yes", e: ["assessed by the epilepsy-expert paediatrician"] },
+      seizureType: { v: "Convulsive", e: ["generalised tonic-clonic (convulsive) seizures"] },
+      mhProblem: { v: "No", e: ["no mental-health problem was identified"] },
+      mhSupport: { v: "No", e: ["no mental-health problem was identified"] },
     },
     notes: [
-      { role: "Pädiatrische Neurologie — Dr Helen Marsh", date: "2025-02-20", type: "epilepsy_clinic", text: "Kapazitätsengpässe verzögerten die erste Ambulanzvorstellung; die Beurteilung durch den epilepsieerfahrenen Pädiater erfolgte mehr als zwei Wochen nach der Überweisung. Es liegen generalisierte tonisch-klonische (konvulsive) Anfälle vor. Ein MRI war bei dieser typischen Präsentation nicht indiziert; ein ECG wurde veranlasst." },
-      { role: "Epilepsie — Screening der psychischen Gesundheit", date: "2025-05-10", type: "mh_screening", text: "Screening der psychischen Gesundheit gemeinsam mit der Familie durchgeführt; es wurde kein Problem der psychischen Gesundheit festgestellt." },
+      { role: "Paediatric Neurology — Dr Helen Marsh", date: "2025-02-20", type: "epilepsy_clinic", text: "Capacity pressures delayed the first clinic; assessed by the epilepsy-expert paediatrician more than two weeks after referral. The events are generalised tonic-clonic (convulsive) seizures. MRI was not indicated for this typical presentation; an ECG was arranged." },
+      { role: "Epilepsy MH screening", date: "2025-05-10", type: "mh_screening", text: "Mental-health screening completed with the family; no mental-health problem was identified." },
     ],
   },
 
@@ -1424,14 +1928,14 @@ const epilepsy = {
     mhScreeningDate: "2025-07-02", carePlanDate: "2026-02-15",
     onValproate: "Yes", onTopiramate: "No", pppInPlace: null,
     i: {
-      expertise: { v: "Yes", e: ["Vom pädiatrischen Oberarzt mit Expertise in Epilepsie"] },
-      seizureType: { v: "Convulsive", e: ["generalisierte tonisch-klonische (konvulsive) Anfälle"] },
-      mhProblem: { v: "Yes", e: ["das Screening ergab eine deutlich niedergedrückte Stimmung"] },
-      mhSupport: { v: "No", e: ["Unterstützung wurde bisher jedoch nicht organisiert"] },
+      expertise: { v: "Yes", e: ["Seen by the consultant paediatrician with expertise in epilepsy"] },
+      seizureType: { v: "Convulsive", e: ["generalised tonic-clonic (convulsive) seizures"] },
+      mhProblem: { v: "Yes", e: ["screening identified significant low mood"] },
+      mhSupport: { v: "No", e: ["support has not yet been arranged"] },
     },
     notes: [
-      { role: "Pädiatrische Neurologie — Dr Helen Marsh", date: "2025-04-09", type: "epilepsy_clinic", text: "Vom pädiatrischen Oberarzt mit Expertise in Epilepsie gesehen. Es liegen generalisierte tonisch-klonische (konvulsive) Anfälle vor. Behandlungsbeginn mit Natriumvalproat. Die Unterlagen zum Schwangerschaftsverhütungsprogramm wurden besprochen, jedoch nicht vervollständigt und stehen weiterhin aus." },
-      { role: "Epilepsie — Screening der psychischen Gesundheit", date: "2025-07-02", type: "mh_screening", text: "Screening der psychischen Gesundheit durchgeführt; das Screening ergab eine deutlich niedergedrückte Stimmung. Eine Überweisung wurde empfohlen, Unterstützung wurde bisher jedoch nicht organisiert." },
+      { role: "Paediatric Neurology — Dr Helen Marsh", date: "2025-04-09", type: "epilepsy_clinic", text: "Seen by the consultant paediatrician with expertise in epilepsy. Events are generalised tonic-clonic (convulsive) seizures. Started on sodium valproate. The pregnancy prevention programme paperwork was discussed but has not been completed and is outstanding." },
+      { role: "Epilepsy MH screening", date: "2025-07-02", type: "mh_screening", text: "Mental-health screening completed; screening identified significant low mood. A referral was recommended but support has not yet been arranged." },
     ],
   },
 
@@ -1445,14 +1949,14 @@ const epilepsy = {
     mhScreeningDate: "2025-08-01", carePlanDate: "2026-03-05",
     onValproate: "No", onTopiramate: "No", pppInPlace: null,
     i: {
-      expertise: { v: "Yes", e: ["Vom epilepsieerfahrenen pädiatrischen Oberarzt"] },
-      seizureType: { v: "Non-convulsive", e: ["typische Absencen (nicht-konvulsive Anfälle)"] },
-      mhProblem: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
-      mhSupport: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
+      expertise: { v: "Yes", e: ["Seen by the epilepsy-expert consultant paediatrician"] },
+      seizureType: { v: "Non-convulsive", e: ["typical absence (non-convulsive) seizures"] },
+      mhProblem: { v: "No", e: ["no mental-health problem was identified"] },
+      mhSupport: { v: "No", e: ["no mental-health problem was identified"] },
     },
     notes: [
-      { role: "Pädiatrische Neurologie — Dr Helen Marsh", date: "2025-05-12", type: "epilepsy_clinic", text: "Vom epilepsieerfahrenen pädiatrischen Oberarzt gesehen. Es liegen typische Absencen (nicht-konvulsive Anfälle) vor, sodass weder ein MRI noch ein ECG indiziert war." },
-      { role: "Epilepsie — Screening der psychischen Gesundheit", date: "2025-08-01", type: "mh_screening", text: "Screening der psychischen Gesundheit mit dem vereinbarten Fragebogen durchgeführt; es wurde kein Problem der psychischen Gesundheit festgestellt." },
+      { role: "Paediatric Neurology — Dr Helen Marsh", date: "2025-05-12", type: "epilepsy_clinic", text: "Seen by the epilepsy-expert consultant paediatrician. The events are typical absence (non-convulsive) seizures, so neither an MRI nor an ECG was indicated." },
+      { role: "Epilepsy MH screening", date: "2025-08-01", type: "mh_screening", text: "Mental-health screening completed using the agreed questionnaire; no mental-health problem was identified." },
     ],
   },
 
@@ -1466,14 +1970,14 @@ const epilepsy = {
     mhScreeningDate: "2025-09-01", carePlanDate: "2026-05-20",
     onValproate: "No", onTopiramate: "No", pppInPlace: null,
     i: {
-      expertise: { v: "Yes", e: ["Vom pädiatrischen Oberarzt mit Expertise in Epilepsie"] },
-      seizureType: { v: "Convulsive", e: ["generalisierte tonisch-klonische (konvulsive) Anfälle"] },
-      mhProblem: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
-      mhSupport: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
+      expertise: { v: "Yes", e: ["Seen by the consultant paediatrician with expertise in epilepsy"] },
+      seizureType: { v: "Convulsive", e: ["generalised tonic-clonic (convulsive) seizures"] },
+      mhProblem: { v: "No", e: ["no mental-health problem was identified"] },
+      mhSupport: { v: "No", e: ["no mental-health problem was identified"] },
     },
     notes: [
-      { role: "Pädiatrische Neurologie — Dr Helen Marsh", date: "2025-06-12", type: "epilepsy_clinic", text: "Vom pädiatrischen Oberarzt mit Expertise in Epilepsie gesehen. Es liegen generalisierte tonisch-klonische (konvulsive) Anfälle vor. Ein MRI des Schädels wurde angefordert und ein ECG veranlasst." },
-      { role: "Epilepsie — Screening der psychischen Gesundheit", date: "2025-09-01", type: "mh_screening", text: "Screening der psychischen Gesundheit durchgeführt; es wurde kein Problem der psychischen Gesundheit festgestellt." },
+      { role: "Paediatric Neurology — Dr Helen Marsh", date: "2025-06-12", type: "epilepsy_clinic", text: "Seen by the consultant paediatrician with expertise in epilepsy. The events are generalised tonic-clonic (convulsive) seizures. An MRI brain was requested and an ECG was arranged." },
+      { role: "Epilepsy MH screening", date: "2025-09-01", type: "mh_screening", text: "Mental-health screening completed; no mental-health problem was identified." },
     ],
   },
 
@@ -1487,14 +1991,14 @@ const epilepsy = {
     mhScreeningDate: "2025-10-01", carePlanDate: "2026-06-25",
     onValproate: "No", onTopiramate: "No", pppInPlace: null,
     i: {
-      expertise: { v: "No", e: ["durch einen allgemeinen Pädiater ohne spezifische Epilepsie-Expertise"] },
-      seizureType: { v: "Convulsive", e: ["generalisierte tonisch-klonische (konvulsive) Anfälle"] },
-      mhProblem: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
-      mhSupport: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
+      expertise: { v: "No", e: ["seen by a general paediatrician without specific epilepsy expertise"] },
+      seizureType: { v: "Convulsive", e: ["generalised tonic-clonic (convulsive) seizures"] },
+      mhProblem: { v: "No", e: ["no mental-health problem was identified"] },
+      mhSupport: { v: "No", e: ["no mental-health problem was identified"] },
     },
     notes: [
-      { role: "Pädiatrie — Dr Sam Reid", date: "2025-07-10", type: "epilepsy_clinic", text: "Die Erstbeurteilung erfolgte durch einen allgemeinen Pädiater ohne spezifische Epilepsie-Expertise; die weiterführende Kontrolle durch den Epilepsie-Verantwortlichen steht aus. Es liegen generalisierte tonisch-klonische (konvulsive) Anfälle vor. Ein ECG wurde veranlasst; ein MRI war nicht indiziert." },
-      { role: "Epilepsie — Screening der psychischen Gesundheit", date: "2025-10-01", type: "mh_screening", text: "Screening der psychischen Gesundheit mit dem vereinbarten Fragebogen durchgeführt; es wurde kein Problem der psychischen Gesundheit festgestellt." },
+      { role: "Paediatrics — Dr Sam Reid", date: "2025-07-10", type: "epilepsy_clinic", text: "First assessment was seen by a general paediatrician without specific epilepsy expertise; onward review by the epilepsy lead is pending. The events are generalised tonic-clonic (convulsive) seizures. An ECG was arranged; MRI was not indicated." },
+      { role: "Epilepsy MH screening", date: "2025-10-01", type: "mh_screening", text: "Mental-health screening completed using the agreed questionnaire; no mental-health problem was identified." },
     ],
   },
 
@@ -1508,14 +2012,14 @@ const epilepsy = {
     mhScreeningDate: null, carePlanDate: "2026-07-15",
     onValproate: "No", onTopiramate: "No", pppInPlace: null,
     i: {
-      expertise: { v: "Yes", e: ["Vom pädiatrischen Oberarzt mit Expertise in Epilepsie"] },
-      seizureType: { v: "Non-convulsive", e: ["typische Absencen (nicht-konvulsive Anfälle)"] },
-      mhProblem: { v: "No", e: ["das Screening der psychischen Gesundheit bisher nicht durchgeführt wurde"] },
-      mhSupport: { v: "No", e: ["das Screening der psychischen Gesundheit bisher nicht durchgeführt wurde"] },
+      expertise: { v: "Yes", e: ["Seen by the consultant paediatrician with expertise in epilepsy"] },
+      seizureType: { v: "Non-convulsive", e: ["typical absence (non-convulsive) seizures"] },
+      mhProblem: { v: "No", e: ["mental-health screening has not yet been carried out"] },
+      mhSupport: { v: "No", e: ["mental-health screening has not yet been carried out"] },
     },
     notes: [
-      { role: "Pädiatrische Neurologie — Dr Helen Marsh", date: "2025-08-13", type: "epilepsy_clinic", text: "Vom pädiatrischen Oberarzt mit Expertise in Epilepsie gesehen. Es liegen typische Absencen (nicht-konvulsive Anfälle) vor, sodass kein ECG indiziert war. Ein MRI des Schädels wurde angefordert." },
-      { role: "Epilepsie — Screening der psychischen Gesundheit", date: "2025-09-01", type: "mh_screening", text: "Die Dokumentationsprüfung vermerkt, dass für dieses Kind im ersten Versorgungsjahr das Screening der psychischen Gesundheit bisher nicht durchgeführt wurde." },
+      { role: "Paediatric Neurology — Dr Helen Marsh", date: "2025-08-13", type: "epilepsy_clinic", text: "Seen by the consultant paediatrician with expertise in epilepsy. The events are typical absence (non-convulsive) seizures, so no ECG was indicated. An MRI brain was requested." },
+      { role: "Epilepsy MH screening", date: "2025-09-01", type: "mh_screening", text: "Documentation review notes that mental-health screening has not yet been carried out for this child within the first year of care." },
     ],
   },
 
@@ -1529,14 +2033,14 @@ const epilepsy = {
     mhScreeningDate: "2025-11-20", carePlanDate: null,
     onValproate: "No", onTopiramate: "No", pppInPlace: null,
     i: {
-      expertise: { v: "Yes", e: ["Vom pädiatrischen Oberarzt mit Expertise in Epilepsie"] },
-      seizureType: { v: "Convulsive", e: ["generalisierte tonisch-klonische (konvulsive) Anfälle"] },
-      mhProblem: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
-      mhSupport: { v: "No", e: ["kein Problem der psychischen Gesundheit festgestellt"] },
+      expertise: { v: "Yes", e: ["Seen by the consultant paediatrician with expertise in epilepsy"] },
+      seizureType: { v: "Convulsive", e: ["generalised tonic-clonic (convulsive) seizures"] },
+      mhProblem: { v: "No", e: ["no mental-health problem was identified"] },
+      mhSupport: { v: "No", e: ["no mental-health problem was identified"] },
     },
     notes: [
-      { role: "Pädiatrische Neurologie — Dr Helen Marsh", date: "2025-09-19", type: "epilepsy_clinic", text: "Vom pädiatrischen Oberarzt mit Expertise in Epilepsie gesehen. Es liegen generalisierte tonisch-klonische (konvulsive) Anfälle vor. Ein ECG wurde veranlasst; ein MRI war bei dieser Präsentation nicht indiziert." },
-      { role: "Epilepsie — Screening der psychischen Gesundheit", date: "2025-11-20", type: "mh_screening", text: "Screening der psychischen Gesundheit mit dem vereinbarten Fragebogen durchgeführt; es wurde kein Problem der psychischen Gesundheit festgestellt." },
+      { role: "Paediatric Neurology — Dr Helen Marsh", date: "2025-09-19", type: "epilepsy_clinic", text: "Seen by the consultant paediatrician with expertise in epilepsy. The events are generalised tonic-clonic (convulsive) seizures. An ECG was arranged; MRI was not indicated for this presentation." },
+      { role: "Epilepsy MH screening", date: "2025-11-20", type: "mh_screening", text: "Mental-health screening completed using the agreed questionnaire; no mental-health problem was identified." },
     ],
   },
 };
@@ -1563,12 +2067,12 @@ const trauma = {
     airwayConsideredMin: 18,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "Yes", e: ["der Atemweg wurde innerhalb von 18 Minuten nach Ankunft mittels Rapid-Sequence-Intubation gesichert"] },
-      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde erstellt und der Familie, dem Hausarzt und dem gemeindenahen Versorgungsteam übermittelt"] },
+      intubationConsidered: { v: "Yes", e: ["airway was secured by rapid sequence intubation within 18 minutes of arrival"] },
+      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was completed and shared with the family, GP and community team"] },
     },
     notes: [
-      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-01-08", type: "resus", text: "Das oberarztgeleitete Trauma-Team nahm dieses Kind nach einem Verkehrsunfall mit hoher Geschwindigkeit auf. GCS 6 bei Ankunft; der Atemweg wurde innerhalb von 18 Minuten nach Ankunft mittels Rapid-Sequence-Intubation gesichert. Tranexamsäure wurde bei massiver Blutung verabreicht." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-01-24", type: "rehab", text: "Der Rehabilitationsbedarf wurde durch den Rehabilitationskoordinator der Traumaversorgung beurteilt; eine Rehabilitationsverordnung wurde erstellt und der Familie, dem Hausarzt und dem gemeindenahen Versorgungsteam übermittelt, wobei die Kernkomponenten im NMTR dokumentiert wurden." },
+      { role: "Trauma team — Dr Olusola Bello", date: "2026-01-08", type: "resus", text: "Consultant-led trauma team received this child after a high-speed road traffic collision. GCS 6 on arrival; the airway was secured by rapid sequence intubation within 18 minutes of arrival. Tranexamic acid given for major haemorrhage." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-01-24", type: "rehab", text: "Rehabilitation needs were assessed by the trauma rehabilitation coordinator; a rehabilitation prescription was completed and shared with the family, GP and community team, with core components recorded on the NMTR." },
     ],
   },
 
@@ -1583,12 +2087,12 @@ const trauma = {
     airwayConsideredMin: null,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "No", e: ["der Atemweg war durchgängig und wurde durchgehend eigenständig aufrechterhalten, sodass keine Intubation erforderlich war"] },
-      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde ausgestellt und dem Hausarzt sowie dem weiterbehandelnden Leistungserbringer in Kopie übermittelt"] },
+      intubationConsidered: { v: "No", e: ["the airway was patent and self-maintained throughout, so intubation was not required"] },
+      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was issued and copied to the GP and ongoing-care provider"] },
     },
     notes: [
-      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-01-15", type: "resus", text: "Sturz aus großer Höhe. GCS 10 bei Ankunft; der Atemweg war durchgängig und wurde durchgehend eigenständig aufrechterhalten, sodass keine Intubation erforderlich war. Keine Indikation für Tranexamsäure. Der Oberarzt traf wegen einer parallel laufenden Reanimation neun Minuten nach Ankunft im Schockraum ein." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-01-31", type: "rehab", text: "Rehabilitationsbedarf beurteilt; eine Rehabilitationsverordnung wurde ausgestellt und dem Hausarzt sowie dem weiterbehandelnden Leistungserbringer in Kopie übermittelt, mit den Kernkomponenten im NMTR." },
+      { role: "Trauma team — Dr Olusola Bello", date: "2026-01-15", type: "resus", text: "Fall from height. GCS 10 on arrival; the airway was patent and self-maintained throughout, so intubation was not required. No indication for tranexamic acid. Consultant attended the bay nine minutes after arrival owing to a concurrent resuscitation." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-01-31", type: "rehab", text: "Rehabilitation needs assessed; a rehabilitation prescription was issued and copied to the GP and ongoing-care provider, with core components on the NMTR." },
     ],
   },
 
@@ -1603,12 +2107,12 @@ const trauma = {
     airwayConsideredMin: 25,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "Yes", e: ["die Notwendigkeit eines definitiven Atemwegs wurde dokumentiert und die Intubation wurde nach 25 Minuten durchgeführt"] },
-      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde gemeinsam mit der Familie erstellt und dem Hausarzt sowie dem gemeindenahen Versorgungsteam übermittelt"] },
+      intubationConsidered: { v: "Yes", e: ["the need for a definitive airway was documented and intubation was performed at 25 minutes"] },
+      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was completed with the family and shared with the GP and community team"] },
     },
     notes: [
-      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-01-20", type: "resus", text: "Quetschverletzung. GCS 7 bei Ankunft; die Notwendigkeit eines definitiven Atemwegs wurde dokumentiert und die Intubation wurde nach 25 Minuten durchgeführt. Tranexamsäure wurde innerhalb einer Stunde verabreicht. Der Oberarzt war innerhalb von drei Minuten im Schockraum anwesend." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-03", type: "rehab", text: "Rehabilitationsbedarf beurteilt; eine Rehabilitationsverordnung wurde gemeinsam mit der Familie erstellt und dem Hausarzt sowie dem gemeindenahen Versorgungsteam übermittelt." },
+      { role: "Trauma team — Dr Olusola Bello", date: "2026-01-20", type: "resus", text: "Crush injury. GCS 7 on arrival; the need for a definitive airway was documented and intubation was performed at 25 minutes. Tranexamic acid given within the hour. Consultant present in the bay within three minutes." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-03", type: "rehab", text: "Rehabilitation needs assessed; a rehabilitation prescription was completed with the family and shared with the GP and community team." },
     ],
   },
 
@@ -1623,12 +2127,12 @@ const trauma = {
     airwayConsideredMin: null,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "No", e: ["der Atemweg wurde bei einem GCS von 14 eigenständig aufrechterhalten und eine Intubation war nicht indiziert"] },
-      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde ausgestellt und der Familie, dem Hausarzt und dem weiterbehandelnden Leistungserbringer übermittelt"] },
+      intubationConsidered: { v: "No", e: ["the airway was self-maintained with a GCS of 14 and intubation was not indicated"] },
+      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was issued and shared with the family, GP and ongoing-care provider"] },
     },
     notes: [
-      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-01-25", type: "resus", text: "Sportverletzung mit einer Milzlazeration. GCS 14 bei Ankunft; der Atemweg wurde bei einem GCS von 14 eigenständig aufrechterhalten und eine Intubation war nicht indiziert. Keine massive Blutung, die Tranexamsäure erfordert hätte." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-07", type: "rehab", text: "Rehabilitationsbedarf beurteilt; eine Rehabilitationsverordnung wurde ausgestellt und der Familie, dem Hausarzt und dem weiterbehandelnden Leistungserbringer übermittelt." },
+      { role: "Trauma team — Dr Olusola Bello", date: "2026-01-25", type: "resus", text: "Sporting injury with a splenic laceration. GCS 14 on arrival; the airway was self-maintained with a GCS of 14 and intubation was not indicated. No major haemorrhage requiring tranexamic acid." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-07", type: "rehab", text: "Rehabilitation needs assessed; a rehabilitation prescription was issued and shared with the family, GP and ongoing-care provider." },
     ],
   },
 
@@ -1643,12 +2147,12 @@ const trauma = {
     airwayConsideredMin: null,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "No", e: ["wach mit einem GCS von 15 und einem eigenständig aufrechterhaltenen Atemweg, sodass keine Atemwegsintervention erwogen wurde"] },
-      rehabPrescription: { v: "No", e: ["eine formelle Rehabilitationsverordnung wurde jedoch bisher nicht erstellt und steht bei Entlassung weiterhin aus"] },
+      intubationConsidered: { v: "No", e: ["alert with a GCS of 15 and a self-maintained airway, so no airway intervention was considered"] },
+      rehabPrescription: { v: "No", e: ["a formal rehabilitation prescription has not yet been completed and remains outstanding"] },
     },
     notes: [
-      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-02-01", type: "resus", text: "Röhrenknochenfraktur der unteren Extremität nach einem Sturz. Das Kleinkind war wach mit einem GCS von 15 und einem eigenständig aufrechterhaltenen Atemweg, sodass keine Atemwegsintervention erwogen wurde. Kein Schädel-Hirn-Trauma." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-05", type: "rehab", text: "Der Rehabilitationsbedarf wurde während des Aufenthalts beurteilt; eine formelle Rehabilitationsverordnung wurde jedoch bisher nicht erstellt und steht bei Entlassung weiterhin aus." },
+      { role: "Trauma team — Dr Olusola Bello", date: "2026-02-01", type: "resus", text: "Lower-limb long-bone fracture from a fall. The toddler was alert with a GCS of 15 and a self-maintained airway, so no airway intervention was considered. No head injury." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-05", type: "rehab", text: "Rehabilitation needs were assessed during admission; however, a formal rehabilitation prescription has not yet been completed and remains outstanding at discharge." },
     ],
   },
 
@@ -1663,12 +2167,12 @@ const trauma = {
     airwayConsideredMin: 22,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "Yes", e: ["der Atemweg wurde 22 Minuten nach Ankunft mittels Intubation gesichert"] },
-      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde erstellt und der Familie, dem Hausarzt und dem weiterbehandelnden Team ausgehändigt"] },
+      intubationConsidered: { v: "Yes", e: ["the airway was secured by intubation at 22 minutes from arrival"] },
+      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was completed and issued to the family, GP and ongoing-care team"] },
     },
     notes: [
-      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-02-04", type: "resus", text: "Penetrierende Abdominalverletzung mit massiver Blutung. GCS 5 bei Ankunft; der Atemweg wurde 22 Minuten nach Ankunft mittels Intubation gesichert. Der Oberarzt war innerhalb von zwei Minuten anwesend. Tranexamsäure wurde verabreicht, jedoch wegen eines schwierigen Interhospitaltransfers verzögert auf 75 Minuten nach dem Trauma." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-23", type: "rehab", text: "Der Rehabilitationsbedarf wurde durch den Rehabilitationskoordinator der Traumaversorgung beurteilt; eine Rehabilitationsverordnung wurde erstellt und der Familie, dem Hausarzt und dem weiterbehandelnden Team ausgehändigt, mit den Kernkomponenten im NMTR." },
+      { role: "Trauma team — Dr Olusola Bello", date: "2026-02-04", type: "resus", text: "Penetrating abdominal injury with major haemorrhage. GCS 5 on arrival; the airway was secured by intubation at 22 minutes from arrival. Consultant present within two minutes. Tranexamic acid was given but delayed to 75 minutes after injury owing to a difficult interhospital transfer." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-23", type: "rehab", text: "Rehabilitation needs assessed by the trauma rehabilitation coordinator; a rehabilitation prescription was completed and issued to the family, GP and ongoing-care team, with core components on the NMTR." },
     ],
   },
 
@@ -1683,12 +2187,12 @@ const trauma = {
     airwayConsideredMin: 29,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "Yes", e: ["ein definitiver Atemweg wurde erwogen und die Intubation 29 Minuten nach Ankunft durchgeführt"] },
-      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde erstellt und dem Hausarzt sowie dem gemeindenahen Rehabilitationsdienst übermittelt"] },
+      intubationConsidered: { v: "Yes", e: ["a definitive airway was considered and intubation carried out at 29 minutes after arrival"] },
+      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was completed and shared with the GP and community rehabilitation service"] },
     },
     notes: [
-      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-02-10", type: "resus", text: "Fußgänger gegen Fahrzeug. GCS 8 bei Ankunft; ein definitiver Atemweg wurde erwogen und die Intubation 29 Minuten nach Ankunft durchgeführt. Tranexamsäure wurde innerhalb einer Stunde verabreicht. Der Oberarzt war nach fünf Minuten anwesend." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-26", type: "rehab", text: "Rehabilitationsbedarf beurteilt; eine Rehabilitationsverordnung wurde erstellt und dem Hausarzt sowie dem gemeindenahen Rehabilitationsdienst übermittelt." },
+      { role: "Trauma team — Dr Olusola Bello", date: "2026-02-10", type: "resus", text: "Pedestrian versus vehicle. GCS 8 on arrival; a definitive airway was considered and intubation carried out at 29 minutes after arrival. Tranexamic acid given within the hour. Consultant present at five minutes." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-26", type: "rehab", text: "Rehabilitation needs assessed; a rehabilitation prescription was completed and shared with the GP and community rehabilitation service." },
     ],
   },
 
@@ -1703,12 +2207,12 @@ const trauma = {
     airwayConsideredMin: null,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "No", e: ["vollständig wach mit einem GCS von 15, sodass keine Atemwegsintervention erwogen wurde"] },
-      rehabPrescription: { v: "No", e: ["für diese Aufnahme mit leichter Verletzung war keine Rehabilitationsverordnung erforderlich" ] },
+      intubationConsidered: { v: "No", e: ["fully alert with a GCS of 15, so no airway intervention was considered"] },
+      rehabPrescription: { v: "No", e: ["no rehabilitation prescription was required for this minor-injury admission" ] },
     },
     notes: [
-      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-02-13", type: "resus", text: "Isolierte geschlossene Unterarmfraktur nach einem Sturz auf dem Spielplatz. Das Kind war vollständig wach mit einem GCS von 15, sodass keine Atemwegsintervention erwogen wurde. Kein Schädel-Hirn-Trauma und keine massive Blutung." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-17", type: "rehab", text: "Rehabilitationsbedarf überprüft; für diese Aufnahme mit leichter Verletzung war keine Rehabilitationsverordnung erforderlich, da sie unterhalb des Schwellenwerts für die Rehabilitation bei schwerem Trauma lag." },
+      { role: "Trauma team — Dr Olusola Bello", date: "2026-02-13", type: "resus", text: "Isolated closed forearm fracture after a playground fall. The child was fully alert with a GCS of 15, so no airway intervention was considered. No head injury and no major haemorrhage." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-17", type: "rehab", text: "Rehabilitation needs reviewed; no rehabilitation prescription was required for this minor-injury admission below the major-trauma rehabilitation threshold." },
     ],
   },
 
@@ -1723,12 +2227,12 @@ const trauma = {
     airwayConsideredMin: null,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "No", e: ["der Atemweg wurde bei einem GCS von 9 aufrechterhalten und eine Intubation war zu diesem Zeitpunkt nicht erforderlich"] },
-      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde ausgestellt und der Familie, dem Hausarzt und dem weiterbehandelnden Leistungserbringer übermittelt"] },
+      intubationConsidered: { v: "No", e: ["the airway was maintained with a GCS of 9 and intubation was not required at this stage"] },
+      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was issued and shared with the family, GP and ongoing-care provider"] },
     },
     notes: [
-      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-02-16", type: "resus", text: "Radfahrer gegen Fahrzeug mit Thoraxverletzung. GCS 9 bei Ankunft; der Atemweg wurde bei einem GCS von 9 aufrechterhalten und eine Intubation war zu diesem Zeitpunkt nicht erforderlich. Keine Indikation für Tranexamsäure." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-03-04", type: "rehab", text: "Rehabilitationsbedarf beurteilt; eine Rehabilitationsverordnung wurde ausgestellt und der Familie, dem Hausarzt und dem weiterbehandelnden Leistungserbringer übermittelt, mit den Kernkomponenten im NMTR." },
+      { role: "Trauma team — Dr Olusola Bello", date: "2026-02-16", type: "resus", text: "Cyclist versus vehicle with a chest injury. GCS 9 on arrival; the airway was maintained with a GCS of 9 and intubation was not required at this stage. No indication for tranexamic acid." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-03-04", type: "rehab", text: "Rehabilitation needs assessed; a rehabilitation prescription was issued and shared with the family, GP and ongoing-care provider, with core components on the NMTR." },
     ],
   },
 
@@ -1743,12 +2247,12 @@ const trauma = {
     airwayConsideredMin: null,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "No", e: ["hielt den eigenen Atemweg bei einem GCS von 12 aufrecht und eine Intubation war nicht indiziert"] },
-      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde erstellt und der Familie, dem Hausarzt und dem weiterbehandelnden Leistungserbringer übermittelt"] },
+      intubationConsidered: { v: "No", e: ["maintaining their own airway with a GCS of 12 and intubation was not indicated"] },
+      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was completed and shared with the family, GP and ongoing-care provider"] },
     },
     notes: [
-      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-02-19", type: "resus", text: "Treppensturz mit einem leichten Schädel-Hirn-Trauma und einer Leberlazeration. Das Kind hielt den eigenen Atemweg bei einem GCS von 12 aufrecht und eine Intubation war nicht indiziert. Keine massive Blutung." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-03-01", type: "rehab", text: "Rehabilitationsbedarf beurteilt; eine Rehabilitationsverordnung wurde erstellt und der Familie, dem Hausarzt und dem weiterbehandelnden Leistungserbringer übermittelt." },
+      { role: "Trauma team — Dr Olusola Bello", date: "2026-02-19", type: "resus", text: "Fall down stairs with a minor head injury and a liver laceration. The child was maintaining their own airway with a GCS of 12 and intubation was not indicated. No major haemorrhage." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-03-01", type: "rehab", text: "Rehabilitation needs assessed; a rehabilitation prescription was completed and shared with the family, GP and ongoing-care provider." },
     ],
   },
 };
@@ -1832,9 +2336,9 @@ const codeMaps = {
   // displayed/evidence wording (translatable). The ECG KPI keys off whether the
   // type is convulsive.
   seizureType: {
-    Convulsive: { code: "konvulsiv", label: "konvulsiv (generalisiert tonisch-klonisch / fokal zu bilateral)" },
-    "Non-convulsive": { code: "nicht konvulsiv", label: "nicht konvulsiv (Absence / fokal bewusst erlebt)" },
-    Absence: { code: "Absence", label: "Absence (nicht konvulsiv)" },
+    Convulsive: { code: "convulsive", label: "convulsive (generalised tonic-clonic / focal to bilateral)" },
+    "Non-convulsive": { code: "non-convulsive", label: "non-convulsive (absence / focal aware)" },
+    Absence: { code: "absence", label: "absence (non-convulsive)" },
   },
 };
 
@@ -1852,14 +2356,10 @@ const labels = {
   // word for the cord record Yes/No values and for these labels.
   yes: "Ja",
   no: "Nein",
-  // Ableitung des Auditnamens (lib/spec.js): die aus dem Vorlagennamen entfernten
-  // Geltungsbereichsangaben und die anschließende Form des Auditnamens.
-  scopeQualifiers: ["lokal", "regional", "national"],
-  auditNameFormat: (base) => `${base}-Audit`,
 };
 
 // --- Mock audit-detail strings (criteria + summary) -------------------------
-const auditDetail = {
+const templateDetail = {
   databaseSummary: "Demografie, Aufnahmen und kodierte klinische Ereignisse für den Kohortenabgleich.",
   criteria: {
     age: { label: "Patientenalter", unit: "Jahre" },
@@ -2085,68 +2585,68 @@ const explain = {
   npdaInitialBicarb: (code) => `Aus dem Krankenhaus-Aufnahmedatensatz für ${code} — initiales Standardbikarbonat bei Aufnahme in mmol/l (NPDA-Format 00.0).`,
 
   // --- Epilepsy12 (Dataset 4) ----------------------------------------------
-  epiPatient: (code) => `Aus den KIS-Stammdaten für ${code} — die 10-stellige NHS-Nummer der Patientin/des Patienten.`,
-  epiDob: (code) => `Aus den KIS-Stammdaten für ${code} — Geburtsdatum, formatiert als DD/MM/YYYY.`,
-  epiSex: (code, sex, sexCode) => `Aus den KIS-Stammdaten für ${code} — bei Geburt zugewiesenes Geschlecht dokumentiert als ${sex === "Male" ? "Männlich" : "Weiblich"}, kodiert als ${sexCode} (1 = Männlich, 2 = Weiblich).`,
-  epiAgeAtAssessment: (code, age) => `Aus dem Epilepsie-Versorgungsdatensatz für ${code} — Alter ${age} Jahre bei der ersten pädiatrischen Untersuchung; die Kohorte umfasst Kinder und Jugendliche bis einschließlich 18 Jahre.`,
-  epiReferralDate: (code) => `Aus dem Epilepsie-Versorgungsdatensatz für ${code} — Datum des Eingangs der Überweisung, formatiert als DD/MM/YYYY.`,
-  epiFirstAssessmentDate: (code, days) => `Aus dem Epilepsie-Versorgungsdatensatz für ${code} — erste pädiatrische Untersuchung ${days} Tage nach der Überweisung (KPI-1-Ziel: innerhalb von 14 Tagen), formatiert als DD/MM/YYYY.`,
-  epiExpertise: (code, seen, mhCode) => `Aus dem Epilepsie-Ambulanzbrief für ${code} — die erste Untersuchung wurde ${seen ? "" : "nicht "}von einer Pädiaterin/einem Pädiater mit Epilepsie-Expertise durchgeführt (KPI 1), dokumentiert als ${mhCode === "Yes" ? "Ja" : "Nein"}.`,
-  epiEsnInputDate: (code) => `Aus dem Epilepsie-Versorgungsdatensatz für ${code} — Datum der ersten Mitbetreuung durch eine Epilepsie-Fachpflegekraft (ESN) (KPI-2-Ziel: innerhalb des ersten Betreuungsjahres), formatiert als DD/MM/YYYY.`,
-  epiEsnInputNotDone: (code) => `Für ${code} ist im ersten Betreuungsjahr keine Mitbetreuung durch eine Epilepsie-Fachpflegekraft (ESN) dokumentiert, sodass dieser KPI unvollständig ist und das Datum leer bleibt.`,
-  epiMriIndicated: (code, indicated) => `Aus dem Epilepsie-Versorgungsdatensatz für ${code} — eine kraniale MRT war klinisch ${indicated ? "" : "nicht "}indiziert; der KPI „MRT innerhalb von 6 Wochen" gilt nur bei bestehender Indikation.`,
-  epiMriRequestNA: (code) => `Für ${code} war keine kraniale MRT indiziert, sodass keine Anforderung gestellt wurde und das Datum leer bleibt.`,
-  epiMriRequestDate: (code) => `Aus dem Epilepsie-Versorgungsdatensatz für ${code} — Datum der Anforderung der kranialen MRT, formatiert als DD/MM/YYYY.`,
-  epiMriPerformedNA: (code) => `Für ${code} war keine kraniale MRT indiziert, sodass keine durchgeführt wurde und das Datum leer bleibt.`,
-  epiMriPerformedNotDone: (code) => `Für ${code} wurde eine kraniale MRT angefordert, aber noch nicht durchgeführt, sodass dieser KPI offen ist und das Datum leer bleibt.`,
-  epiMriPerformedDate: (code, days) => `Aus dem Radiologie-Datensatz für ${code} — kraniale MRT ${days} Tage nach der Anforderung durchgeführt (KPI-5-Ziel: innerhalb von 42 Tagen), formatiert als DD/MM/YYYY.`,
-  epiSeizureType: (code, label, stCode) => `Aus dem Epilepsie-Ambulanzbrief für ${code} — die Anfälle sind ${label}, dokumentiert als ${stCode}; der EKG-KPI gilt für konvulsive Anfälle.`,
-  epiEcgNA: (code) => `${code} hat keine konvulsiven Anfälle, sodass ein EKG nicht Teil der erforderlichen Abklärung ist und das Datum leer bleibt.`,
-  epiEcgNotDone: (code) => `${code} hat konvulsive Anfälle und sollte daher innerhalb des ersten Jahres ein EKG erhalten; es ist jedoch keines dokumentiert, sodass dieser KPI unvollständig ist und das Datum leer bleibt.`,
-  epiEcgDate: (code) => `Aus dem kardiologischen Datensatz für ${code} — Datum der EKG-Durchführung (KPI 4, konvulsive Anfälle), formatiert als DD/MM/YYYY.`,
-  epiMhScreeningDate: (code) => `Aus dem Epilepsie-Versorgungsdatensatz für ${code} — Datum des abgeschlossenen Screenings der psychischen Gesundheit (KPI 6, innerhalb des ersten Betreuungsjahres), formatiert als DD/MM/YYYY.`,
-  epiMhScreeningNotDone: (code) => `Für ${code} ist im ersten Betreuungsjahr kein Screening der psychischen Gesundheit dokumentiert, sodass dieser KPI unvollständig ist und das Datum leer bleibt.`,
-  epiMhProblem: (code, identified, mhCode) => `Aus der Notiz zum Screening der psychischen Gesundheit für ${code} — beim Screening wurde ${identified ? "" : "kein "}psychisches Problem festgestellt (KPI 6), dokumentiert als ${mhCode === "Yes" ? "Ja" : "Nein"}.`,
-  epiMhSupportProvided: (code, provided, mhCode) => `Aus der Notiz zum Screening der psychischen Gesundheit für ${code} — nach Feststellung eines Problems wurde ${provided ? "" : "keine "}psychosoziale Unterstützung geleistet (KPI 7), dokumentiert als ${mhCode === "Yes" ? "Ja" : "Nein"}.`,
-  epiMhSupportNA: (code) => `Für ${code} wurde kein psychisches Problem festgestellt, sodass der KPI zur geleisteten Unterstützung (KPI 7) nicht zutrifft und die Zelle leer bleibt.`,
-  epiCarePlanDate: (code) => `Aus dem Epilepsie-Versorgungsdatensatz für ${code} — Datum der Vereinbarung des umfassenden Behandlungsplans (KPI-9-Ziel: bis zum 12. Monat), formatiert als DD/MM/YYYY.`,
-  epiCarePlanNotDone: (code) => `Für ${code} ist bis zum 12. Monat kein umfassender Behandlungsplan dokumentiert, sodass dieser KPI unvollständig ist und das Datum leer bleibt.`,
-  epiOnValproate: (code, on) => `Aus dem Verordnungsdatensatz für ${code} — der Patientin/dem Patienten ist ${on ? "derzeit Natriumvalproat verordnet" : "kein Natriumvalproat verordnet"}.`,
-  epiOnTopiramate: (code, on) => `Aus dem Verordnungsdatensatz für ${code} — der Patientin/dem Patienten ist ${on ? "derzeit Topiramat verordnet" : "kein Topiramat verordnet"}.`,
-  epiPppNA: (code) => `Das Schwangerschaftsverhütungsprogramm (KPI 8) gilt nur für weibliche Personen ab 12 Jahren unter Valproat oder Topiramat; ${code} erfüllt diese Kriterien nicht, sodass es nicht zutrifft und die Zelle leer bleibt.`,
-  epiPppInPlace: (code, inPlace) => `Aus dem Epilepsie-Versorgungsdatensatz für ${code} — für diese gebärfähige weibliche Person unter Valproat/Topiramat ${inPlace ? "besteht ein Schwangerschaftsverhütungsprogramm" : "besteht KEIN Schwangerschaftsverhütungsprogramm"} (bzw. eine Risikoaufklärungserklärung) (KPI 8, sicherheitskritisch).`,
+  epiPatient: (code) => `From the EHR demographics for ${code} — the patient's 10-digit NHS number.`,
+  epiDob: (code) => `From the EHR demographics for ${code} — date of birth, formatted DD/MM/YYYY.`,
+  epiSex: (code, sex, sexCode) => `From the EHR demographics for ${code} — sex assigned at birth recorded as ${sex}, coded ${sexCode} (1 = Male, 2 = Female).`,
+  epiAgeAtAssessment: (code, age) => `From the epilepsy service record for ${code} — age ${age} years at the first paediatric assessment; the cohort is children and young people aged 18 or under.`,
+  epiReferralDate: (code) => `From the epilepsy service record for ${code} — date the referral was received, formatted DD/MM/YYYY.`,
+  epiFirstAssessmentDate: (code, days) => `From the epilepsy service record for ${code} — first paediatric assessment ${days} days after referral (KPI 1 target: within 14 days), formatted DD/MM/YYYY.`,
+  epiExpertise: (code, seen, mhCode) => `From the epilepsy clinic letter for ${code} — the first assessment ${seen ? "was" : "was not"} carried out by a paediatrician with expertise in epilepsy (KPI 1), recorded as ${mhCode}.`,
+  epiEsnInputDate: (code) => `From the epilepsy service record for ${code} — date of the first epilepsy specialist nurse (ESN) input (KPI 2 target: within the first year of care), formatted DD/MM/YYYY.`,
+  epiEsnInputNotDone: (code) => `No epilepsy specialist nurse (ESN) input is recorded for ${code} in the first year of care, so this KPI is incomplete and the date is left blank.`,
+  epiMriIndicated: (code, indicated) => `From the epilepsy service record for ${code} — an MRI brain ${indicated ? "was" : "was not"} clinically indicated; the MRI-within-6-weeks KPI applies only where one is indicated.`,
+  epiMriRequestNA: (code) => `An MRI brain was not indicated for ${code}, so no request was raised and the date is left blank.`,
+  epiMriRequestDate: (code) => `From the epilepsy service record for ${code} — date the MRI brain was requested, formatted DD/MM/YYYY.`,
+  epiMriPerformedNA: (code) => `An MRI brain was not indicated for ${code}, so none was performed and the date is left blank.`,
+  epiMriPerformedNotDone: (code) => `An MRI brain was requested for ${code} but has not yet been performed, so this KPI is outstanding and the date is left blank.`,
+  epiMriPerformedDate: (code, days) => `From the radiology record for ${code} — MRI brain performed ${days} days after request (KPI 5 target: within 42 days), formatted DD/MM/YYYY.`,
+  epiSeizureType: (code, label, stCode) => `From the epilepsy clinic letter for ${code} — the seizures are ${label}, recorded as ${stCode}; the ECG KPI applies to convulsive seizures.`,
+  epiEcgNA: (code) => `${code} does not have convulsive seizures, so an ECG is not part of the required workup and the date is left blank.`,
+  epiEcgNotDone: (code) => `${code} has convulsive seizures and so should have an ECG within the first year, but none is recorded, so this KPI is incomplete and the date is left blank.`,
+  epiEcgDate: (code) => `From the cardiology record for ${code} — date the ECG was performed (KPI 4, convulsive seizures), formatted DD/MM/YYYY.`,
+  epiMhScreeningDate: (code) => `From the epilepsy service record for ${code} — date mental-health screening was completed (KPI 6, within the first year of care), formatted DD/MM/YYYY.`,
+  epiMhScreeningNotDone: (code) => `No mental-health screening is recorded for ${code} in the first year of care, so this KPI is incomplete and the date is left blank.`,
+  epiMhProblem: (code, identified, mhCode) => `From the mental-health screening note for ${code} — a mental-health problem ${identified ? "was" : "was not"} identified at screening (KPI 6), recorded as ${mhCode}.`,
+  epiMhSupportProvided: (code, provided, mhCode) => `From the mental-health screening note for ${code} — mental-health support ${provided ? "was" : "was not"} provided after a problem was identified (KPI 7), recorded as ${mhCode}.`,
+  epiMhSupportNA: (code) => `No mental-health problem was identified for ${code}, so the support-provided KPI (KPI 7) does not apply and the cell is left blank.`,
+  epiCarePlanDate: (code) => `From the epilepsy service record for ${code} — date the comprehensive care plan was agreed (KPI 9 target: by 12 months), formatted DD/MM/YYYY.`,
+  epiCarePlanNotDone: (code) => `No comprehensive care plan is recorded for ${code} by 12 months, so this KPI is incomplete and the date is left blank.`,
+  epiOnValproate: (code, on) => `From the prescribing record for ${code} — the patient is ${on ? "currently prescribed" : "not prescribed"} sodium valproate.`,
+  epiOnTopiramate: (code, on) => `From the prescribing record for ${code} — the patient is ${on ? "currently prescribed" : "not prescribed"} topiramate.`,
+  epiPppNA: (code) => `The pregnancy prevention programme (KPI 8) applies only to females aged 12 or over taking valproate or topiramate; ${code} does not meet those criteria, so it is not applicable and the cell is left blank.`,
+  epiPppInPlace: (code, inPlace) => `From the epilepsy service record for ${code} — a pregnancy prevention programme (or risk-acknowledgement form) ${inPlace ? "is in place" : "is NOT in place"} for this female of child-bearing potential on valproate/topiramate (KPI 8, safety-critical).`,
 
   // --- Major trauma (Dataset 5) --------------------------------------------
-  traPatient: (code) => `Aus den KIS-Stammdaten für ${code} — die 10-stellige NHS-Nummer der Patientin/des Patienten.`,
-  traDob: (code) => `Aus den KIS-Stammdaten für ${code} — Geburtsdatum, formatiert als DD/MM/YYYY.`,
-  traSex: (code, sex, sexCode) => `Aus den KIS-Stammdaten für ${code} — bei Geburt zugewiesenes Geschlecht dokumentiert als ${sex === "Male" ? "Männlich" : "Weiblich"}, kodiert als ${sexCode} (1 = Männlich, 2 = Weiblich).`,
-  traAgeYears: (code, age) => `Aus dem Traumaregister-Datensatz für ${code} — Alter ${age} Jahre; die pädiatrische Schwerverletzten-Kohorte umfasst Kinder unter 16 Jahren.`,
-  traIss: (code, iss, level) => `Aus dem Traumaregister-Datensatz für ${code} — Injury Severity Score von ${iss}; der BPT zahlt einen zweistufigen Zuschlag, Stufe 1 ab ISS ≥9 und Stufe 2 ab ISS ≥16 (${level === "Level 2" ? "Stufe 2" : level === "Level 1" ? "Stufe 1" : "unter Stufe 1"}).`,
-  traAis3plus: (code, yes) => `Aus dem Traumaregister-Datensatz für ${code} — die Patientin/der Patient ${yes ? "weist mindestens eine AIS-3+-Verletzung auf" : "weist keine AIS-3+-Verletzung auf"}, das Einschlusskriterium des NMTR.`,
-  traEdArrival: (code) => `Aus dem Notaufnahme-Datensatz für ${code} — Datum und Uhrzeit des Eintreffens in der Notaufnahme, verwendet als Startzeitpunkt für die Zeitmessungen der Akutphase.`,
-  traDischargeDate: (code) => `Aus dem Traumaregister-Datensatz für ${code} — Entlassungsdatum, formatiert als DD/MM/YYYY; ab diesem Datum läuft die BPT-Einreichungsfrist.`,
-  traNmtrSubmitted: (code, yes) => `Aus dem Traumaregister-Datensatz für ${code} — der Fall wurde ${yes ? "" : "nicht "}an das National Major Trauma Registry übermittelt (C1).`,
-  traDatasetComplete: (code, yes) => `Aus dem Traumaregister-Datensatz für ${code} — der NMTR-Datensatz ist für diesen Fall ${yes ? "vollständig" : "unvollständig"} (C1).`,
-  traSubmissionDate: (code, days) => `Aus dem Traumaregister-Datensatz für ${code} — ${days} Tage nach Entlassung übermittelt (BPT-Auslöseziel: innerhalb von 25 Tagen), formatiert als DD/MM/YYYY.`,
-  traTeamActivated: (code, yes) => `Aus dem Notaufnahme-Datensatz für ${code} — für diese Aufnahme wurde ${yes ? "" : "kein "}Trauma-Team alarmiert (C2, Stufe 2).`,
-  traConsultantPresent: (code, present) => `Aus dem Notaufnahme-Datensatz für ${code} — bei der Schockraumaufnahme war ${present ? "" : "keine "}Fachärztin/kein Facharzt anwesend (C2, Stufe 2).`,
-  traConsultantArrival: (code, min) => `Aus dem Notaufnahme-Datensatz für ${code} — die Fachärztin/der Facharzt traf ${min} Minuten nach Eintreffen ein (C2-Ziel: fachärztliche Anwesenheit innerhalb von 5 Minuten, Stufe 2 / ISS ≥16).`,
-  traConsultantArrivalNA: (code) => `Der Standard der fachärztlich geleiteten Schockraumaufnahme (C2) ist ein Kriterium der Stufe 2 und gilt ab ISS ≥16; ${code} liegt unter diesem Schwellenwert, sodass er nicht zutrifft und die Zelle leer bleibt.`,
-  traGcs: (code, gcs) => `Aus dem Notaufnahme-Datensatz für ${code} — Glasgow Coma Scale von ${gcs} bei Eintreffen; die Kriterien zu CT-Schädel und Atemwegssicherung richten sich nach diesem Wert.`,
-  traHeadInjury: (code, yes) => `Aus dem Traumaregister-Datensatz für ${code} — es liegt ${yes ? "ein" : "kein"} Schädel-Hirn-Trauma (AIS 1+) vor; das Kriterium „CT-Schädel innerhalb von 60 Minuten" gilt nur bei entsprechend qualifizierenden Kopfverletzungen.`,
-  traCtHead: (code, min) => `Aus dem Radiologie-Datensatz für ${code} — CT-Schädel ${min} Minuten nach Eintreffen durchgeführt (C3-Ziel: innerhalb von 60 Minuten, Stufe 2), Angabe in Minuten.`,
-  traCtHeadNAnoHead: (code) => `${code} hat kein Schädel-Hirn-Trauma, sodass ein CT-Schädel nicht Teil der erforderlichen Abklärung ist und die Zelle leer bleibt.`,
-  traCtHeadNAnotEligible: (code) => `Der Standard „CT-Schädel innerhalb von 60 Minuten" (C3) gilt für Kopfverletzungen der Stufe 2 mit GCS ≤13; ${code} erfüllt diese Kriterien nicht, sodass er nicht zutrifft und die Zelle leer bleibt.`,
-  traTxaIndicated: (code, yes) => `Aus dem Traumaregister-Datensatz für ${code} — Tranexamsäure war bei massiver Blutung ${yes ? "" : "nicht "}indiziert; das Kriterium „TXA innerhalb von 1 Stunde" gilt nur bei bestehender Indikation.`,
-  traTxaGiven: (code, given) => `Aus dem Medikationsdatensatz für ${code} — Tranexamsäure wurde ${given ? "" : "nicht "}verabreicht (C4, Stufe 2).`,
-  traTxaMin: (code, min) => `Aus dem Medikationsdatensatz für ${code} — Tranexamsäure ${min} Minuten nach dem Trauma verabreicht (C4-Ziel: innerhalb von 60 Minuten, Stufe 2), Angabe in Minuten.`,
-  traTxaNAnotIndicated: (code) => `Für ${code} war Tranexamsäure nicht indiziert, sodass keine verabreicht wurde und die Zelle leer bleibt.`,
-  traIntubationConsidered: (code, considered, val) => `Aus der Reanimationsnotiz für ${code} — Atemwegsmanagement/Intubation wurde im Rahmen der Erstuntersuchung ${considered ? "" : "nicht "}erwogen (C5, qualifizierend bei GCS <9), dokumentiert als ${val === "Yes" ? "Ja" : "Nein"}.`,
-  traAirwayMin: (code, min) => `Aus der Reanimationsnotiz für ${code} — Atemwegssicherung/Intubation ${min} Minuten nach Eintreffen erwogen (C5-Ziel: innerhalb von 30 Minuten bei GCS <9, Stufe 1), Angabe in Minuten.`,
-  traAirwayNA: (code) => `Der Standard „Atemwegssicherung innerhalb von 30 Minuten erwogen" (C5) gilt für Fälle mit GCS <9; ${code} erreicht diesen Schwellenwert nicht, sodass er nicht zutrifft und die Zelle leer bleibt.`,
-  traRehabNeedsAssessed: (code, yes) => `Aus dem Traumaregister-Datensatz für ${code} — der Rehabilitationsbedarf wurde während des Aufenthalts ${yes ? "" : "nicht "}erhoben (C6, ISS ≥9).`,
-  traRehabPrescription: (code, issued, val) => `Aus der Rehabilitations-/Entlassungsnotiz für ${code} — eine Rehabilitationsverordnung wurde ${issued ? "" : "NICHT "}mit den Kernkomponenten im NMTR ausgestellt und an die Patientin/den Patienten, den Hausarzt und den weiterbehandelnden Leistungserbringer weitergegeben (C6, ISS ≥9), dokumentiert als ${val === "Yes" ? "Ja" : "Nein"}.`,
-  traRehabNA: (code) => `Der Standard zur Rehabilitationsverordnung (C6) gilt für die Kohorte mit ISS ≥9; ${code} liegt unter diesem Schwellenwert, sodass er nicht zutrifft und die Zelle leer bleibt.`,
+  traPatient: (code) => `From the EHR demographics for ${code} — the patient's 10-digit NHS number.`,
+  traDob: (code) => `From the EHR demographics for ${code} — date of birth, formatted DD/MM/YYYY.`,
+  traSex: (code, sex, sexCode) => `From the EHR demographics for ${code} — sex assigned at birth recorded as ${sex}, coded ${sexCode} (1 = Male, 2 = Female).`,
+  traAgeYears: (code, age) => `From the trauma registry record for ${code} — age ${age} years; the paediatric major-trauma cohort is children under 16.`,
+  traIss: (code, iss, level) => `From the trauma registry record for ${code} — Injury Severity Score of ${iss}; the BPT pays a two-level top-up, Level 1 at ISS ≥9 and Level 2 at ISS ≥16 (${level}).`,
+  traAis3plus: (code, yes) => `From the trauma registry record for ${code} — the patient ${yes ? "has" : "does not have"} at least one AIS 3+ injury, the NMTR eligibility criterion.`,
+  traEdArrival: (code) => `From the ED record for ${code} — date and time of arrival in the emergency department, used as the clock-start for the acute-phase timings.`,
+  traDischargeDate: (code) => `From the trauma registry record for ${code} — date of discharge, formatted DD/MM/YYYY; the BPT submission window runs from this date.`,
+  traNmtrSubmitted: (code, yes) => `From the trauma registry record for ${code} — the case ${yes ? "has" : "has not"} been submitted to the National Major Trauma Registry (C1).`,
+  traDatasetComplete: (code, yes) => `From the trauma registry record for ${code} — the NMTR dataset is ${yes ? "complete" : "incomplete"} for this case (C1).`,
+  traSubmissionDate: (code, days) => `From the trauma registry record for ${code} — submitted ${days} days after discharge (BPT trigger target: within 25 days), formatted DD/MM/YYYY.`,
+  traTeamActivated: (code, yes) => `From the ED record for ${code} — a trauma team ${yes ? "was" : "was not"} activated for this reception (C2, Level 2).`,
+  traConsultantPresent: (code, present) => `From the ED record for ${code} — a consultant ${present ? "was" : "was not"} present at the trauma-team reception (C2, Level 2).`,
+  traConsultantArrival: (code, min) => `From the ED record for ${code} — the consultant arrived ${min} minutes after arrival (C2 target: consultant present within 5 minutes, Level 2 / ISS ≥16).`,
+  traConsultantArrivalNA: (code) => `The consultant-led reception standard (C2) is a Level 2 criterion applying to ISS ≥16; ${code} is below that threshold, so it is not applicable and the cell is left blank.`,
+  traGcs: (code, gcs) => `From the ED record for ${code} — Glasgow Coma Scale of ${gcs} at arrival; the CT-head and airway criteria key off this value.`,
+  traHeadInjury: (code, yes) => `From the trauma registry record for ${code} — there ${yes ? "is" : "is no"} head injury (AIS 1+); the CT-head-within-60-minutes criterion applies only to eligible head injuries.`,
+  traCtHead: (code, min) => `From the radiology record for ${code} — CT head performed ${min} minutes after arrival (C3 target: within 60 minutes, Level 2), formatted in minutes.`,
+  traCtHeadNAnoHead: (code) => `${code} has no head injury, so a CT head is not part of the required workup and the cell is left blank.`,
+  traCtHeadNAnotEligible: (code) => `The CT-head-within-60-minutes standard (C3) applies to Level 2 head injuries with GCS ≤13; ${code} does not meet those criteria, so it is not applicable and the cell is left blank.`,
+  traTxaIndicated: (code, yes) => `From the trauma registry record for ${code} — tranexamic acid ${yes ? "was" : "was not"} indicated for major haemorrhage; the TXA-within-1-hour criterion applies only where indicated.`,
+  traTxaGiven: (code, given) => `From the medication record for ${code} — tranexamic acid ${given ? "was" : "was not"} given (C4, Level 2).`,
+  traTxaMin: (code, min) => `From the medication record for ${code} — tranexamic acid given ${min} minutes after injury (C4 target: within 60 minutes, Level 2), formatted in minutes.`,
+  traTxaNAnotIndicated: (code) => `Tranexamic acid was not indicated for ${code}, so none was given and the cell is left blank.`,
+  traIntubationConsidered: (code, considered, val) => `From the resuscitation note for ${code} — airway management/intubation ${considered ? "was" : "was not"} considered as part of the primary survey (C5, eligible at GCS <9), recorded as ${val}.`,
+  traAirwayMin: (code, min) => `From the resuscitation note for ${code} — airway/intubation considered ${min} minutes after arrival (C5 target: within 30 minutes for GCS <9, Level 1), formatted in minutes.`,
+  traAirwayNA: (code) => `The airway-considered-within-30-minutes standard (C5) applies to cases with GCS <9; ${code} does not meet that threshold, so it is not applicable and the cell is left blank.`,
+  traRehabNeedsAssessed: (code, yes) => `From the trauma registry record for ${code} — rehabilitation needs ${yes ? "were" : "were not"} assessed during the admission (C6, ISS ≥9).`,
+  traRehabPrescription: (code, issued, val) => `From the rehabilitation/discharge note for ${code} — a rehabilitation prescription ${issued ? "was" : "was NOT"} issued with core components on the NMTR and shared with the patient, GP and ongoing-care provider (C6, ISS ≥9), recorded as ${val}.`,
+  traRehabNA: (code) => `The rehabilitation-prescription standard (C6) applies to the cohort with ISS ≥9; ${code} is below that threshold, so it is not applicable and the cell is left blank.`,
 };
 
 // --- Blocked-cell reason_detail (CPH009 age-at-discharge) --------------------
@@ -2154,9 +2654,9 @@ const blockedReason = {
   cordAgeDischargeHome:
     "CPH009 wurde an Tag 7 in das regionale Kühlungs- und Neurologiezentrum verlegt und nie von dieser Station nach Hause entlassen, sodass kein Alter bei Entlassung nach Hause dokumentiert ist (cord_ph_birth_records und der Verlegungsbericht durchsucht).",
   epilepsyMriPerformed:
-    "Die kraniale MRT von EPI007 wurde angefordert, aber im verlegenden Haus durchgeführt, und der Befund ist noch nicht in das EHR zurückgelangt, sodass kein Durchführungsdatum der MRT dokumentiert ist (radiology_results und der Verlegungsbericht wurden durchsucht).",
+    "EPI007's MRI brain was requested but performed at the transferring unit, and the report has not yet been returned to the EHR, so no MRI performed date is recorded (searched radiology_results and the transfer summary).",
   traumaConsultantArrival:
-    "TRA009 war eine Verlegung in den Schockraum und der Zeitstempel des fachärztlichen Eintreffens wurde nicht im strukturierten Notaufnahme-Datensatz erfasst; die Traumadokumentation wird angefordert, sodass die Zeit ab Eintreffen noch nicht bestätigt werden kann (ed_trauma_receptions und die Reanimationsnotiz wurden durchsucht).",
+    "TRA009 was a resuscitation-bay transfer and the consultant-arrival timestamp was not captured in the structured ED record; the trauma documentation is being retrieved, so the time from arrival cannot yet be confirmed (searched ed_trauma_receptions and the resuscitation note).",
 };
 
 // --- Timeline strings (headlines, details, think snippets, tool headlines) ---
@@ -2171,9 +2671,9 @@ const timeline = {
     inspectedSchema: "Das EHR-Schema untersucht",
     troponinResults: "Die Troponin-Befunde gelesen",
     cardiometabolicScreen: "Das kardiometabolische Screening gelesen",
-    epilepsyInvestigations: "Die MRT- und EKG-Daten gelesen",
-    traumaReception: "Die Schockraum-Aufnahmezeiten gelesen",
-    traumaInterventions: "Die CT-, TXA- und Atemwegsdaten gelesen",
+    epilepsyInvestigations: "Read the MRI and ECG records",
+    traumaReception: "Read the trauma reception times",
+    traumaInterventions: "Read the CT, TXA and airway records",
   },
   // Cord-pH population (timelineA -> cordPhPopulation).
   cord: {
@@ -2219,25 +2719,25 @@ const timeline = {
   },
   // Epilepsy12 population (timelineE -> epilepsyPopulation).
   epilepsy: {
-    mapTemplate: { headline: "Die Vorlage dem EHR-Schema zuordnen…", detail: "Jede Epilepsy12-Spalte wird einem Feld der **EHR-Datenbank** zugeordnet, bevor die strukturierten Stammdaten und die Angaben zur Erstuntersuchung übernommen werden." },
-    demographics: { headline: "Die Stammdaten- und Überweisungsfelder übernehmen…", detail: "Geburtsdatum, Geschlecht, Alter bei der Erstuntersuchung, das Überweisungsdatum und das Datum der ersten pädiatrischen Untersuchung werden direkt aus `patient_demographics` und `epilepsy_assessments` gezogen." },
-    clinicLetters: { headline: "Die Epilepsie-Ambulanzbriefe lesen…", detail: "Der erste Epilepsie-Ambulanzbrief jedes Kindes wird daraufhin gelesen, ob die untersuchende Pädiaterin/der untersuchende Pädiater über Epilepsie-Expertise verfügte (KPI 1), und auf den Anfallstyp, der den EKG-KPI bestimmt." },
-    specialistInput: { headline: "Die Felder zu Fachpflegekraft und Behandlungsplan übernehmen…", detail: "Das Datum der Mitbetreuung durch die Epilepsie-Fachpflegekraft (KPI 2) und das Datum des umfassenden Behandlungsplans (KPI 9) werden gezogen. Wo weder Mitbetreuung noch Plan dokumentiert sind, trägt das Feld eine ausdrückliche Kennzeichnung statt eines Leerwerts." },
-    investigations: { headline: "Die MRT- und EKG-Felder übernehmen…", detail: "Es wird gezogen, ob eine MRT indiziert war, samt Anforderungs- und Durchführungsdatum (KPI 5), sowie das EKG-Datum bei konvulsiven Anfällen (KPI 4). Fälle, in denen eine Untersuchung nicht indiziert, noch nicht erfolgt oder nicht verfügbar ist, tragen eine ausdrückliche Kennzeichnung." },
-    mentalHealth: { headline: "Screening und Unterstützung der psychischen Gesundheit prüfen…", detail: "Das Datum des Screenings der psychischen Gesundheit wird gezogen (KPI 6), anschließend wird die Screening-Notiz daraufhin gelesen, ob ein Problem festgestellt wurde und, falls ja, ob Unterstützung geleistet wurde (KPI 7)." },
-    medicationSafety: { headline: "Die Sicherheit von Valproat/Topiramat prüfen…", detail: "Die Verordnungskennzeichen für Valproat und Topiramat werden gezogen und, für weibliche Personen ab 12 Jahren unter einem dieser Wirkstoffe, ob ein Schwangerschaftsverhütungsprogramm besteht (KPI 8, sicherheitskritisch)." },
-    finalizing: { headline: "Das Audit abschließen…", detail: "Alle Zellen sind befüllt und auf den EHR-Datensatz oder die Quellnotizen zurückführbar." },
+    mapTemplate: { headline: "Mapping the template to the EHR schema…", detail: "Resolving each Epilepsy12 column to a field in the **EHR database** before copying across the structured demographics and the first-assessment details." },
+    demographics: { headline: "Copying the demographics and referral fields…", detail: "Pulling date of birth, sex, age at first assessment, the referral date and the first paediatric assessment date straight from `patient_demographics` and `epilepsy_assessments`." },
+    clinicLetters: { headline: "Reading the epilepsy clinic letters…", detail: "Reading each child's first epilepsy clinic letter for whether the assessing paediatrician had epilepsy expertise (KPI 1) and the seizure type that drives the ECG KPI." },
+    specialistInput: { headline: "Copying the specialist-nurse and care-plan fields…", detail: "Pulling the epilepsy specialist nurse input date (KPI 2) and the comprehensive care plan date (KPI 9). Where input or a plan is not yet recorded the field carries an explicit label rather than a blank." },
+    investigations: { headline: "Copying the MRI and ECG fields…", detail: "Pulling whether an MRI was indicated and its request/performed dates (KPI 5) and the ECG date for convulsive seizures (KPI 4). Cases where an investigation is not indicated, not yet done or unobtainable carry an explicit label." },
+    mentalHealth: { headline: "Checking mental-health screening and support…", detail: "Pulling the mental-health screening date (KPI 6), then reading the screening note for whether a problem was identified and, where it was, whether support was provided (KPI 7)." },
+    medicationSafety: { headline: "Checking valproate/topiramate safety…", detail: "Pulling the valproate and topiramate prescribing flags and, for females aged 12 or over on either drug, whether a pregnancy prevention programme is in place (KPI 8, safety-critical)." },
+    finalizing: { headline: "Finalizing the audit…", detail: "All cells populated and traceable to the EHR record or the source notes." },
   },
   // Major trauma population (timelineT -> traumaPopulation).
   trauma: {
-    mapTemplate: { headline: "Die Vorlage dem EHR-Schema zuordnen…", detail: "Jede NMTR-Spalte wird einem Feld der **EHR-Datenbank** zugeordnet, bevor die strukturierten Stammdaten und die Angaben zur Verletzungsschwere übernommen werden." },
-    demographics: { headline: "Die Stammdaten- und Verletzungsfelder übernehmen…", detail: "Geburtsdatum, Geschlecht, Alter, der Injury Severity Score und das AIS-3+-Einschlusskennzeichen werden direkt aus `patient_demographics` und dem Traumaregister-Datensatz gezogen." },
-    registrySubmission: { headline: "Die Felder zur Registerübermittlung übernehmen…", detail: "Die Ankunftszeit in der Notaufnahme, das Entlassungsdatum und die NMTR-Kennzeichen für übermittelt/vollständig werden samt Übermittlungsdatum gezogen, um das 25-Tage-BPT-Fenster zu prüfen (C1)." },
-    reception: { headline: "Die Felder zur Schockraumaufnahme übernehmen…", detail: "Es wird gezogen, ob ein Trauma-Team alarmiert wurde, ob eine Fachärztin/ein Facharzt anwesend war und wann sie/er eintraf (C2, Stufe 2). Eine Aufnahmezeit konnte nicht ermittelt werden und ist markiert." },
-    investigations: { headline: "Die CT-, TXA- und Atemwegsfelder übernehmen…", detail: "Der GCS und das Kennzeichen für ein Schädel-Hirn-Trauma werden samt Zeit bis zum CT-Schädel (C3), der TXA-Indikation und -Zeit (C4) sowie dem Zeitpunkt der erwogenen Atemwegssicherung bei Fällen mit niedrigem GCS (C5) gezogen. Fälle, in denen eine Maßnahme nicht indiziert oder nicht qualifizierend ist, tragen eine ausdrückliche Kennzeichnung." },
-    resusNotes: { headline: "Die Reanimationsnotizen lesen…", detail: "Die Reanimationsnotiz jedes Falls wird daraufhin gelesen, ob Atemwegsmanagement/Intubation im Rahmen der Erstuntersuchung erwogen wurde (C5)." },
-    rehabilitation: { headline: "Die Rehabilitationsverordnungen prüfen…", detail: "Es wird gezogen, ob der Rehabilitationsbedarf erhoben wurde, anschließend wird die Rehabilitations-/Entlassungsnotiz daraufhin gelesen, ob eine Rehabilitationsverordnung ausgestellt wurde (C6, ISS ≥9)." },
-    finalizing: { headline: "Das Audit abschließen…", detail: "Alle Zellen sind befüllt und auf den EHR-Datensatz oder die Quellnotizen zurückführbar." },
+    mapTemplate: { headline: "Mapping the template to the EHR schema…", detail: "Resolving each NMTR column to a field in the **EHR database** before copying across the structured demographics and the injury-severity details." },
+    demographics: { headline: "Copying the demographics and injury fields…", detail: "Pulling date of birth, sex, age, the Injury Severity Score and the AIS 3+ eligibility flag straight from `patient_demographics` and the trauma registry record." },
+    registrySubmission: { headline: "Copying the registry submission fields…", detail: "Pulling the ED arrival time, discharge date and the NMTR submitted/complete flags with the submission date to check the 25-day BPT window (C1)." },
+    reception: { headline: "Copying the trauma-reception fields…", detail: "Pulling whether a trauma team was activated, whether a consultant was present and the consultant arrival time (C2, Level 2). One reception time could not be located and is flagged." },
+    investigations: { headline: "Copying the CT, TXA and airway fields…", detail: "Pulling the GCS and head-injury flag with the CT-head time (C3), the TXA indication and timing (C4) and the airway-considered time for low-GCS cases (C5). Cases where an intervention is not indicated or not eligible carry an explicit label." },
+    resusNotes: { headline: "Reading the resuscitation notes…", detail: "Reading each case's resuscitation note for whether airway management/intubation was considered as part of the primary survey (C5)." },
+    rehabilitation: { headline: "Checking the rehabilitation prescriptions…", detail: "Pulling whether rehabilitation needs were assessed, then reading the rehab/discharge note for whether a rehabilitation prescription was issued (C6, ISS ≥9)." },
+    finalizing: { headline: "Finalizing the audit…", detail: "All cells populated and traceable to the EHR record or the source notes." },
   },
   // Flow openers (timelineA / timelineB / timelineC).
   flowA: {
@@ -2252,13 +2752,117 @@ const timeline = {
     reviewingTemplate: { headline: "Die Vorlage prüfen…", detail: "Das Audit **Pädiatrischer Diabetes (NPDA)** wird gegen die **EHR-Datenbank** geprüft und die Feldzuordnungen werden aufgelöst." },
   },
   flowE: {
-    reviewingTemplate: { headline: "Die Vorlage prüfen…", detail: "Das Audit **Pädiatrische Epilepsie (Epilepsy12)** wird gegen die **EHR-Datenbank** geprüft und die Feldzuordnungen werden aufgelöst." },
+    reviewingTemplate: { headline: "Reviewing the template…", detail: "Reviewing the **Paediatric epilepsy (Epilepsy12)** audit against the **EHR database** and resolving the field mappings." },
   },
   flowT: {
-    reviewingTemplate: { headline: "Die Vorlage prüfen…", detail: "Das Audit **Pädiatrisches schweres Trauma (NMTR)** wird gegen die **EHR-Datenbank** geprüft und die Feldzuordnungen werden aufgelöst." },
+    reviewingTemplate: { headline: "Reviewing the template…", detail: "Reviewing the **Paediatric major trauma (NMTR)** audit against the **EHR database** and resolving the field mappings." },
+  },
+  diabetesWorklist: {
+    creating: { headline: "BPT-Liste erstellen", detail: "Eine fokussierte BPT-Risikoliste aus der Chat-Antwort wurde fixiert." },
+    scoping: { headline: "BPT-Liste eingrenzen", detail: "Nur die pädiatrischen Diabetespatienten auswählen, die bereits in der nachvollziehbaren Chat-Liste identifiziert wurden." },
+    fetchingEvidence: "Quelldaten für letztes HbA1c und Urin-ACR abrufen",
+    readingNotes: { headline: "Ambulanznotizen lesen", detail: "Glukosemanagement-, DKA/Aufnahme- und Review-Nachweise patientenweise prüfen." },
   },
   // Folded activity-line label for thinking steps.
   thinkingLabel: "Überlegt",
+};
+
+const diabetesWorklist = {
+  tableTitle: "Diabetes-BPT-Nachweisliste",
+  sheetName: "Diabetes-Liste",
+  columns: [
+    { key: "patient", header: "Patient", width: 12 },
+    { key: "hba1c", header: "Letztes HbA1c", width: 14 },
+    { key: "hba1cDate", header: "HbA1c-Datum / Ambulanztermin", width: 30 },
+    { key: "glucoseIntervention", header: "Nachweis Glukosemanagement-Intervention", width: 40 },
+    { key: "acr", header: "Urin-ACR-Ergebnis", width: 20 },
+    { key: "acrDate", header: "Urin-ACR-Datum", width: 22 },
+    { key: "admission", header: "DKA-/Aufnahmenachweis", width: 28 },
+    { key: "lastReview", header: "Letzter Diabetes-Review", width: 26 },
+  ],
+  answer: [
+    "Zusammenfassung: [12]{1} pädiatrische Diabetespatienten sind im Geltungsbereich. 7/12 benötigen vor der BPT-Einreichungsfrist eine Maßnahme: [5]{2} haben ein HbA1c von 70 mmol/mol oder höher, und bei [2]{3} fehlt der Urin-ACR-Nachweis.",
+    "",
+    "---",
+    "",
+    "**Hohes HbA1c - Interventionsnachweis erforderlich**",
+    "",
+    "• Problem: Diese Patienten liegen über dem HbA1c-Schwellenwert; die BPT-Leistung hängt daher davon ab, dass eine Glukosemanagement-Intervention überprüft oder vereinbart dokumentiert ist.",
+    "",
+    "• Patienten: NPD002 HbA1c [74,0 mmol/mol]{4}; NPD003 HbA1c [81,0 mmol/mol]{5} mit [DKA bei Neudiagnose]{6}; NPD005 HbA1c [86,0 mmol/mol]{7}; NPD006 HbA1c [92,0 mmol/mol]{8} mit [kürzlicher DKA-Aufnahme]{9}; NPD008 HbA1c [70,0 mmol/mol]{11}.",
+    "",
+    "• Maßnahme: Überprüfung durch Diabetes-CNS oder Konsiliararzt, anschließend Interventionsplan vor der Einreichung dokumentieren.",
+    "",
+    "---",
+    "",
+    "**Fehlender Urin-ACR-Nachweis - Lücke im Versorgungsprozess**",
+    "",
+    "• Problem: Für diese Patienten ist kein Urin-ACR-Ergebnis dokumentiert; der jährliche Versorgungsprozess-Nachweis ist daher unvollständig.",
+    "",
+    "• Patienten: NPD007 - [kein Urin-ACR-Ergebnis]{10}; NPD010 - [kein Urin-ACR-Ergebnis]{12}.",
+    "",
+    "• Maßnahme: Laborergebnis finden oder Urin-ACR vor der Einreichung buchen und dokumentieren.",
+    "",
+    "---",
+    "",
+    "Soll ich eine Tabelle für die Diabetes-Audit-Leitung erstellen, die die Quelldaten verfolgt?",
+  ].join("\n"),
+  ask: {
+    question: "Tabelle für die Diabetes-Audit-Leitung mit Quelldaten erstellen?",
+    createLabel: "Tabelle erstellen",
+    keepLabel: "Liste behalten",
+  },
+  riskListAsk: {
+    question: "Nachvollziehbare Patientenliste abrufen?",
+    showLabel: "Liste anzeigen",
+    keepLabel: "Zusammenfassung behalten",
+  },
+  messages: {
+    keepRiskSummary: "Ich belasse es bei einer kurzen BPT-Risikozusammenfassung.",
+    buildingTable: "Die Diabetes-BPT-Nachweisliste wird jetzt erstellt. Sie enthält nur die 7 Patienten mit Handlungsbedarf und quellengestützte Nachweise für HbA1c, ACR, Glukosemanagement-Intervention, DKA/Aufnahmen und letzten Review.",
+    keepChatAnswer: "Ich belasse die Diabetes-Melderisiko-Antwort im Chat.",
+  },
+  activities: {
+    genericQuery: { label: "Datenbank abfragen", headline: "Zitierte Datensätze lesen" },
+    initial: [
+      { id: "mock-diabetes-bpt-requirements", label: "BPT-Anforderungen prüfen", headline: "Prüfen, welche pädiatrischen Diabetesmaßnahmen für diese Meldefrist gelten" },
+      { id: "mock-diabetes-cohort", label: "Diabeteskohorte prüfen", headline: "Pädiatrische Diabetespatienten im Berichtsjahr zählen" },
+      { id: "mock-diabetes-evidence-map", label: "Erforderliche Nachweise zuordnen", headline: "Outcome- und Versorgungsprozessfelder für die BPT-Einreichung identifizieren" },
+      { id: "mock-diabetes-care-processes", label: "Patientennachweise abfragen", headline: "HbA1c, Urin-ACR und Ambulanznotizen für die zugeordneten Maßnahmen lesen" },
+      { id: "mock-diabetes-admissions", label: "Aufnahmenotizen prüfen", headline: "DKA-Aufnahmen zu Patienten mit Handlungsbedarf suchen" },
+      { id: "mock-diabetes-bpt-gap", label: "BPT-Lücke bewerten", headline: "Patienten nach fehlendem Nachweis und empfohlener Nachverfolgung gruppieren" },
+    ],
+    riskList: { label: "BPT-Risikonachweise prüfen", headline: "HbA1c-, ACR- und Aufnahmenachweise lesen" },
+    table: [
+      { id: "mock-diabetes-worklist-table", label: "Quellengestützte Tabelle vorbereiten", headline: "Liste für die Diabetes-Audit-Leitung erstellen" },
+      { id: "mock-diabetes-worklist-columns", label: "Nachweisspalten auflösen", headline: "HbA1c, ACR, Glukosemanagement, Aufnahme und Review zuordnen" },
+      { id: "mock-diabetes-worklist-population", label: "Tabellenbefüllung starten", headline: "Live-Befüllung für die 7 Patienten mit Handlungsbedarf starten" },
+    ],
+  },
+  citations: {
+    cohort: { explanation: "Anzahl pädiatrischer Diabetespatienten in der Meldekohorte", denominatorLabel: "Patienten in der Meldekohorte", completenessLabel: "gezählte Patienten" },
+    highHba1c: { explanation: "Anzahl der Diabetespatienten mit HbA1c von mindestens 70 mmol/mol", denominatorLabel: "Patienten mit hohem HbA1c", completenessLabel: "geprüfte HbA1c-Werte" },
+    missingAcr: { explanation: "Anzahl der Diabetespatienten mit fehlendem Urin-ACR-Nachweis", denominatorLabel: "Patienten mit fehlendem ACR", completenessLabel: "geprüfte ACR-Felder" },
+    hba1c: (code) => `letzter HbA1c-Wert für ${code}`,
+    dkaNewDiagnosis: (code) => `Aufnahmenotiz mit DKA bei Neudiagnose für ${code}`,
+    recentDka: (code) => `Aufnahmenotiz mit kürzlicher DKA-Aufnahme für ${code}`,
+    urinaryAcr: (code) => `Urin-ACR-Abfrage für ${code}`,
+  },
+  evidence: {
+    dkaNewDiagnosis: "diabetischer Ketoazidose (DKA) zum Zeitpunkt der Neudiagnose",
+    recentDka: "diabetischer Ketoazidose (DKA) nach einer interkurrenten Erkrankung",
+  },
+  cell: {
+    noneRecorded: "Nicht dokumentiert",
+    patientExplanation: (code) => `${code} ist in dieser Periode Teil der pädiatrischen Diabetes-Meldekohorte.`,
+    hba1cDate: (code) => `Das Ambulanz-Beobachtungspanel dokumentiert das HbA1c-Datum für ${code}.`,
+    glucoseIntervention: (code) => `Die Diabetes-Ambulanznotiz dokumentiert Glukosemanagement-Interventionsnachweis für ${code}.`,
+    acrDate: (code) => `Das Ambulanz-Beobachtungspanel dokumentiert das Urin-ACR-Datum für ${code}.`,
+    acrDateMissing: (code) => `Für ${code} ist kein Urin-ACR-Ergebnis dokumentiert, daher gibt es kein Urin-ACR-Datum.`,
+    dkaAdmission: (code) => `Die Aufnahmenotiz dokumentiert eine diabetesbezogene DKA-Aufnahme für ${code}.`,
+    noAdmission: (code) => `Für ${code} ist in der Aufnahmeabfrage des Auditjahres keine diabetesbezogene Aufnahme dokumentiert.`,
+    lastReview: (code) => `Die Jahresreview-Notiz dokumentiert den letzten Diabetes-Review für ${code}.`,
+  },
 };
 
 // --- Sample doctor's email (Flow B) -----------------------------------------
@@ -2275,43 +2879,43 @@ Dr Mark Alvarez
 Notfallmedizin`;
 
 // --- Tracked-dashboard descriptors (home cards §2.2 + left panel §4) ---------
-// Three paediatric BPT dashboards. Each opens a seeded audit via selectAudit().
+// Three paediatric BPT dashboards. Each opens a seeded audit via selectPopulatedTable().
 // `trackers` lists ids into the `trackers` map below. Numbers/ids/refs/kinds are
 // logic and identical across packs; title/subtitle strings stay English verbatim.
 const dashboards = [
   {
     id: "paediatric-diabetes-bpt",
-    auditId: "npda-lo-audit",
-    title: "Diabetes-BPT",
+    templateId: "npda-lo-audit",
+    title: "Diabetes BPT",
     logo: "dash-diabetes",
-    subtitle: "NPDA · zentrale Versorgungsprozesse",
+    subtitle: "NPDA · key care processes",
     submissionDeadline: "2026-07-20",
     trackers: ["t-dia-hba1c-coverage", "t-dia-care-processes", "t-dia-mdt-contacts", "t-dia-psychology", "t-dia-dietitian", "t-dia-carb-counting", "t-dia-high-hba1c", "t-dia-coeliac-thyroid"],
   },
   {
     id: "paediatric-epilepsy-bpt",
-    auditId: "epilepsy12-lo-audit",
-    title: "Epilepsie-BPT",
+    templateId: "epilepsy12-lo-audit",
+    title: "Epilepsy BPT",
     logo: "dash-epilepsy",
-    subtitle: "Epilepsy12 · KPIs der Abteilung",
+    subtitle: "Epilepsy12 · service KPIs",
     submissionDeadline: "2027-01-12",
     trackers: ["t-epi-paediatrician-2wk", "t-epi-esn-first-year", "t-epi-mri-6wk", "t-epi-ecg-convulsive", "t-epi-mh-screening", "t-epi-care-plan-12mo", "t-epi-valproate-ppp"],
   },
   {
     id: "paediatric-trauma-bpt",
-    auditId: "nmtr-trauma-lo-audit",
-    title: "BPT Schweres Trauma",
+    templateId: "nmtr-trauma-lo-audit",
+    title: "Major Trauma BPT",
     logo: "dash-trauma",
-    subtitle: "NMTR · Standards der Akutversorgung",
-    submissionDeadline: "Einreichung ≤25 Tage nach Entlassung",
+    subtitle: "NMTR · acute care standards",
+    submissionDeadline: "Submit ≤25 days of discharge",
     trackers: ["t-tra-registry-25d", "t-tra-consultant-5min", "t-tra-ct-head-60min", "t-tra-txa-1h", "t-tra-airway-30min", "t-tra-rehab-prescription"],
   },
   {
     id: "cord-ph-bpt",
-    auditId: "cord-ph-lo-audit",
-    title: "Audit Nabelschnur-pH",
+    templateId: "cord-ph-lo-audit",
+    title: "Cord pH Audit",
     logo: "dash-cordph",
-    subtitle: "Nabelschnurblutgas · Qualität bei der Geburt",
+    subtitle: "Cord blood gas · quality at birth",
     submissionDeadline: "2026-06-12",
     trackers: ["t-cord-paired-gases", "t-cord-ph-acidosis", "t-cord-severe-acidosis", "t-cord-base-excess", "t-cord-nicu-admission", "t-cord-dcc", "t-cord-acidosis-trend"],
   },
@@ -2330,18 +2934,18 @@ const trackers = {
   "t-dia-hba1c-coverage": {
     id: "t-dia-hba1c-coverage",
     dashboardId: "paediatric-diabetes-bpt",
-    title: "HbA1c ≥4×/Jahr Abdeckung",
+    title: "HbA1c ≥4×/yr coverage",
     kind: "timeseries",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "m1", label: "Aug.", value: 0.55, status: "not-met", highlightRefs: ["NPDA!T2", "NPDA!U2", "NPDA!T3", "NPDA!U3", "NPDA!T4", "NPDA!U4", "NPDA!T5", "NPDA!U5", "NPDA!T6", "NPDA!U6", "NPDA!T7", "NPDA!U7", "NPDA!T8", "NPDA!U8", "NPDA!T9", "NPDA!U9", "NPDA!T10", "NPDA!U10", "NPDA!T11", "NPDA!U11", "NPDA!T12", "NPDA!U12", "NPDA!T13", "NPDA!U13"] },
-      { key: "m2", label: "Sep.", value: 0.62, status: "not-met", highlightRefs: ["NPDA!T2", "NPDA!U2", "NPDA!T3", "NPDA!U3", "NPDA!T4", "NPDA!U4", "NPDA!T5", "NPDA!U5", "NPDA!T6", "NPDA!U6", "NPDA!T7", "NPDA!U7", "NPDA!T8", "NPDA!U8", "NPDA!T9", "NPDA!U9", "NPDA!T10", "NPDA!U10", "NPDA!T11", "NPDA!U11", "NPDA!T12", "NPDA!U12", "NPDA!T13", "NPDA!U13"] },
-      { key: "m3", label: "Okt.", value: 0.70, status: "not-met", highlightRefs: ["NPDA!T2", "NPDA!U2", "NPDA!T3", "NPDA!U3", "NPDA!T4", "NPDA!U4", "NPDA!T5", "NPDA!U5", "NPDA!T6", "NPDA!U6", "NPDA!T7", "NPDA!U7", "NPDA!T8", "NPDA!U8", "NPDA!T9", "NPDA!U9", "NPDA!T10", "NPDA!U10", "NPDA!T11", "NPDA!U11", "NPDA!T12", "NPDA!U12", "NPDA!T13", "NPDA!U13"] },
-      { key: "m4", label: "Nov.", value: 0.75, status: "not-met", highlightRefs: ["NPDA!T2", "NPDA!U2", "NPDA!T3", "NPDA!U3", "NPDA!T4", "NPDA!U4", "NPDA!T5", "NPDA!U5", "NPDA!T6", "NPDA!U6", "NPDA!T7", "NPDA!U7", "NPDA!T8", "NPDA!U8", "NPDA!T9", "NPDA!U9", "NPDA!T10", "NPDA!U10", "NPDA!T11", "NPDA!U11", "NPDA!T12", "NPDA!U12", "NPDA!T13", "NPDA!U13"] },
-      { key: "m5", label: "Dez.", value: 0.80, status: "not-met", highlightRefs: ["NPDA!T2", "NPDA!U2", "NPDA!T3", "NPDA!U3", "NPDA!T4", "NPDA!U4", "NPDA!T5", "NPDA!U5", "NPDA!T6", "NPDA!U6", "NPDA!T7", "NPDA!U7", "NPDA!T8", "NPDA!U8", "NPDA!T9", "NPDA!U9", "NPDA!T10", "NPDA!U10", "NPDA!T11", "NPDA!U11", "NPDA!T12", "NPDA!U12", "NPDA!T13", "NPDA!U13"] },
-      { key: "m6", label: "Jan.", value: 0.83, status: "not-met", highlightRefs: ["NPDA!T2", "NPDA!U2", "NPDA!T3", "NPDA!U3", "NPDA!T4", "NPDA!U4", "NPDA!T5", "NPDA!U5", "NPDA!T6", "NPDA!U6", "NPDA!T7", "NPDA!U7", "NPDA!T8", "NPDA!U8", "NPDA!T9", "NPDA!U9", "NPDA!T10", "NPDA!U10", "NPDA!T11", "NPDA!U11", "NPDA!T12", "NPDA!U12", "NPDA!T13", "NPDA!U13"] },
+      { key: "m1", label: "Aug", value: 0.55, status: "not-met", highlightRefs: ["NPDA!T2", "NPDA!U2", "NPDA!T3", "NPDA!U3", "NPDA!T4", "NPDA!U4", "NPDA!T5", "NPDA!U5", "NPDA!T6", "NPDA!U6", "NPDA!T7", "NPDA!U7", "NPDA!T8", "NPDA!U8", "NPDA!T9", "NPDA!U9", "NPDA!T10", "NPDA!U10", "NPDA!T11", "NPDA!U11", "NPDA!T12", "NPDA!U12", "NPDA!T13", "NPDA!U13"] },
+      { key: "m2", label: "Sep", value: 0.62, status: "not-met", highlightRefs: ["NPDA!T2", "NPDA!U2", "NPDA!T3", "NPDA!U3", "NPDA!T4", "NPDA!U4", "NPDA!T5", "NPDA!U5", "NPDA!T6", "NPDA!U6", "NPDA!T7", "NPDA!U7", "NPDA!T8", "NPDA!U8", "NPDA!T9", "NPDA!U9", "NPDA!T10", "NPDA!U10", "NPDA!T11", "NPDA!U11", "NPDA!T12", "NPDA!U12", "NPDA!T13", "NPDA!U13"] },
+      { key: "m3", label: "Oct", value: 0.70, status: "not-met", highlightRefs: ["NPDA!T2", "NPDA!U2", "NPDA!T3", "NPDA!U3", "NPDA!T4", "NPDA!U4", "NPDA!T5", "NPDA!U5", "NPDA!T6", "NPDA!U6", "NPDA!T7", "NPDA!U7", "NPDA!T8", "NPDA!U8", "NPDA!T9", "NPDA!U9", "NPDA!T10", "NPDA!U10", "NPDA!T11", "NPDA!U11", "NPDA!T12", "NPDA!U12", "NPDA!T13", "NPDA!U13"] },
+      { key: "m4", label: "Nov", value: 0.75, status: "not-met", highlightRefs: ["NPDA!T2", "NPDA!U2", "NPDA!T3", "NPDA!U3", "NPDA!T4", "NPDA!U4", "NPDA!T5", "NPDA!U5", "NPDA!T6", "NPDA!U6", "NPDA!T7", "NPDA!U7", "NPDA!T8", "NPDA!U8", "NPDA!T9", "NPDA!U9", "NPDA!T10", "NPDA!U10", "NPDA!T11", "NPDA!U11", "NPDA!T12", "NPDA!U12", "NPDA!T13", "NPDA!U13"] },
+      { key: "m5", label: "Dec", value: 0.80, status: "not-met", highlightRefs: ["NPDA!T2", "NPDA!U2", "NPDA!T3", "NPDA!U3", "NPDA!T4", "NPDA!U4", "NPDA!T5", "NPDA!U5", "NPDA!T6", "NPDA!U6", "NPDA!T7", "NPDA!U7", "NPDA!T8", "NPDA!U8", "NPDA!T9", "NPDA!U9", "NPDA!T10", "NPDA!U10", "NPDA!T11", "NPDA!U11", "NPDA!T12", "NPDA!U12", "NPDA!T13", "NPDA!U13"] },
+      { key: "m6", label: "Jan", value: 0.83, status: "not-met", highlightRefs: ["NPDA!T2", "NPDA!U2", "NPDA!T3", "NPDA!U3", "NPDA!T4", "NPDA!U4", "NPDA!T5", "NPDA!U5", "NPDA!T6", "NPDA!U6", "NPDA!T7", "NPDA!U7", "NPDA!T8", "NPDA!U8", "NPDA!T9", "NPDA!U9", "NPDA!T10", "NPDA!U10", "NPDA!T11", "NPDA!U11", "NPDA!T12", "NPDA!U12", "NPDA!T13", "NPDA!U13"] },
     ],
-    criterion: "BPT-Kriterium Kinderdiabetes (j) — ≥4 datierte HbA1c-Ergebnisse im Auditjahr, Kohortenziel ≥90 % (Forschung §3 A1) [3]",
+    criterion: "Paediatric Diabetes BPT criterion (j) — ≥4 dated HbA1c results in the audit year, cohort target ≥90% (research §3 A1) [3]",
   },
   // A2 — seven NICE annual health checks, cohort partitioned by number of
   // applicable checks completed (recomputed from the BP/foot/retinal/ACR/
@@ -2351,93 +2955,93 @@ const trackers = {
   "t-dia-care-processes": {
     id: "t-dia-care-processes",
     dashboardId: "paediatric-diabetes-bpt",
-    title: "Sieben jährliche NICE-Gesundheitschecks",
+    title: "Seven NICE annual health checks",
     kind: "histogram",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "c5", label: "5 Checks erfolgt", value: 6 / 12, status: "met", highlightRefs: ["NPDA!AG2", "NPDA!AH2", "NPDA!AI2", "NPDA!AK2", "NPDA!AN2", "NPDA!AP2", "NPDA!AR2", "NPDA!AG3", "NPDA!AH3", "NPDA!AI3", "NPDA!AK3", "NPDA!AN3", "NPDA!AP3", "NPDA!AR3", "NPDA!AG6", "NPDA!AH6", "NPDA!AI6", "NPDA!AK6", "NPDA!AN6", "NPDA!AP6", "NPDA!AR6", "NPDA!AG7", "NPDA!AH7", "NPDA!AI7", "NPDA!AK7", "NPDA!AN7", "NPDA!AP7", "NPDA!AR7", "NPDA!AG9", "NPDA!AH9", "NPDA!AI9", "NPDA!AK9", "NPDA!AN9", "NPDA!AP9", "NPDA!AR9", "NPDA!AG13", "NPDA!AH13", "NPDA!AI13", "NPDA!AK13", "NPDA!AN13", "NPDA!AP13", "NPDA!AR13"] },
-      { key: "c4", label: "4 Checks erfolgt", value: 1 / 12, status: "not-met", highlightRefs: ["NPDA!AG11", "NPDA!AH11", "NPDA!AI11", "NPDA!AK11", "NPDA!AN11", "NPDA!AP11", "NPDA!AR11"] },
-      { key: "c2", label: "2 Checks erfolgt", value: 2 / 12, status: "not-met", highlightRefs: ["NPDA!AG4", "NPDA!AH4", "NPDA!AI4", "NPDA!AK4", "NPDA!AN4", "NPDA!AP4", "NPDA!AR4", "NPDA!AG8", "NPDA!AH8", "NPDA!AI8", "NPDA!AK8", "NPDA!AN8", "NPDA!AP8", "NPDA!AR8"] },
-      { key: "c1", label: "1 Check erfolgt", value: 3 / 12, status: "not-met", highlightRefs: ["NPDA!AG5", "NPDA!AH5", "NPDA!AI5", "NPDA!AK5", "NPDA!AN5", "NPDA!AP5", "NPDA!AR5", "NPDA!AG10", "NPDA!AH10", "NPDA!AI10", "NPDA!AK10", "NPDA!AN10", "NPDA!AP10", "NPDA!AR10", "NPDA!AG12", "NPDA!AH12", "NPDA!AI12", "NPDA!AK12", "NPDA!AN12", "NPDA!AP12", "NPDA!AR12"] },
+      { key: "c5", label: "5 checks done", value: 6 / 12, status: "met", highlightRefs: ["NPDA!AG2", "NPDA!AH2", "NPDA!AI2", "NPDA!AK2", "NPDA!AN2", "NPDA!AP2", "NPDA!AR2", "NPDA!AG3", "NPDA!AH3", "NPDA!AI3", "NPDA!AK3", "NPDA!AN3", "NPDA!AP3", "NPDA!AR3", "NPDA!AG6", "NPDA!AH6", "NPDA!AI6", "NPDA!AK6", "NPDA!AN6", "NPDA!AP6", "NPDA!AR6", "NPDA!AG7", "NPDA!AH7", "NPDA!AI7", "NPDA!AK7", "NPDA!AN7", "NPDA!AP7", "NPDA!AR7", "NPDA!AG9", "NPDA!AH9", "NPDA!AI9", "NPDA!AK9", "NPDA!AN9", "NPDA!AP9", "NPDA!AR9", "NPDA!AG13", "NPDA!AH13", "NPDA!AI13", "NPDA!AK13", "NPDA!AN13", "NPDA!AP13", "NPDA!AR13"] },
+      { key: "c4", label: "4 checks done", value: 1 / 12, status: "not-met", highlightRefs: ["NPDA!AG11", "NPDA!AH11", "NPDA!AI11", "NPDA!AK11", "NPDA!AN11", "NPDA!AP11", "NPDA!AR11"] },
+      { key: "c2", label: "2 checks done", value: 2 / 12, status: "not-met", highlightRefs: ["NPDA!AG4", "NPDA!AH4", "NPDA!AI4", "NPDA!AK4", "NPDA!AN4", "NPDA!AP4", "NPDA!AR4", "NPDA!AG8", "NPDA!AH8", "NPDA!AI8", "NPDA!AK8", "NPDA!AN8", "NPDA!AP8", "NPDA!AR8"] },
+      { key: "c1", label: "1 check done", value: 3 / 12, status: "not-met", highlightRefs: ["NPDA!AG5", "NPDA!AH5", "NPDA!AI5", "NPDA!AK5", "NPDA!AN5", "NPDA!AP5", "NPDA!AR5", "NPDA!AG10", "NPDA!AH10", "NPDA!AI10", "NPDA!AK10", "NPDA!AN10", "NPDA!AP10", "NPDA!AR10", "NPDA!AG12", "NPDA!AH12", "NPDA!AI12", "NPDA!AK12", "NPDA!AN12", "NPDA!AP12", "NPDA!AR12"] },
     ],
-    criterion: "BPT-Kriterium Kinderdiabetes (k) — die sieben jährlichen NICE-Gesundheitschecks, soweit zutreffend, durchgeführt (Forschung §3 A2) [3][5]",
+    criterion: "Paediatric Diabetes BPT criterion (k) — the seven NICE annual health checks completed where applicable (research §3 A2) [3][5]",
   },
   // A3 — MDT clinic ≥4/yr + ≥8 additional contacts. Representative headline
   // (no per-contact field in the mock); the gap exemplar is the highest-HbA1c row.
   "t-dia-mdt-contacts": {
     id: "t-dia-mdt-contacts",
     dashboardId: "paediatric-diabetes-bpt",
-    title: "MDT-Sprechstunde ≥4/Jahr + ≥8 Kontakte",
+    title: "MDT clinic ≥4/yr + ≥8 contacts",
     kind: "stat",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Patienten mit ≥4 Sprechstunden + ≥8 Kontakten", value: 11, status: "met", highlightRefs: ["NPDA!O2", "NPDA!O3", "NPDA!O4", "NPDA!O5", "NPDA!O6", "NPDA!O8", "NPDA!O9", "NPDA!O10", "NPDA!O11", "NPDA!O12", "NPDA!O13"] },
+      { key: "met", label: "Patients meeting ≥4 clinics + ≥8 contacts", value: 11, status: "met", highlightRefs: ["NPDA!O2", "NPDA!O3", "NPDA!O4", "NPDA!O5", "NPDA!O6", "NPDA!O8", "NPDA!O9", "NPDA!O10", "NPDA!O11", "NPDA!O12", "NPDA!O13"] },
     ],
-    criterion: "BPT-Kriterien Kinderdiabetes (g) & (h) — ≥4 MDT-Sprechstundentermine und ≥8 zusätzliche Kontakte pro Jahr. Näherung: Der Demodatensatz enthält kein Feld je Kontakt, daher verankert der Sprechstundenbesuch jeder Patientin/jedes Patienten (Spalte O) die Hervorhebung (Forschung §3 A3) [3]",
+    criterion: "Paediatric Diabetes BPT criteria (g) & (h) — ≥4 MDT clinic appointments and ≥8 additional contacts per year. Proxy: the mock has no per-contact field, so each patient's clinic visit (column O) anchors the highlight (research §3 A3) [3]",
   },
   // A4 — annual psychology assessment (psychScreen present in audit year for all).
   "t-dia-psychology": {
     id: "t-dia-psychology",
     dashboardId: "paediatric-diabetes-bpt",
-    title: "Jährliche psychologische Beurteilung",
+    title: "Annual psychology assessment",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "In diesem Jahr beurteilt", value: 12 / 12, status: "met", highlightRefs: ["NPDA!AY2", "NPDA!AY3", "NPDA!AY4", "NPDA!AY5", "NPDA!AY6", "NPDA!AY7", "NPDA!AY8", "NPDA!AY9", "NPDA!AY10", "NPDA!AY11", "NPDA!AY12", "NPDA!AY13"] },
-      { key: "not-met", label: "Nicht beurteilt", value: 0, status: "not-met", highlightRefs: [] },
+      { key: "met", label: "Assessed this year", value: 12 / 12, status: "met", highlightRefs: ["NPDA!AY2", "NPDA!AY3", "NPDA!AY4", "NPDA!AY5", "NPDA!AY6", "NPDA!AY7", "NPDA!AY8", "NPDA!AY9", "NPDA!AY10", "NPDA!AY11", "NPDA!AY12", "NPDA!AY13"] },
+      { key: "not-met", label: "Not assessed", value: 0, status: "not-met", highlightRefs: [] },
     ],
-    criterion: "BPT-Kriterium Kinderdiabetes (l) — mindestens jährliche psychologische Beurteilung hinsichtlich eines zusätzlichen Unterstützungsbedarfs (Forschung §3 A4) [3]",
+    criterion: "Paediatric Diabetes BPT criterion (l) — psychological assessment at least annually for additional-support need (research §3 A4) [3]",
   },
   // A5 — additional dietitian appointment offered (i.dietitian.v === "Yes").
   "t-dia-dietitian": {
     id: "t-dia-dietitian",
     dashboardId: "paediatric-diabetes-bpt",
-    title: "Zusätzlicher Ernährungsberatungstermin angeboten",
+    title: "Additional dietitian appointment offered",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Angeboten", value: 9 / 12, status: "met", highlightRefs: ["NPDA!BD2", "NPDA!BD3", "NPDA!BD4", "NPDA!BD6", "NPDA!BD7", "NPDA!BD8", "NPDA!BD9", "NPDA!BD11", "NPDA!BD13"] },
-      { key: "not-met", label: "Nicht angeboten", value: 3 / 12, status: "not-met", highlightRefs: ["NPDA!BD5", "NPDA!BD10", "NPDA!BD12"] },
+      { key: "met", label: "Offered", value: 9 / 12, status: "met", highlightRefs: ["NPDA!BD2", "NPDA!BD3", "NPDA!BD4", "NPDA!BD6", "NPDA!BD7", "NPDA!BD8", "NPDA!BD9", "NPDA!BD11", "NPDA!BD13"] },
+      { key: "not-met", label: "Not offered", value: 3 / 12, status: "not-met", highlightRefs: ["NPDA!BD5", "NPDA!BD10", "NPDA!BD12"] },
     ],
-    criterion: "BPT-Kriterium Kinderdiabetes (i) — mindestens ein zusätzlicher Ernährungsberatungstermin pro Jahr angeboten, Ziel ≥90 % (Forschung §3 A5) [3]",
+    criterion: "Paediatric Diabetes BPT criterion (i) — at least one additional dietitian appointment offered per year, target ≥90% (research §3 A5) [3]",
   },
   // A6 — carb-counting ≤14d of diagnosis, cohort = newly-diagnosed T1 (NPD003, NPD007).
   "t-dia-carb-counting": {
     id: "t-dia-carb-counting",
     dashboardId: "paediatric-diabetes-bpt",
-    title: "Kohlenhydratzählen ≤14 Tage nach Diagnose (neuer Typ 1)",
+    title: "Carb-counting ≤14d of diagnosis (new T1)",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Innerhalb von 14 Tagen", value: 1 / 2, status: "met", highlightRefs: ["NPDA!BC4", "NPDA!I4"] },
-      { key: "not-met", label: "Über 14 Tage", value: 1 / 2, status: "not-met", highlightRefs: ["NPDA!BC8", "NPDA!I8"] },
+      { key: "met", label: "Within 14 days", value: 1 / 2, status: "met", highlightRefs: ["NPDA!BC4", "NPDA!I4"] },
+      { key: "not-met", label: "Over 14 days", value: 1 / 2, status: "not-met", highlightRefs: ["NPDA!BC8", "NPDA!I8"] },
     ],
-    criterion: "BPT-Kriterium Kinderdiabetes (f) — Kohlenhydratzählen der Stufe 3 innerhalb von 14 Tagen nach Diagnose bei neu diagnostiziertem Typ 1, Nenner = Neudiagnosen (Forschung §3 A6) [3]",
+    criterion: "Paediatric Diabetes BPT criterion (f) — level-3 carbohydrate counting within 14 days of diagnosis for new type 1, denominator = newly diagnosed (research §3 A6) [3]",
   },
   // A7 — high-HbA1c (≥69 mmol/mol) follow-up flag. Count at risk = 5.
   "t-dia-high-hba1c": {
     id: "t-dia-high-hba1c",
     dashboardId: "paediatric-diabetes-bpt",
-    title: "Markierung Nachverfolgung bei hohem HbA1c (≥69)",
+    title: "High-HbA1c (≥69) follow-up flag",
     kind: "stat",
     target: { op: "<=", value: 0 },
     elements: [
-      { key: "at-risk", label: "Patienten mit HbA1c ≥69 mmol/mol", value: 5, status: "not-met", highlightRefs: ["NPDA!T3", "NPDA!T4", "NPDA!T6", "NPDA!T7", "NPDA!T9"] },
+      { key: "at-risk", label: "Patients with HbA1c ≥69 mmol/mol", value: 5, status: "not-met", highlightRefs: ["NPDA!T3", "NPDA!T4", "NPDA!T6", "NPDA!T7", "NPDA!T9"] },
     ],
-    criterion: "BPT-Kriterium Kinderdiabetes (o)(i) — ein HbA1c ≥69 mmol/mol löst eine Eskalation aus; als erlösgefährdet markiert (Forschung §3 A7) [3]",
+    criterion: "Paediatric Diabetes BPT criterion (o)(i) — HbA1c ≥69 mmol/mol triggers escalation; flagged as revenue-at-risk (research §3 A7) [3]",
   },
   // A8 — coeliac + thyroid screening at diagnosis, cohort = newly-diagnosed T1.
   "t-dia-coeliac-thyroid": {
     id: "t-dia-coeliac-thyroid",
     dashboardId: "paediatric-diabetes-bpt",
-    title: "Zöliakie- und Schilddrüsenscreening bei Diagnose (neuer Typ 1)",
+    title: "Coeliac + thyroid screening at diagnosis (new T1)",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Beide gescreent", value: 2 / 2, status: "met", highlightRefs: ["NPDA!AR4", "NPDA!AP4", "NPDA!AR8", "NPDA!AP8"] },
-      { key: "not-met", label: "Unvollständig", value: 0, status: "not-met", highlightRefs: [] },
+      { key: "met", label: "Both screened", value: 2 / 2, status: "met", highlightRefs: ["NPDA!AR4", "NPDA!AP4", "NPDA!AR8", "NPDA!AP8"] },
+      { key: "not-met", label: "Incomplete", value: 0, status: "not-met", highlightRefs: [] },
     ],
-    criterion: "Teilmenge des BPT-Kriteriums Kinderdiabetes (k) — Zöliakie- und Schilddrüsenscreening im Umfeld der Diagnose bei neu diagnostiziertem Typ 1 (Forschung §3 A8) [3][5]",
+    criterion: "Paediatric Diabetes BPT criterion (k) subset — coeliac and thyroid screening around diagnosis for new type 1 (research §3 A8) [3][5]",
   },
 
   // === Dashboard 2 — Paediatric Epilepsy BPT (Epilepsy12, rows A2–A11) ======
@@ -2445,100 +3049,100 @@ const trackers = {
   "t-epi-paediatrician-2wk": {
     id: "t-epi-paediatrician-2wk",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "Pädiater mit Epilepsie-Expertise ≤2 Wochen",
+    title: "Epilepsy-expert paediatrician ≤2 weeks",
     kind: "timeseries",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "m1", label: "Aug.", value: 0.50, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
-      { key: "m2", label: "Sep.", value: 0.58, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
-      { key: "m3", label: "Okt.", value: 0.65, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
-      { key: "m4", label: "Nov.", value: 0.72, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
-      { key: "m5", label: "Dez.", value: 0.78, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
-      { key: "m6", label: "Jan.", value: 0.80, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
+      { key: "m1", label: "Aug", value: 0.50, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
+      { key: "m2", label: "Sep", value: 0.58, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
+      { key: "m3", label: "Oct", value: 0.65, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
+      { key: "m4", label: "Nov", value: 0.72, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
+      { key: "m5", label: "Dec", value: 0.78, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
+      { key: "m6", label: "Jan", value: 0.80, status: "not-met", highlightRefs: ["Epilepsy!F2", "Epilepsy!G2", "Epilepsy!H2", "Epilepsy!F3", "Epilepsy!G3", "Epilepsy!H3", "Epilepsy!F4", "Epilepsy!G4", "Epilepsy!H4", "Epilepsy!F5", "Epilepsy!G5", "Epilepsy!H5", "Epilepsy!F6", "Epilepsy!G6", "Epilepsy!H6", "Epilepsy!F7", "Epilepsy!G7", "Epilepsy!H7", "Epilepsy!F8", "Epilepsy!G8", "Epilepsy!H8", "Epilepsy!F9", "Epilepsy!G9", "Epilepsy!H9", "Epilepsy!F10", "Epilepsy!G10", "Epilepsy!H10", "Epilepsy!F11", "Epilepsy!G11", "Epilepsy!H11"] },
     ],
-    criterion: "Epilepsy12 KPI 1 — Vorstellung bei einer Fachärztin/einem Facharzt für Kinderheilkunde mit Epilepsie-Expertise innerhalb von 2 Wochen nach Überweisung (Forschung §3 B1) [7]",
+    criterion: "Epilepsy12 KPI 1 — seen by an epilepsy-expert consultant paediatrician within 2 weeks of referral (research §3 B1) [7]",
   },
   // B2 — ESN input within the first year.
   "t-epi-esn-first-year": {
     id: "t-epi-esn-first-year",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "ESN-Mitbetreuung im ersten Jahr",
+    title: "ESN input within first year",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "ESN-Mitbetreuung im Jahr", value: 9 / 10, status: "met", highlightRefs: ["Epilepsy!J2", "Epilepsy!J3", "Epilepsy!J4", "Epilepsy!J5", "Epilepsy!J6", "Epilepsy!J8", "Epilepsy!J9", "Epilepsy!J10", "Epilepsy!J11"] },
-      { key: "not-met", label: "Keine ESN-Mitbetreuung", value: 1 / 10, status: "not-met", highlightRefs: ["Epilepsy!J7"] },
+      { key: "met", label: "ESN input in year", value: 9 / 10, status: "met", highlightRefs: ["Epilepsy!J2", "Epilepsy!J3", "Epilepsy!J4", "Epilepsy!J5", "Epilepsy!J6", "Epilepsy!J8", "Epilepsy!J9", "Epilepsy!J10", "Epilepsy!J11"] },
+      { key: "not-met", label: "No ESN input", value: 1 / 10, status: "not-met", highlightRefs: ["Epilepsy!J7"] },
     ],
-    criterion: "Epilepsy12 KPI 2 — Mitbetreuung durch eine Epilepsie-Fachpflegekraft im ersten Betreuungsjahr (Forschung §3 B2) [3][7]",
+    criterion: "Epilepsy12 KPI 2 — epilepsy specialist nurse input within the first year of care (research §3 B2) [3][7]",
   },
   // B3 — MRI ≤6 weeks where indicated (eligible = mriIndicated Yes; 6 of 10).
   "t-epi-mri-6wk": {
     id: "t-epi-mri-6wk",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "MRT ≤6 Wochen (bei Indikation)",
+    title: "MRI ≤6 weeks (where indicated)",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Innerhalb von 6 Wochen", value: 4 / 6, status: "met", highlightRefs: ["Epilepsy!M2", "Epilepsy!N2", "Epilepsy!M3", "Epilepsy!N3", "Epilepsy!M6", "Epilepsy!N6", "Epilepsy!M10", "Epilepsy!N10"] },
-      { key: "not-met", label: "Über 6 Wochen / nicht erfolgt", value: 2 / 6, status: "not-met", highlightRefs: ["Epilepsy!M4", "Epilepsy!N4", "Epilepsy!M8", "Epilepsy!N8"] },
+      { key: "met", label: "Within 6 weeks", value: 4 / 6, status: "met", highlightRefs: ["Epilepsy!M2", "Epilepsy!N2", "Epilepsy!M3", "Epilepsy!N3", "Epilepsy!M6", "Epilepsy!N6", "Epilepsy!M10", "Epilepsy!N10"] },
+      { key: "not-met", label: "Over 6 weeks / not done", value: 2 / 6, status: "not-met", highlightRefs: ["Epilepsy!M4", "Epilepsy!N4", "Epilepsy!M8", "Epilepsy!N8"] },
     ],
-    criterion: "Epilepsy12 KPI 5 — MRT innerhalb von 6 Wochen nach Anforderung bei bestehender Indikation; Nenner = nur indizierte Fälle (Forschung §3 B3) [7]",
+    criterion: "Epilepsy12 KPI 5 — MRI within 6 weeks of request where indicated; denominator = indicated cases only (research §3 B3) [7]",
   },
   // B4 — ECG in convulsive seizures (eligible = convulsive; 7 of 10).
   "t-epi-ecg-convulsive": {
     id: "t-epi-ecg-convulsive",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "EKG bei konvulsiven Anfällen",
+    title: "ECG in convulsive seizures",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "EKG durchgeführt", value: 6 / 7, status: "met", highlightRefs: ["Epilepsy!Q2", "Epilepsy!Q3", "Epilepsy!Q5", "Epilepsy!Q8", "Epilepsy!Q9", "Epilepsy!Q11"] },
-      { key: "not-met", label: "Kein EKG", value: 1 / 7, status: "not-met", highlightRefs: ["Epilepsy!Q6"] },
+      { key: "met", label: "ECG performed", value: 6 / 7, status: "met", highlightRefs: ["Epilepsy!Q2", "Epilepsy!Q3", "Epilepsy!Q5", "Epilepsy!Q8", "Epilepsy!Q9", "Epilepsy!Q11"] },
+      { key: "not-met", label: "No ECG", value: 1 / 7, status: "not-met", highlightRefs: ["Epilepsy!Q6"] },
     ],
-    criterion: "Epilepsy12 KPI 4 — EKG bis zum Ende des ersten Jahres bei konvulsiven Anfällen; Nenner = konvulsive Fälle (Forschung §3 B4) [7]",
+    criterion: "Epilepsy12 KPI 4 — ECG by first year where seizures are convulsive; denominator = convulsive cases (research §3 B4) [7]",
   },
   // B5 — mental-health screening documented within first year.
   "t-epi-mh-screening": {
     id: "t-epi-mh-screening",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "Screening der psychischen Gesundheit + Unterstützung",
+    title: "Mental-health screening + support",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Gescreent", value: 9 / 10, status: "met", highlightRefs: ["Epilepsy!S2", "Epilepsy!S3", "Epilepsy!S4", "Epilepsy!S5", "Epilepsy!S6", "Epilepsy!S7", "Epilepsy!S8", "Epilepsy!S9", "Epilepsy!S11"] },
-      { key: "not-met", label: "Nicht gescreent", value: 1 / 10, status: "not-met", highlightRefs: ["Epilepsy!S10"] },
+      { key: "met", label: "Screened", value: 9 / 10, status: "met", highlightRefs: ["Epilepsy!S2", "Epilepsy!S3", "Epilepsy!S4", "Epilepsy!S5", "Epilepsy!S6", "Epilepsy!S7", "Epilepsy!S8", "Epilepsy!S9", "Epilepsy!S11"] },
+      { key: "not-met", label: "Not screened", value: 1 / 10, status: "not-met", highlightRefs: ["Epilepsy!S10"] },
     ],
-    criterion: "Epilepsy12 KPI 6 & 7 — im ersten Jahr dokumentiertes Screening der psychischen Gesundheit, mit Unterstützung bei festgestelltem Problem (Forschung §3 B5) [7]",
+    criterion: "Epilepsy12 KPIs 6 & 7 — mental-health screening documented in first year, with support where a problem is identified (research §3 B5) [7]",
   },
   // B6 — comprehensive care plan by 12 months.
   "t-epi-care-plan-12mo": {
     id: "t-epi-care-plan-12mo",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "Umfassender Behandlungsplan bis 12 Monate",
+    title: "Comprehensive care plan by 12 months",
     kind: "timeseries",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "m1", label: "Aug.", value: 0.55, status: "not-met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
-      { key: "m2", label: "Sep.", value: 0.65, status: "not-met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
-      { key: "m3", label: "Okt.", value: 0.72, status: "not-met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
-      { key: "m4", label: "Nov.", value: 0.80, status: "not-met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
-      { key: "m5", label: "Dez.", value: 0.85, status: "not-met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
-      { key: "m6", label: "Jan.", value: 0.90, status: "met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
+      { key: "m1", label: "Aug", value: 0.55, status: "not-met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
+      { key: "m2", label: "Sep", value: 0.65, status: "not-met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
+      { key: "m3", label: "Oct", value: 0.72, status: "not-met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
+      { key: "m4", label: "Nov", value: 0.80, status: "not-met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
+      { key: "m5", label: "Dec", value: 0.85, status: "not-met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
+      { key: "m6", label: "Jan", value: 0.90, status: "met", highlightRefs: ["Epilepsy!W2", "Epilepsy!W3", "Epilepsy!W4", "Epilepsy!W5", "Epilepsy!W6", "Epilepsy!W7", "Epilepsy!W8", "Epilepsy!W9", "Epilepsy!W10", "Epilepsy!W11"] },
     ],
-    criterion: "Epilepsy12 KPI 9a/9b — ein vereinbarter umfassender Behandlungsplan bis zum 12. Monat (Forschung §3 B6) [7]",
+    criterion: "Epilepsy12 KPI 9a/9b — an agreed comprehensive care plan by 12 months (research §3 B6) [7]",
   },
   // B7 — valproate/topiramate safety (PPP). Eligible = female ≥12 on valproate/
   // topiramate (EPI002, EPI003, EPI005); EPI005 is the deliberate PPP gap.
   "t-epi-valproate-ppp": {
     id: "t-epi-valproate-ppp",
     dashboardId: "paediatric-epilepsy-bpt",
-    title: "Sicherheit von Valproat/Topiramat (Schwangerschaftsverhütungsprogramm)",
+    title: "Valproate/topiramate safety (PPP)",
     kind: "stat",
     target: { op: ">=", value: 1 },
     elements: [
-      { key: "at-risk", label: "Unter Valproat/Topiramat ohne Verhütungsprogramm", value: 1, status: "not-met", highlightRefs: ["Epilepsy!AA6"] },
+      { key: "at-risk", label: "On valproate/topiramate without PPP", value: 1, status: "not-met", highlightRefs: ["Epilepsy!AA6"] },
     ],
-    criterion: "Epilepsy12 KPI 8 — Schwangerschaftsverhütungsprogramm bzw. Risikoaufklärung für weibliche Personen ab 12 Jahren unter Valproat oder Topiramat (Forschung §3 B7) [7]",
+    criterion: "Epilepsy12 KPI 8 — pregnancy prevention programme / risk-acknowledgement for females ≥12 on valproate or topiramate (research §3 B7) [7]",
   },
 
   // === Dashboard 3 — Paediatric Major Trauma BPT (NMTR, rows A2–A11) ========
@@ -2546,82 +3150,82 @@ const trackers = {
   "t-tra-registry-25d": {
     id: "t-tra-registry-25d",
     dashboardId: "paediatric-trauma-bpt",
-    title: "Registerübermittlung ≤25 Tage",
+    title: "Registry submission ≤25 days",
     kind: "timeseries",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "m1", label: "Aug.", value: 0.60, status: "not-met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
-      { key: "m2", label: "Sep.", value: 0.70, status: "not-met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
-      { key: "m3", label: "Okt.", value: 0.78, status: "not-met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
-      { key: "m4", label: "Nov.", value: 0.83, status: "not-met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
-      { key: "m5", label: "Dez.", value: 0.88, status: "not-met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
-      { key: "m6", label: "Jan.", value: 0.90, status: "met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
+      { key: "m1", label: "Aug", value: 0.60, status: "not-met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
+      { key: "m2", label: "Sep", value: 0.70, status: "not-met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
+      { key: "m3", label: "Oct", value: 0.78, status: "not-met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
+      { key: "m4", label: "Nov", value: 0.83, status: "not-met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
+      { key: "m5", label: "Dec", value: 0.88, status: "not-met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
+      { key: "m6", label: "Jan", value: 0.90, status: "met", highlightRefs: ["Trauma!I2", "Trauma!L2", "Trauma!J2", "Trauma!K2", "Trauma!I3", "Trauma!L3", "Trauma!J3", "Trauma!K3", "Trauma!I4", "Trauma!L4", "Trauma!J4", "Trauma!K4", "Trauma!I5", "Trauma!L5", "Trauma!J5", "Trauma!K5", "Trauma!I6", "Trauma!L6", "Trauma!J6", "Trauma!K6", "Trauma!I7", "Trauma!L7", "Trauma!J7", "Trauma!K7", "Trauma!I8", "Trauma!L8", "Trauma!J8", "Trauma!K8", "Trauma!I9", "Trauma!L9", "Trauma!J9", "Trauma!K9", "Trauma!I10", "Trauma!L10", "Trauma!J10", "Trauma!K10", "Trauma!I11", "Trauma!L11", "Trauma!J11", "Trauma!K11"] },
     ],
-    criterion: "BPT-Auslöser Schwerverletztenversorgung — NMTR/TARN-Datensatz vollständig und innerhalb von 25 Tagen nach Entlassung übermittelt (Forschung §3 C1) [10][12]",
+    criterion: "Major Trauma BPT trigger — NMTR/TARN dataset complete and submitted within 25 days of discharge (research §3 C1) [10][12]",
   },
   // C2 — consultant-led reception ≤5 min, eligible = Level 2 (ISS ≥16; 6 cases).
   "t-tra-consultant-5min": {
     id: "t-tra-consultant-5min",
     dashboardId: "paediatric-trauma-bpt",
-    title: "Fachärztlich geleitete Aufnahme ≤5 Min. (Stufe 2)",
+    title: "Consultant-led reception ≤5 min (Level 2)",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Facharzt ≤5 Min.", value: 4 / 6, status: "met", highlightRefs: ["Trauma!N2", "Trauma!O2", "Trauma!P2", "Trauma!N4", "Trauma!O4", "Trauma!P4", "Trauma!N7", "Trauma!O7", "Trauma!P7", "Trauma!N8", "Trauma!O8", "Trauma!P8"] },
-      { key: "not-met", label: "Über 5 Min. / nicht dokumentiert", value: 2 / 6, status: "not-met", highlightRefs: ["Trauma!N3", "Trauma!O3", "Trauma!P3", "Trauma!N10", "Trauma!O10", "Trauma!P10"] },
+      { key: "met", label: "Consultant ≤5 min", value: 4 / 6, status: "met", highlightRefs: ["Trauma!N2", "Trauma!O2", "Trauma!P2", "Trauma!N4", "Trauma!O4", "Trauma!P4", "Trauma!N7", "Trauma!O7", "Trauma!P7", "Trauma!N8", "Trauma!O8", "Trauma!P8"] },
+      { key: "not-met", label: "Over 5 min / not recorded", value: 2 / 6, status: "not-met", highlightRefs: ["Trauma!N3", "Trauma!O3", "Trauma!P3", "Trauma!N10", "Trauma!O10", "Trauma!P10"] },
     ],
-    criterion: "BPT Schwerverletztenversorgung (Stufe 2, ISS ≥16) — fachärztlich geleitetes Trauma-Team, Facharzt innerhalb von 5 Min. nach Eintreffen anwesend (Forschung §3 C2) [10]",
+    criterion: "Major Trauma BPT (Level 2, ISS ≥16) — consultant-led trauma team, consultant present within 5 min of arrival (research §3 C2) [10]",
   },
   // C3 — CT head ≤60 min, eligible = Level 2 head injury with GCS ≤13 (6 cases).
   "t-tra-ct-head-60min": {
     id: "t-tra-ct-head-60min",
     dashboardId: "paediatric-trauma-bpt",
-    title: "CT-Schädel ≤60 Min. (GCS ≤13, Stufe 2)",
+    title: "CT head ≤60 min (GCS ≤13, Level 2)",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Innerhalb von 60 Min.", value: 5 / 6, status: "met", highlightRefs: ["Trauma!R2", "Trauma!S2", "Trauma!T2", "Trauma!R4", "Trauma!S4", "Trauma!T4", "Trauma!R7", "Trauma!S7", "Trauma!T7", "Trauma!R8", "Trauma!S8", "Trauma!T8", "Trauma!R10", "Trauma!S10", "Trauma!T10"] },
-      { key: "not-met", label: "Über 60 Min.", value: 1 / 6, status: "not-met", highlightRefs: ["Trauma!R3", "Trauma!S3", "Trauma!T3"] },
+      { key: "met", label: "Within 60 min", value: 5 / 6, status: "met", highlightRefs: ["Trauma!R2", "Trauma!S2", "Trauma!T2", "Trauma!R4", "Trauma!S4", "Trauma!T4", "Trauma!R7", "Trauma!S7", "Trauma!T7", "Trauma!R8", "Trauma!S8", "Trauma!T8", "Trauma!R10", "Trauma!S10", "Trauma!T10"] },
+      { key: "not-met", label: "Over 60 min", value: 1 / 6, status: "not-met", highlightRefs: ["Trauma!R3", "Trauma!S3", "Trauma!T3"] },
     ],
-    criterion: "BPT Schwerverletztenversorgung (Stufe 2) — CT-Schädel innerhalb von 60 Min. bei Kopfverletzungen mit GCS ≤13 (Forschung §3 C3) [10]",
+    criterion: "Major Trauma BPT (Level 2) — CT head within 60 min for head-injury cases with GCS ≤13 (research §3 C3) [10]",
   },
   // C4 — tranexamic acid ≤1 h, eligible = Level 2 with TXA indicated (4 cases).
   "t-tra-txa-1h": {
     id: "t-tra-txa-1h",
     dashboardId: "paediatric-trauma-bpt",
-    title: "Tranexamsäure ≤1 Std. (Stufe 2)",
+    title: "Tranexamic acid ≤1 h (Level 2)",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Innerhalb von 1 Stunde", value: 3 / 4, status: "met", highlightRefs: ["Trauma!V2", "Trauma!W2", "Trauma!X2", "Trauma!V4", "Trauma!W4", "Trauma!X4", "Trauma!V8", "Trauma!W8", "Trauma!X8"] },
-      { key: "not-met", label: "Über 1 Stunde", value: 1 / 4, status: "not-met", highlightRefs: ["Trauma!V7", "Trauma!W7", "Trauma!X7"] },
+      { key: "met", label: "Within 1 hour", value: 3 / 4, status: "met", highlightRefs: ["Trauma!V2", "Trauma!W2", "Trauma!X2", "Trauma!V4", "Trauma!W4", "Trauma!X4", "Trauma!V8", "Trauma!W8", "Trauma!X8"] },
+      { key: "not-met", label: "Over 1 hour", value: 1 / 4, status: "not-met", highlightRefs: ["Trauma!V7", "Trauma!W7", "Trauma!X7"] },
     ],
-    criterion: "BPT Schwerverletztenversorgung (Stufe 2) — Tranexamsäure innerhalb von 1 Stunde bei bestehender Indikation (Forschung §3 C4) [10]",
+    criterion: "Major Trauma BPT (Level 2) — tranexamic acid within 1 hour where indicated (research §3 C4) [10]",
   },
   // C5 — airway considered ≤30 min, eligible = Level 1 GCS <9 (4 cases; all met).
   "t-tra-airway-30min": {
     id: "t-tra-airway-30min",
     dashboardId: "paediatric-trauma-bpt",
-    title: "Atemwegssicherung erwogen ≤30 Min. (GCS <9)",
+    title: "Airway considered ≤30 min (GCS <9)",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Innerhalb von 30 Min.", value: 4 / 4, status: "met", highlightRefs: ["Trauma!Z2", "Trauma!AA2", "Trauma!Z4", "Trauma!AA4", "Trauma!Z7", "Trauma!AA7", "Trauma!Z8", "Trauma!AA8"] },
-      { key: "not-met", label: "Über 30 Min.", value: 0, status: "not-met", highlightRefs: [] },
+      { key: "met", label: "Within 30 min", value: 4 / 4, status: "met", highlightRefs: ["Trauma!Z2", "Trauma!AA2", "Trauma!Z4", "Trauma!AA4", "Trauma!Z7", "Trauma!AA7", "Trauma!Z8", "Trauma!AA8"] },
+      { key: "not-met", label: "Over 30 min", value: 0, status: "not-met", highlightRefs: [] },
     ],
-    criterion: "BPT Schwerverletztenversorgung (Stufe 1) — Atemwegssicherung/Intubation innerhalb von 30 Min. bei GCS <9 erwogen (Forschung §3 C5) [10]",
+    criterion: "Major Trauma BPT (Level 1) — airway/intubation considered within 30 min for GCS <9 (research §3 C5) [10]",
   },
   // C6 — rehabilitation prescription, cohort = ISS ≥9 (9 cases; TRA005 is the gap).
   "t-tra-rehab-prescription": {
     id: "t-tra-rehab-prescription",
     dashboardId: "paediatric-trauma-bpt",
-    title: "Rehabilitationsverordnung (ISS ≥9)",
+    title: "Rehabilitation prescription (ISS ≥9)",
     kind: "stat",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "gap", label: "Fälle mit ISS≥9 ohne Rehabilitationsverordnung", value: 1, status: "not-met", highlightRefs: ["Trauma!AC6", "Trauma!AD6"] },
+      { key: "gap", label: "ISS≥9 cases without a rehab prescription", value: 1, status: "not-met", highlightRefs: ["Trauma!AC6", "Trauma!AD6"] },
     ],
-    criterion: "BPT Schwerverletztenversorgung (Stufe 1) — Rehabilitationsbedarf erhoben und Rehabilitationsverordnung bei ISS ≥9 ausgestellt (Forschung §3 C6) [10]",
+    criterion: "Major Trauma BPT (Level 1) — rehabilitation needs assessed and a rehabilitation prescription issued for ISS ≥9 (research §3 C6) [10]",
   },
 
   // === Dashboard 4 — Cord pH Audit (cord blood gas, ALL sheet rows 2–10) =====
@@ -2633,83 +3237,83 @@ const trackers = {
   "t-cord-paired-gases": {
     id: "t-cord-paired-gases",
     dashboardId: "cord-ph-bpt",
-    title: "Gepaarte Nabelschnurgase abgenommen",
+    title: "Paired cord gases sampled",
     kind: "donut",
     target: { op: ">=", value: 0.95 },
     elements: [
-      { key: "met", label: "Gültiger arterieller pH dokumentiert", value: 8 / 9, status: "met", highlightRefs: ["ALL!Z2", "ALL!AA2", "ALL!Z3", "ALL!AA3", "ALL!Z5", "ALL!AA5", "ALL!Z6", "ALL!AA6", "ALL!Z7", "ALL!AA7", "ALL!Z8", "ALL!AA8", "ALL!Z9", "ALL!AA9", "ALL!Z10", "ALL!AA10"] },
-      { key: "not-met", label: "Fehlend / nicht verwertbar", value: 1 / 9, status: "not-met", highlightRefs: ["ALL!Z4", "ALL!AA4"] },
+      { key: "met", label: "Valid arterial pH recorded", value: 8 / 9, status: "met", highlightRefs: ["ALL!Z2", "ALL!AA2", "ALL!Z3", "ALL!AA3", "ALL!Z5", "ALL!AA5", "ALL!Z6", "ALL!AA6", "ALL!Z7", "ALL!AA7", "ALL!Z8", "ALL!AA8", "ALL!Z9", "ALL!AA9", "ALL!Z10", "ALL!AA10"] },
+      { key: "not-met", label: "Missing / unusable", value: 1 / 9, status: "not-met", highlightRefs: ["ALL!Z4", "ALL!AA4"] },
     ],
-    criterion: "Audit Nabelschnurblutgase — gepaarte (arterielle + venöse) Nabelschnurgase bei der Geburt abgenommen, Ziel ≥95 % der Geburten (Forschung §7.1 D1)",
+    criterion: "Cord blood gas audit — paired (arterial + venous) cord gases sampled at birth, target ≥95% of births (research §7.1 D1)",
   },
   // D2 — cord arterial pH ≥7.1 (non-acidotic). Denominator = babies with a valid
   // pH (8). met = pH ≥7.1 (rows 2,5,6,7,8,9); not-met = pH <7.1 (rows 3,10).
   "t-cord-ph-acidosis": {
     id: "t-cord-ph-acidosis",
     dashboardId: "cord-ph-bpt",
-    title: "Arterieller Nabelschnur-pH ≥7,1",
+    title: "Cord arterial pH ≥7.1",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "pH ≥7,1", value: 6 / 8, status: "met", highlightRefs: ["ALL!Z2", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9"] },
-      { key: "not-met", label: "pH <7,1 (azidotisch)", value: 2 / 8, status: "not-met", highlightRefs: ["ALL!Z3", "ALL!Z10"] },
+      { key: "met", label: "pH ≥7.1", value: 6 / 8, status: "met", highlightRefs: ["ALL!Z2", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9"] },
+      { key: "not-met", label: "pH <7.1 (acidotic)", value: 2 / 8, status: "not-met", highlightRefs: ["ALL!Z3", "ALL!Z10"] },
     ],
-    criterion: "Audit Nabelschnurblutgase — arterieller Nabelschnur-pH ≥7,1 bei der Geburt (nicht azidotisch), Nenner = Neugeborene mit gültigem pH (Forschung §7.1 D2)",
+    criterion: "Cord blood gas audit — cord arterial pH ≥7.1 at birth (non-acidotic), denominator = babies with a valid pH (research §7.1 D2)",
   },
   // D3 — severe acidosis (pH <7.0). One baby: CPH009 (pH 6.98, row 10).
   "t-cord-severe-acidosis": {
     id: "t-cord-severe-acidosis",
     dashboardId: "cord-ph-bpt",
-    title: "Schwere Azidose (pH <7,0)",
+    title: "Severe acidosis (pH <7.0)",
     kind: "stat",
     target: { op: "<=", value: 0 },
     elements: [
-      { key: "at-risk", label: "Neugeborene mit arteriellem Nabelschnur-pH <7,0", value: 1, status: "not-met", highlightRefs: ["ALL!Z10"] },
+      { key: "at-risk", label: "Babies with cord arterial pH <7.0", value: 1, status: "not-met", highlightRefs: ["ALL!Z10"] },
     ],
-    criterion: "Audit Nabelschnurblutgase — schwere metabolische Azidose (arterieller Nabelschnur-pH <7,0) zur Überprüfung markiert; jeder Fall ist ein Sentinel-Befund (Forschung §7.1 D3)",
+    criterion: "Cord blood gas audit — severe metabolic acidosis (cord arterial pH <7.0) flagged for review; any case is a sentinel finding (research §7.1 D3)",
   },
   // D4 — base-excess distribution (col AA). Denominator = babies with a BE value
   // (8). Healthy band BE ≥ -8 (rows 2,5,8,9) = met; worse bands not-met.
   "t-cord-base-excess": {
     id: "t-cord-base-excess",
     dashboardId: "cord-ph-bpt",
-    title: "Verteilung des Basenüberschusses",
+    title: "Base excess distribution",
     kind: "histogram",
     target: { op: ">=", value: 0.9 },
     elements: [
       { key: "be1", label: "≥ -8", value: 4 / 8, status: "met", highlightRefs: ["ALL!AA2", "ALL!AA5", "ALL!AA8", "ALL!AA9"] },
-      { key: "be2", label: "-8 bis -12", value: 2 / 8, status: "not-met", highlightRefs: ["ALL!AA6", "ALL!AA7"] },
+      { key: "be2", label: "-8 to -12", value: 2 / 8, status: "not-met", highlightRefs: ["ALL!AA6", "ALL!AA7"] },
       { key: "be3", label: "< -12", value: 2 / 8, status: "not-met", highlightRefs: ["ALL!AA3", "ALL!AA10"] },
     ],
-    criterion: "Audit Nabelschnurblutgase — Verteilung des arteriellen Nabelschnur-Basenüberschusses; BE ≥ -8 mmol/l ist der unauffällige Bereich, Nenner = Neugeborene mit dokumentiertem BE (Forschung §7.1 D4)",
+    criterion: "Cord blood gas audit — cord arterial base excess distribution; BE ≥ -8 mmol/L is the reassuring band, denominator = babies with a recorded BE (research §7.1 D4)",
   },
   // D5 — NICU admission (col AM). met = not admitted (6, rows 2,4,5,6,8,9);
   // not-met = admitted (3, rows 3,7,10).
   "t-cord-nicu-admission": {
     id: "t-cord-nicu-admission",
     dashboardId: "cord-ph-bpt",
-    title: "Aufnahme auf die Neugeborenen-Intensivstation",
+    title: "NICU admission",
     kind: "donut",
     target: { op: "<=", value: 0.2 },
     elements: [
-      { key: "met", label: "Nicht aufgenommen", value: 6 / 9, status: "met", highlightRefs: ["ALL!AM2", "ALL!AM5", "ALL!AM6", "ALL!AM8", "ALL!AM9", "ALL!AM4"] },
-      { key: "not-met", label: "Auf die Neugeborenen-Intensivstation aufgenommen", value: 3 / 9, status: "not-met", highlightRefs: ["ALL!AM3", "ALL!AM7", "ALL!AM10"] },
+      { key: "met", label: "Not admitted", value: 6 / 9, status: "met", highlightRefs: ["ALL!AM2", "ALL!AM5", "ALL!AM6", "ALL!AM8", "ALL!AM9", "ALL!AM4"] },
+      { key: "not-met", label: "Admitted to NICU", value: 3 / 9, status: "not-met", highlightRefs: ["ALL!AM3", "ALL!AM7", "ALL!AM10"] },
     ],
-    criterion: "Audit Nabelschnurblutgase — Aufnahmen reifer Neugeborener auf die Neugeborenen-Intensivstation nach der Geburt; niedriger ist besser, verstanden als Indikator für die Qualität bei der Geburt (Forschung §7.1 D5)",
+    criterion: "Cord blood gas audit — term admissions to NICU after birth; lower is better, framed as a quality-at-birth indicator (research §7.1 D5)",
   },
   // D6 — delayed cord clamping performed (i.dcc.v, col Y). met = Yes (4, rows
   // 2,4,5,9); not-met = No (5, rows 3,6,7,8,10).
   "t-cord-dcc": {
     id: "t-cord-dcc",
     dashboardId: "cord-ph-bpt",
-    title: "Verzögertes Abnabeln durchgeführt",
+    title: "Delayed cord clamping performed",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "Verzögertes Abnabeln erfolgt", value: 4 / 9, status: "met", highlightRefs: ["ALL!Y2", "ALL!Y4", "ALL!Y5", "ALL!Y9"] },
-      { key: "not-met", label: "Kein verzögertes Abnabeln", value: 5 / 9, status: "not-met", highlightRefs: ["ALL!Y3", "ALL!Y6", "ALL!Y7", "ALL!Y8", "ALL!Y10"] },
+      { key: "met", label: "DCC performed", value: 4 / 9, status: "met", highlightRefs: ["ALL!Y2", "ALL!Y4", "ALL!Y5", "ALL!Y9"] },
+      { key: "not-met", label: "No DCC", value: 5 / 9, status: "not-met", highlightRefs: ["ALL!Y3", "ALL!Y6", "ALL!Y7", "ALL!Y8", "ALL!Y10"] },
     ],
-    criterion: "Audit Nabelschnurblutgase — verzögertes Abnabeln bei der Geburt durchgeführt, Ziel ≥90 % der infrage kommenden Geburten (Forschung §7.1 D6)",
+    criterion: "Cord blood gas audit — delayed cord clamping performed at birth, target ≥90% of eligible births (research §7.1 D6)",
   },
   // D7 — acidosis rate (pH <7.1) trend. Lower is better, target ≤0.10. Six
   // monthly points trending down; the latest (Jan) ≈ the current cohort's <7.1
@@ -2717,18 +3321,18 @@ const trackers = {
   "t-cord-acidosis-trend": {
     id: "t-cord-acidosis-trend",
     dashboardId: "cord-ph-bpt",
-    title: "Trend der Azidoserate (pH <7,1)",
+    title: "Acidosis rate (pH <7.1) trend",
     kind: "timeseries",
     target: { op: "<=", value: 0.1 },
     elements: [
-      { key: "m1", label: "Aug.", value: 0.45, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
-      { key: "m2", label: "Sep.", value: 0.40, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
-      { key: "m3", label: "Okt.", value: 0.36, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
-      { key: "m4", label: "Nov.", value: 0.31, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
-      { key: "m5", label: "Dez.", value: 0.28, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
-      { key: "m6", label: "Jan.", value: 0.25, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
+      { key: "m1", label: "Aug", value: 0.45, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
+      { key: "m2", label: "Sep", value: 0.40, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
+      { key: "m3", label: "Oct", value: 0.36, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
+      { key: "m4", label: "Nov", value: 0.31, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
+      { key: "m5", label: "Dec", value: 0.28, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
+      { key: "m6", label: "Jan", value: 0.25, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
     ],
-    criterion: "Audit Nabelschnurblutgase — monatliche Rate arterieller Nabelschnurazidosen (pH <7,1); niedriger ist besser, Verbesserungsziel ≤10 % (Forschung §7.1 D7)",
+    criterion: "Cord blood gas audit — monthly cord arterial acidosis rate (pH <7.1); lower is better, improvement target ≤10% (research §7.1 D7)",
   },
 };
 
@@ -2742,12 +3346,14 @@ export default {
   records: { cord, chest, npda, epilepsy, trauma },
   codeMaps,
   labels,
-  auditDetail,
+  templateDetail,
   specValues,
   explain,
   blockedReason,
   timeline,
+  diabetesWorklist,
   email,
   dashboards,
   trackers,
+  artifactWorkspace,
 };

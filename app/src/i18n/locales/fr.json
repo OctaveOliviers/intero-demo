@@ -5,6 +5,8 @@
   "common": {
     "rename": "Renommer",
     "delete": "Supprimer",
+    "pin": "Épingler",
+    "unpin": "Désépingler",
     "cancel": "Annuler",
     "close": "Fermer",
     "apply": "Appliquer",
@@ -20,7 +22,13 @@
     "cloneToLocal": "Cloner en local",
     "optional": "(facultatif)",
     "download": "Télécharger",
-    "remove": "Supprimer {label}"
+    "remove": "Supprimer {label}",
+    "back": "Retour",
+    "skip": "Ignorer",
+    "submit": "Envoyer",
+    "next": "Suivant",
+    "send": "Envoyer",
+    "loading": "Chargement…"
   },
   "level": {
     "national": "National",
@@ -46,18 +54,39 @@
   "leftPanel": {
     "collapseSidebar": "Réduire la barre latérale",
     "expandSidebar": "Développer la barre latérale",
-    "newAudit": "Nouvel audit",
-    "searchAudits": "Rechercher des audits",
+    "newThread": "Nouveau fil",
+    "newChat": "Nouveau chat",
+    "search": "Recherche",
+    "dataLibrary": "Dataset",
     "templates": "Modèles",
     "databases": "Bases de données",
     "noMatches": "Aucun résultat",
-    "noAudits": "Aucun audit pour l’instant",
     "feedback": "Commentaires",
     "settings": "Paramètres",
     "signOut": "Se déconnecter",
     "signingOut": "Déconnexion…",
     "deleteConfirm": "Supprimer cette analyse ? Cela supprime définitivement son exécution et toutes ses données.",
-    "deleteFailed": "Impossible de supprimer l’analyse. Veuillez réessayer."
+    "deleteFailed": "Impossible de supprimer l’analyse. Veuillez réessayer.",
+    "pinnedArtifacts": "Artefacts épinglés",
+    "tables": "Tableaux",
+    "threads": "Discussions",
+    "searchTables": "Rechercher des tableaux",
+    "searchChats": "Rechercher des discussions",
+    "allTemplates": "Tous les modèles",
+    "noTables": "Aucun tableau pour l’instant",
+    "noChats": "Aucune discussion pour l’instant",
+    "noTableMatches": "Aucun tableau correspondant",
+    "noChatMatches": "Aucune discussion correspondante",
+    "tableReady": "Prêt – pas encore ouvert",
+    "statusBuilding": "Création…",
+    "statusReady": "Prêt",
+    "statusBlocked": "Bloqué",
+    "statusQueued": "En attente",
+    "deleteChatConfirm": "Supprimer cette discussion ? Cela supprime définitivement la conversation.",
+    "deleteTableConfirm": "Supprimer ce tableau ? Cela le supprime définitivement.",
+    "renameChatPrompt": "Renommer cette conversation :",
+    "renameTablePrompt": "Renommer ce tableau :",
+    "deleteChatFailed": "Impossible de supprimer la discussion. Veuillez réessayer."
   },
   "home": {
     "heading": "Que souhaitez-vous savoir ?",
@@ -71,13 +100,26 @@
     "stopReading": "Arrêter la lecture",
     "readingRequest": "Lecture de votre demande…",
     "indexingTemplate": "Indexation du modèle…",
-    "availableAudits": "Audits disponibles",
+    "availableTemplates": "Modèles disponibles",
     "removeFile": "Supprimer le fichier",
     "templatesLoading": "Les modèles sont encore en cours de chargement. Réessayez dans un instant.",
-    "parseError": "Une erreur s’est produite lors de la lecture de votre demande."
+    "parseError": "Une erreur s’est produite lors de la lecture de votre demande.",
+    "attachContext": "Joindre un dataset ou un modèle",
+    "attachedContext": "Contexte joint",
+    "datasets": "Datasets",
+    "noDatasets": "Aucun dataset",
+    "noTemplates": "Aucun modèle",
+    "noChatOpen": "Aucune discussion ouverte. Lancez un nouveau chat pour commencer.",
+    "attachmentsError": "Impossible de charger les pièces jointes.",
+    "sourceLabel": "Source {number}",
+    "openEvidenceFor": "Ouvrir la preuve pour {text}",
+    "openEvidenceSource": "Ouvrir la preuve pour la source {number}",
+    "scopeTitle": "Périmètre de cette réponse",
+    "questionProgress": "Question {current} sur {total}",
+    "other": "Autre"
   },
   "results": {
-    "title": "Résultats de l’audit",
+    "title": "Résultats",
     "downloadWorkbook": "Télécharger le classeur",
     "workbookNotReady": "Classeur pas encore prêt",
     "inclusionCriteria": "Critères d’inclusion",
@@ -93,9 +135,7 @@
     "toggleInclusion": "Afficher/masquer le panneau des critères d’inclusion",
     "toggleActivity": "Afficher/masquer le panneau d’activité",
     "countersAria": "Compteurs de statut de l’exécution",
-    "openReviewSummary": "Ouvrir le récapitulatif de vérification",
-    "closeDashboardPane": "Fermer le volet du tableau de bord",
-    "closeWorkbookPane": "Fermer le volet du classeur"
+    "openReviewSummary": "Ouvrir le récapitulatif de vérification"
   },
   "rightPanel": {
     "closePanel": "Fermer le panneau",
@@ -107,7 +147,7 @@
     "sourceNote": "Note source",
     "sourceNotes": "Notes sources",
     "result": "Résultat",
-    "resultMeta": "{rows, plural, one {# ligne} other {# lignes}} · {ms} ms",
+    "resultMeta": "{rows, plural, one {# ligne} other {# lignes}}",
     "agentActivity": "Activité de l’agent",
     "reviewSummary": "Récapitulatif de vérification",
     "cells": "Cellules",
@@ -135,11 +175,11 @@
   "activity": {
     "finalizing": "Finalisation…",
     "working": "Traitement…",
-    "runFailed": "Échec de l’exécution",
+    "tablePopulationFailed": "Échec de la population du tableau",
     "stopped": "Arrêté",
     "completed": "Terminé",
     "noActivityYet": "Aucune activité pour l’instant",
-    "stopRun": "Arrêter l’exécution et rédiger son récapitulatif",
+    "stopTablePopulation": "Arrêter la population du tableau et rédiger son récapitulatif",
     "expand": "Développer l’activité de l’agent",
     "collapse": "Réduire l’activité de l’agent",
     "showLess": "Afficher moins",
@@ -150,6 +190,15 @@
   },
   "spreadsheetChip": {
     "download": "Télécharger"
+  },
+  "tableInspector": {
+    "openTitle": "Ouvrir le tableau",
+    "fallbackTitle": "Tableau",
+    "running": "Création du tableau…",
+    "done": "Tableau prêt — ouvrez-le",
+    "error": "Impossible de terminer ce tableau",
+    "queued": "En attente — pas encore démarré",
+    "openCta": "Ouvrir →"
   },
   "noteEvidence": {
     "empty": "Aucun texte de note renvoyé pour cette ligne."
@@ -169,7 +218,33 @@
   "settings": {
     "title": "Paramètres",
     "language": "Langue",
-    "languageHint": "Modifie l’interface et les données de démonstration. L’application se recharge pour appliquer le changement."
+    "languageHint": "Modifie l’interface et les données de démonstration. L’application se recharge pour appliquer le changement.",
+    "general": "Général",
+    "usersRoles": "Utilisateurs et rôles",
+    "sourceDatabases": "Bases de données sources",
+    "managedByIt": "Les comptes utilisateurs et les rôles sont gérés par l’informatique — l’édition arrive prochainement.",
+    "colName": "Nom",
+    "colUsername": "Identifiant",
+    "colRole": "Rôle",
+    "colStatus": "Statut",
+    "statusActive": "Actif",
+    "statusResetPending": "Réinitialisation en attente",
+    "statusInactive": "Inactif",
+    "loadingUsers": "Chargement des utilisateurs…",
+    "noUsers": "Aucun utilisateur pour le moment.",
+    "usersLoadError": "Impossible de charger les utilisateurs.",
+    "loadingDatabases": "Chargement des bases de données…",
+    "noDatabases": "Aucune base de données source pour le moment.",
+    "databasesLoadError": "Impossible de charger les bases de données.",
+    "uploadDatabase": "Importer une base de données",
+    "uploadStarted": "Import lancé — indexation en arrière-plan.",
+    "uploadFailed": "Échec de l’import.",
+    "renamePrompt": "Nouveau nom pour cette base de données",
+    "renameFailed": "Échec du renommage.",
+    "reindexStarted": "Réindexation lancée.",
+    "reindexFailed": "Échec de la réindexation.",
+    "deleteConfirm": "Supprimer cette base de données source ? Cette action est irréversible.",
+    "deleteFailed": "Échec de la suppression."
   },
   "database": {
     "back": "‹ Bases de données",
@@ -194,21 +269,20 @@
     "databasesTitle": "Bases de données",
     "loadingDatabases": "Chargement des bases de données…",
     "noDatabases": "Aucune base de données trouvée. Ajoutez une base de données pour commencer.",
+    "dataLibraryTitle": "Dataset",
+    "loadingDatasets": "Chargement des datasets…",
+    "noDatasets": "Aucun dataset pour l’instant. Créez-en un pour limiter la base de données à un groupe de patients.",
     "errXlsxOnly": "Seuls les fichiers .xlsx et .xlsm sont pris en charge.",
     "errDbOnly": "Seuls les fichiers .sqlite, .sqlite3 et .db sont pris en charge.",
-    "cloned": "« {name} » cloné dans les audits locaux.",
+    "cloned": "« {name} » cloné dans les modèles locaux.",
     "renameDbPrompt": "Renommer la base de données",
-    "removeDbConfirm": "Retirer « {name} » du catalogue ? Le fichier SQLite sur le disque ne sera pas supprimé.",
-    "addTemplateTitle": "Ajouter un modèle d'audit",
-    "addTemplateHint": "Déposez un fichier Excel (.xlsx) ou cliquez pour parcourir",
-    "addDatabaseTitle": "Ajouter une base de données",
-    "addDatabaseHint": "Déposez un fichier SQLite (.sqlite / .db) ou cliquez pour parcourir"
+    "removeDbConfirm": "Retirer « {name} » du catalogue ? Le fichier SQLite sur le disque ne sera pas supprimé."
   },
   "template": {
     "indexingHelp": "Lecture de votre tableur pour que l’agent en apprenne les colonnes et la structure.\nCela prend quelques secondes — vous pourrez l’ouvrir dès qu’il sera prêt.",
     "selectDatabase": "Sélectionner une base de données…",
     "noDatabases": "Aucune base de données indexée disponible",
-    "renamePrompt": "Renommer l’audit",
+    "renamePrompt": "Renommer le modèle",
     "deleteConfirm": "Supprimer « {name} » ? Cette action est irréversible.",
     "renameFailed": "Échec du renommage : {error}",
     "deleteFailed": "Échec de la suppression : {error}",
@@ -226,20 +300,19 @@
       "dateTo": "ex. 2024-12-31",
       "hospitals": "ex. Royal Infirmary, Western General",
       "cohort": "ex. pédiatrique"
-    },
-    "auditOptions": "Options de l'audit"
+    }
   },
-  "audit": {
+  "templateDetail": {
     "back": "‹ Modèles",
-    "loadingDetail": "Chargement des détails de l’audit…",
+    "loadingDetail": "Chargement des détails du modèle…",
     "inclusionCriteria": "Critères d’inclusion",
-    "noCriteriaYet": "Aucun critère d’inclusion pour l’instant — associez une base de données à cet audit pour définir sa cohorte.",
+    "noCriteriaYet": "Aucun critère d’inclusion pour l’instant — associez une base de données à ce modèle pour définir sa cohorte.",
     "noFixedCriteria": "Aucun critère d’inclusion fixe — chaque dossier patient est dans le périmètre.",
     "removeCriterion": "Supprimer {label}",
     "databases": "Bases de données",
-    "noDatabasePaired": "Aucune base de données n’est encore associée à cet audit.",
+    "noDatabasePaired": "Aucune base de données n’est encore associée à ce modèle.",
     "template": "Modèle",
-    "pairDatabaseHint": "Associez une base de données à cet audit pour voir comment chaque champ est rempli.",
+    "pairDatabaseHint": "Associez une base de données à ce modèle pour voir comment chaque champ est rempli.",
     "metrics": "Metrics tracked"
   },
   "spec": {
@@ -302,12 +375,22 @@
     "initialRun": "Exécution initiale",
     "refreshN": "Actualisation {n}"
   },
-  "tracker": {
-    "noData": "Aucune donnée",
-    "unsupportedChart": "Graphique non pris en charge",
-    "noTrackers": "Aucun indicateur pour ce tableau de bord.",
-    "submissionDeadline": "Date limite de soumission : {date}",
-    "target": "Cible {value}",
-    "donutChart": "Graphique en anneau"
+  "sharing": {
+    "share": "Partager",
+    "shareTitle": "Partager « {title} »",
+    "colleagueLabel": "Partager avec",
+    "colleaguePlaceholder": "Ajouter un collègue…",
+    "noColleagues": "Aucun collègue avec qui partager.",
+    "noColleagueMatches": "Aucun collègue correspondant.",
+    "editHint": "Les personnes ajoutées peuvent modifier ce {type}.",
+    "messageLabel": "Message",
+    "messagePlaceholder": "Ajouter une courte note…",
+    "diabetesBptMessage": "Bonjour Aanya. Sept patients nécessitent une action avant la soumission de remboursement : cinq ont besoin d'une preuve d'intervention HbA1c et deux n'ont pas de preuve d'ACR urinaire. Voici le tableau des preuves sourcées. Peux-tu revoir les preuves et fermer les écarts ?",
+    "done": "Terminé",
+    "revoke": "Retirer l'accès de {name}",
+    "loadingGrantees": "Chargement…",
+    "typeNounDataset": "dataset",
+    "typeNounTemplate": "modèle",
+    "typeNounTable": "tableau"
   }
 }

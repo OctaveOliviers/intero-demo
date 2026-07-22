@@ -28,8 +28,8 @@ function countValue(summary, key) {
   return 0;
 }
 
-export function shouldShowRefreshAction(runStatus, refreshInFlight) {
-  return runStatus !== "running" && !refreshInFlight;
+export function shouldShowRefreshAction(tablePopulationStatus, refreshInFlight) {
+  return tablePopulationStatus !== "running" && !refreshInFlight;
 }
 
 export function groupActivityByExecution(events) {

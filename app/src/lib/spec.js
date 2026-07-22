@@ -130,20 +130,6 @@ const SPEC_VALUES = CONTENT.specValues || {
   },
 };
 
-// Derive the created audit's name from the chosen template's name: drop the
-// trailing scope qualifier — "(local)" / "(regional)" / "(national)" IN THE
-// ACTIVE LANGUAGE — then apply the locale's audit-name format. Both the words
-// and the format live in the content pack, so a translated template name no
-// longer yields a half-English name like "Nabelschnur-pH audit".
-function auditNameFromTemplate(templateName) {
-  const scope = CONTENT.labels?.scopeQualifiers || ["local", "regional", "national"];
-  const stripped = String(templateName || "")
-    .replace(new RegExp(`\\s*\\((?:${scope.join("|")})\\)\\s*$`, "i"), "")
-    .trim();
-  const format = CONTENT.labels?.auditNameFormat;
-  return format ? format(stripped) : `${stripped} audit`;
-}
-
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -286,7 +272,7 @@ export async function parseRequest(text, { templates = null } = {}) {
   const t = (text || "").toLowerCase();
   const cohort = [];
   const templatePool = Array.isArray(templates) && templates.length ? templates : allTemplatesFlat();
-  const realMode = !isMockMode("audits");
+  const realMode = !isMockMode("templates");
 
   // Condition + the template/specialty it implies.
   let templateId = "cord-ph-lo-audit";
@@ -330,8 +316,8 @@ export async function parseRequest(text, { templates = null } = {}) {
   }
 
   // Resolve the output template against the active catalog source. In real
-  // mode the Home flow points this catalog at backend audits, so `templateId`
-  // becomes a backend audit id (never a frontend-only static id).
+  // mode the Home flow points this catalog at backend templates, so `templateId`
+  // becomes a backend template id (never a frontend-only static id).
   const findByName = (fn) => templatePool.find((x) => fn((x.name || "").toLowerCase()));
   let chosen = getTemplateById(templateId);
   if (!chosen) {
@@ -353,7 +339,7 @@ export async function parseRequest(text, { templates = null } = {}) {
   }
   if (chosen) {
     templateId = chosen.id;
-    summary = auditNameFromTemplate(chosen.name);
+    summary = `${chosen.name.replace(/\s*\((?:local|regional|national)\)\s*$/i, "").trim()} audit`;
   }
 
   // The cord branch gets a richer, prefilled chip set (the typical filters a
