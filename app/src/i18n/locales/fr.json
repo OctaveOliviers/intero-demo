@@ -294,5 +294,11 @@
     "updatedCells": "Cellules mises à jour",
     "initialRun": "Exécution initiale",
     "refreshN": "Actualisation {n}"
+  },
+  "tracker": {
+    "noData": "Aucune donnée",
+    "unsupportedChart": "Graphique non pris en charge",
+    "noTrackers": "Aucun indicateur pour ce tableau de bord.",
+    "submissionDeadline": "Date limite de soumission : {date}"
   }
 }

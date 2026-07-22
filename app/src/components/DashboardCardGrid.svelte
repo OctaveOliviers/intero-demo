@@ -6,6 +6,7 @@
   // Presentational: clicking a card emits `select` with { auditId } — the matching
   // audit's REAL id; the consumer (HomeScreen) calls selectAudit(auditId).
   import { createEventDispatcher } from "svelte";
+  import { _ } from "svelte-i18n";
   import { audits } from "../stores/audits.js";
   import { CONTENT } from "../lib/mock/content/index.js";
   import { dashboardDeadlineValue } from "../lib/dashboardDeadline.js";
@@ -35,7 +36,7 @@
       <span class="logo"><Icon name={d.logo} size={30} /></span>
       <span class="title">{d.title}</span>
       {#if deadline}
-        <span class="deadline">Submission deadline: {deadline}</span>
+        <span class="deadline">{$_("tracker.submissionDeadline", { values: { date: deadline } })}</span>
       {/if}
     </button>
   {/each}

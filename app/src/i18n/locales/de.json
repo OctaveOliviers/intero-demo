@@ -294,5 +294,11 @@
     "updatedCells": "Aktualisierte Zellen",
     "initialRun": "Erster Lauf",
     "refreshN": "Aktualisierung {n}"
+  },
+  "tracker": {
+    "noData": "Keine Daten",
+    "unsupportedChart": "Nicht unterstütztes Diagramm",
+    "noTrackers": "Keine Kennzahlen für dieses Dashboard.",
+    "submissionDeadline": "Einreichungsfrist: {date}"
   }
 }

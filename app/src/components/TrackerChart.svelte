@@ -8,6 +8,7 @@
   // detail `{ key }`. There are no filters, sliders, toggles, dropdowns, date
   // pickers, or text inputs anywhere in this component.
   import { createEventDispatcher } from "svelte";
+  import { _ } from "svelte-i18n";
 
   // --- Props (fixed by spec §7.2) -------------------------------------------
   // kind: "donut" | "timeseries" | "histogram" | "stat"
@@ -197,7 +198,7 @@
 </script>
 
 {#if !hasData}
-  <div class="empty">No data</div>
+  <div class="empty">{$_("tracker.noData")}</div>
 {:else if kind === "donut"}
   <div class="chart donut-chart">
     <svg
@@ -424,7 +425,7 @@
     {/if}
   </button>
 {:else}
-  <div class="empty">Unsupported chart</div>
+  <div class="empty">{$_("tracker.unsupportedChart")}</div>
 {/if}
 
 <style>

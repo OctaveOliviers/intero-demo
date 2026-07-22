@@ -12,6 +12,7 @@
   // event with detail `{ trackerId, elementKey }` — the §3.1 selection model
   // that ResultsView uses to enter split view.
   import { createEventDispatcher } from "svelte";
+  import { _ } from "svelte-i18n";
   import { audits, currentAuditId } from "../stores/audits.js";
   import { CONTENT } from "../lib/mock/content/index.js";
   import TrackerChart from "./TrackerChart.svelte";
@@ -41,7 +42,7 @@
 </script>
 
 {#if trackers.length === 0}
-  <div class="empty">No trackers for this dashboard.</div>
+  <div class="empty">{$_("tracker.noTrackers")}</div>
 {:else}
   <div class="tracker-grid">
     {#each trackers as t (t.id)}

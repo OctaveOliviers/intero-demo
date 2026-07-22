@@ -294,5 +294,11 @@
     "updatedCells": "Updated cells",
     "initialRun": "Initial run",
     "refreshN": "Refresh {n}"
+  },
+  "tracker": {
+    "noData": "No data",
+    "unsupportedChart": "Unsupported chart",
+    "noTrackers": "No trackers for this dashboard.",
+    "submissionDeadline": "Submission deadline: {date}"
   }
 }

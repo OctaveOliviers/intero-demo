@@ -845,6 +845,11 @@ const EPILEPSY_NHS = {
 const EPI_SEX = CONTENT.codeMaps.sex;                 // sex assigned at birth
 const EPI_SEIZURE_TYPE = CONTENT.codeMaps.seizureType; // convulsive vs not
 
+// Displayed Yes/No cell text for the epilepsy/trauma sheets. Record values stay
+// the English lookup keys the logic compares against ("Yes"/"No"); the visible
+// cell maps through CONTENT.labels so translated packs show their own words.
+const yn = (v) => (v === "Yes" ? CONTENT.labels.yes : v === "No" ? CONTENT.labels.no : v);
+
 // Whole-days between two ISO dates (b − a). Used for the KPI time-windows shown
 // in the explanations (referral→assessment, MRI request→performed).
 function daysBetween(aIso, bIso) {
@@ -932,7 +937,7 @@ function makeEpilepsyCell(colKey, { r, ref, db }) {
     // --- B1: epilepsy-expert paediatrician within 2 weeks of referral --------
     case "referralDate": return epilepsyDate({ code: r.code, ref, db, table: "epilepsy_assessments", column: "Referral_date", iso: r.referralDate, explanation: X.epiReferralDate(r.code) });
     case "firstAssessmentDate": return epilepsyDate({ code: r.code, ref, db, table: "epilepsy_assessments", column: "First_assessment_date", iso: r.firstAssessmentDate, explanation: X.epiFirstAssessmentDate(r.code, daysBetween(r.referralDate, r.firstAssessmentDate)) });
-    case "expertisePaediatrician": return epilepsyInterp({ r, ref, db, value: i.expertise.v, noteTypes: ["epilepsy_clinic"], evidence: i.expertise.e, explanation: X.epiExpertise(r.code, i.expertise.v === "Yes", i.expertise.v) });
+    case "expertisePaediatrician": return epilepsyInterp({ r, ref, db, value: yn(i.expertise.v), noteTypes: ["epilepsy_clinic"], evidence: i.expertise.e, explanation: X.epiExpertise(r.code, i.expertise.v === "Yes", i.expertise.v) });
 
     // --- B2: ESN input within first year -------------------------------------
     case "esnInputDate":
@@ -940,7 +945,7 @@ function makeEpilepsyCell(colKey, { r, ref, db }) {
       return epilepsyDate({ code: r.code, ref, db, table: "epilepsy_assessments", column: "ESN_input_date", iso: r.esnInputDate, explanation: X.epiEsnInputDate(r.code) });
 
     // --- B3: MRI within 6 weeks where indicated ------------------------------
-    case "mriIndicated": return epilepsyDirect({ code: r.code, ref, db, table: "epilepsy_assessments", column: "MRI_indicated", value: r.mriIndicated, explanation: X.epiMriIndicated(r.code, r.mriIndicated === "Yes") });
+    case "mriIndicated": return epilepsyDirect({ code: r.code, ref, db, table: "epilepsy_assessments", column: "MRI_indicated", value: yn(r.mriIndicated), explanation: X.epiMriIndicated(r.code, r.mriIndicated === "Yes") });
     case "mriRequestDate":
       if (r.mriIndicated !== "Yes" || !r.mriRequestDate) return epilepsyBlank({ code: r.code, ref, db, table: "radiology_requests", column: "MRI_request_date", explanation: X.epiMriRequestNA(r.code) });
       return epilepsyDate({ code: r.code, ref, db, table: "radiology_requests", column: "MRI_request_date", iso: r.mriRequestDate, explanation: X.epiMriRequestDate(r.code) });
@@ -963,10 +968,10 @@ function makeEpilepsyCell(colKey, { r, ref, db }) {
     case "mhScreeningDate":
       if (!r.mhScreeningDate) return epilepsyBlank({ code: r.code, ref, db, table: "epilepsy_assessments", column: "MH_screening_date", explanation: X.epiMhScreeningNotDone(r.code) });
       return epilepsyDate({ code: r.code, ref, db, table: "epilepsy_assessments", column: "MH_screening_date", iso: r.mhScreeningDate, explanation: X.epiMhScreeningDate(r.code) });
-    case "mhProblemIdentified": return epilepsyInterp({ r, ref, db, value: i.mhProblem.v, noteTypes: ["mh_screening"], evidence: i.mhProblem.e, explanation: X.epiMhProblem(r.code, i.mhProblem.v === "Yes", i.mhProblem.v) });
+    case "mhProblemIdentified": return epilepsyInterp({ r, ref, db, value: yn(i.mhProblem.v), noteTypes: ["mh_screening"], evidence: i.mhProblem.e, explanation: X.epiMhProblem(r.code, i.mhProblem.v === "Yes", i.mhProblem.v) });
     case "mhSupportProvided":
       if (i.mhProblem.v !== "Yes") return epilepsyBlank({ code: r.code, ref, db, table: "epilepsy_assessments", column: "MH_support_provided", explanation: X.epiMhSupportNA(r.code) });
-      return epilepsyInterp({ r, ref, db, value: i.mhSupport.v, noteTypes: ["mh_screening"], evidence: i.mhSupport.e, explanation: X.epiMhSupportProvided(r.code, i.mhSupport.v === "Yes", i.mhSupport.v) });
+      return epilepsyInterp({ r, ref, db, value: yn(i.mhSupport.v), noteTypes: ["mh_screening"], evidence: i.mhSupport.e, explanation: X.epiMhSupportProvided(r.code, i.mhSupport.v === "Yes", i.mhSupport.v) });
 
     // --- B6: comprehensive care plan by 12 months ----------------------------
     case "carePlanDate":
@@ -974,11 +979,11 @@ function makeEpilepsyCell(colKey, { r, ref, db }) {
       return epilepsyDate({ code: r.code, ref, db, table: "epilepsy_assessments", column: "Care_plan_date", iso: r.carePlanDate, explanation: X.epiCarePlanDate(r.code) });
 
     // --- B7: valproate/topiramate safety (PPP, females ≥12) ------------------
-    case "onValproate": return epilepsyDirect({ code: r.code, ref, db, table: "medications", column: "On_sodium_valproate", value: r.onValproate, explanation: X.epiOnValproate(r.code, r.onValproate === "Yes") });
-    case "onTopiramate": return epilepsyDirect({ code: r.code, ref, db, table: "medications", column: "On_topiramate", value: r.onTopiramate, explanation: X.epiOnTopiramate(r.code, r.onTopiramate === "Yes") });
+    case "onValproate": return epilepsyDirect({ code: r.code, ref, db, table: "medications", column: "On_sodium_valproate", value: yn(r.onValproate), explanation: X.epiOnValproate(r.code, r.onValproate === "Yes") });
+    case "onTopiramate": return epilepsyDirect({ code: r.code, ref, db, table: "medications", column: "On_topiramate", value: yn(r.onTopiramate), explanation: X.epiOnTopiramate(r.code, r.onTopiramate === "Yes") });
     case "pppInPlace":
       if (!pppEligible(r)) return epilepsyBlank({ code: r.code, ref, db, table: "epilepsy_assessments", column: "PPP_in_place", explanation: X.epiPppNA(r.code) });
-      return epilepsyDirect({ code: r.code, ref, db, table: "epilepsy_assessments", column: "PPP_in_place", value: r.pppInPlace === "Yes" ? "Yes" : "No", explanation: X.epiPppInPlace(r.code, r.pppInPlace === "Yes") });
+      return epilepsyDirect({ code: r.code, ref, db, table: "epilepsy_assessments", column: "PPP_in_place", value: yn(r.pppInPlace === "Yes" ? "Yes" : "No"), explanation: X.epiPppInPlace(r.code, r.pppInPlace === "Yes") });
 
     default:
       return { ref, value: "" }; // blank spacer columns (_s1.._s7)
@@ -1112,50 +1117,50 @@ function makeTraumaCell(colKey, { r, ref, db }) {
     }
     case "ageYears": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "Age_years", value: r.ageYears, explanation: X.traAgeYears(r.code, r.ageYears) });
     case "iss": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "Injury_severity_score", value: r.iss, explanation: X.traIss(r.code, r.iss, traumaLevel(r.iss)) });
-    case "ais3plus": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "AIS_3plus_injury", value: r.ais3plus, explanation: X.traAis3plus(r.code, r.ais3plus === "Yes") });
+    case "ais3plus": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "AIS_3plus_injury", value: yn(r.ais3plus), explanation: X.traAis3plus(r.code, r.ais3plus === "Yes") });
 
     // --- C1: registry submission within 25 days of discharge -----------------
     case "edArrivalDateTime": return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "ED_arrival_datetime", value: r.edArrivalDateTime, explanation: X.traEdArrival(r.code) });
     case "dischargeDate": return traumaDate({ code: r.code, ref, db, table: "trauma_registry", column: "Discharge_date", iso: r.dischargeDate, explanation: X.traDischargeDate(r.code) });
-    case "nmtrSubmitted": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "NMTR_submitted", value: r.nmtrSubmitted, explanation: X.traNmtrSubmitted(r.code, r.nmtrSubmitted === "Yes") });
-    case "datasetComplete": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "NMTR_dataset_complete", value: r.datasetComplete, explanation: X.traDatasetComplete(r.code, r.datasetComplete === "Yes") });
+    case "nmtrSubmitted": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "NMTR_submitted", value: yn(r.nmtrSubmitted), explanation: X.traNmtrSubmitted(r.code, r.nmtrSubmitted === "Yes") });
+    case "datasetComplete": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "NMTR_dataset_complete", value: yn(r.datasetComplete), explanation: X.traDatasetComplete(r.code, r.datasetComplete === "Yes") });
     case "submissionDate": return traumaDate({ code: r.code, ref, db, table: "trauma_registry", column: "NMTR_submission_date", iso: r.submissionDate, explanation: X.traSubmissionDate(r.code, daysBetween(r.dischargeDate, r.submissionDate)) });
 
     // --- C2: consultant-led trauma-team reception ≤5 min (Level 2) -----------
-    case "traumaTeamActivated": return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Trauma_team_activated", value: r.traumaTeamActivated, explanation: X.traTeamActivated(r.code, r.traumaTeamActivated === "Yes") });
-    case "consultantPresent": return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Consultant_present", value: r.consultantPresent, explanation: X.traConsultantPresent(r.code, r.consultantPresent === "Yes") });
+    case "traumaTeamActivated": return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Trauma_team_activated", value: yn(r.traumaTeamActivated), explanation: X.traTeamActivated(r.code, r.traumaTeamActivated === "Yes") });
+    case "consultantPresent": return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Consultant_present", value: yn(r.consultantPresent), explanation: X.traConsultantPresent(r.code, r.consultantPresent === "Yes") });
     case "consultantArrivalMin":
       if (!isLevel2(r)) return traumaBlank({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Consultant_arrival_min", explanation: X.traConsultantArrivalNA(r.code) });
       return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Consultant_arrival_min", value: r.consultantArrivalMin, explanation: X.traConsultantArrival(r.code, r.consultantArrivalMin) });
 
     // --- C3: CT head ≤60 min (GCS ≤13 head injury, Level 2) ------------------
     case "gcs": return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "GCS_at_arrival", value: r.gcs, explanation: X.traGcs(r.code, r.gcs) });
-    case "headInjury": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "Head_injury", value: r.headInjury, explanation: X.traHeadInjury(r.code, r.headInjury === "Yes") });
+    case "headInjury": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "Head_injury", value: yn(r.headInjury), explanation: X.traHeadInjury(r.code, r.headInjury === "Yes") });
     case "ctHeadMin":
       if (r.headInjury !== "Yes") return traumaBlank({ code: r.code, ref, db, table: "radiology_results", column: "CT_head_min", explanation: X.traCtHeadNAnoHead(r.code) });
       if (!ctHeadEligible(r)) return traumaBlank({ code: r.code, ref, db, table: "radiology_results", column: "CT_head_min", explanation: X.traCtHeadNAnotEligible(r.code) });
       return traumaDirect({ code: r.code, ref, db, table: "radiology_results", column: "CT_head_min", value: r.ctHeadMin, explanation: X.traCtHead(r.code, r.ctHeadMin) });
 
     // --- C4: tranexamic acid ≤1 h (Level 2) ---------------------------------
-    case "txaIndicated": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "TXA_indicated", value: r.txaIndicated, explanation: X.traTxaIndicated(r.code, r.txaIndicated === "Yes") });
+    case "txaIndicated": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "TXA_indicated", value: yn(r.txaIndicated), explanation: X.traTxaIndicated(r.code, r.txaIndicated === "Yes") });
     case "txaGiven":
       if (r.txaIndicated !== "Yes") return traumaBlank({ code: r.code, ref, db, table: "medications", column: "TXA_given", explanation: X.traTxaNAnotIndicated(r.code) });
-      return traumaDirect({ code: r.code, ref, db, table: "medications", column: "TXA_given", value: r.txaGiven, explanation: X.traTxaGiven(r.code, r.txaGiven === "Yes") });
+      return traumaDirect({ code: r.code, ref, db, table: "medications", column: "TXA_given", value: yn(r.txaGiven), explanation: X.traTxaGiven(r.code, r.txaGiven === "Yes") });
     case "txaMin":
       if (r.txaIndicated !== "Yes" || r.txaMin == null) return traumaBlank({ code: r.code, ref, db, table: "medications", column: "TXA_given_min", explanation: X.traTxaNAnotIndicated(r.code) });
       return traumaDirect({ code: r.code, ref, db, table: "medications", column: "TXA_given_min", value: r.txaMin, explanation: X.traTxaMin(r.code, r.txaMin) });
 
     // --- C5: airway considered ≤30 min (GCS <9, Level 1) --------------------
-    case "intubationConsidered": return traumaInterp({ r, ref, db, value: i.intubationConsidered.v, noteTypes: ["resus"], evidence: i.intubationConsidered.e, explanation: X.traIntubationConsidered(r.code, i.intubationConsidered.v === "Yes", i.intubationConsidered.v) });
+    case "intubationConsidered": return traumaInterp({ r, ref, db, value: yn(i.intubationConsidered.v), noteTypes: ["resus"], evidence: i.intubationConsidered.e, explanation: X.traIntubationConsidered(r.code, i.intubationConsidered.v === "Yes", i.intubationConsidered.v) });
     case "airwayConsideredMin":
       if (!airwayEligible(r)) return traumaBlank({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Airway_considered_min", explanation: X.traAirwayNA(r.code) });
       return traumaDirect({ code: r.code, ref, db, table: "ed_trauma_receptions", column: "Airway_considered_min", value: r.airwayConsideredMin, explanation: X.traAirwayMin(r.code, r.airwayConsideredMin) });
 
     // --- C6: rehabilitation prescription (ISS ≥9, Level 1) ------------------
-    case "rehabNeedsAssessed": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "Rehab_needs_assessed", value: r.rehabNeedsAssessed, explanation: X.traRehabNeedsAssessed(r.code, r.rehabNeedsAssessed === "Yes") });
+    case "rehabNeedsAssessed": return traumaDirect({ code: r.code, ref, db, table: "trauma_registry", column: "Rehab_needs_assessed", value: yn(r.rehabNeedsAssessed), explanation: X.traRehabNeedsAssessed(r.code, r.rehabNeedsAssessed === "Yes") });
     case "rehabPrescriptionIssued":
       if (!rehabApplies(r)) return traumaBlank({ code: r.code, ref, db, table: "trauma_registry", column: "Rehab_prescription_issued", explanation: X.traRehabNA(r.code) });
-      return traumaInterp({ r, ref, db, value: i.rehabPrescription.v, noteTypes: ["rehab"], evidence: i.rehabPrescription.e, explanation: X.traRehabPrescription(r.code, i.rehabPrescription.v === "Yes", i.rehabPrescription.v) });
+      return traumaInterp({ r, ref, db, value: yn(i.rehabPrescription.v), noteTypes: ["rehab"], evidence: i.rehabPrescription.e, explanation: X.traRehabPrescription(r.code, i.rehabPrescription.v === "Yes", i.rehabPrescription.v) });
 
     default:
       return { ref, value: "" }; // blank spacer columns (_s1.._s6)

@@ -294,5 +294,11 @@
     "updatedCells": "Bijgewerkte cellen",
     "initialRun": "Eerste uitvoering",
     "refreshN": "Vernieuwing {n}"
+  },
+  "tracker": {
+    "noData": "Geen gegevens",
+    "unsupportedChart": "Niet-ondersteunde grafiek",
+    "noTrackers": "Geen indicatoren voor dit dashboard.",
+    "submissionDeadline": "Inzendtermijn: {date}"
   }
 }

@@ -710,7 +710,7 @@ const cord = {
       prom: { v: "No", e: ["no prolonged rupture of membranes"] },
       rffs: { v: "No", e: ["No risk factors for sepsis"] },
       sentinel: { v: "None", e: ["no sentinel event"] },
-      dcc: { v: "Yes", e: ["delayed cord clamping for around 60 seconds", "cord left to pulsate for about a minute before clamping"] },
+      dcc: { v: "Yes", e: ["delayed cord clamping for around 60 seconds", "Cord left to pulsate for about a minute before clamping"] },
       intub: { v: "No", e: ["The baby was not intubated"] },
       compress: { v: "No", e: ["no cardiac compressions were required"] },
       drugs: { v: "None", e: ["no resuscitation drugs were given"] },
