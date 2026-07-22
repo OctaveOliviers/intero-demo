@@ -2150,9 +2150,9 @@ const blockedReason = {
   cordAgeDischargeHome:
     "CPH009 werd op dag 7 overgeplaatst naar het regionale koel- en neurologiecentrum en werd nooit vanaf deze afdeling naar huis ontslagen, daarom is er geen leeftijd bij ontslag naar huis geregistreerd (cord_ph_birth_records en de overplaatsingsbrief doorzocht).",
   epilepsyMriPerformed:
-    "EPI007's MRI brain was requested but performed at the transferring unit, and the report has not yet been returned to the EHR, so no MRI performed date is recorded (searched radiology_results and the transfer summary).",
+    "De MRI-schedel van EPI007 is aangevraagd maar verricht in het verwijzende ziekenhuis, en het verslag is nog niet teruggekomen in het EPD, daarom is er geen uitvoeringsdatum van de MRI geregistreerd (radiology_results en de overplaatsingsbrief doorzocht).",
   traumaConsultantArrival:
-    "TRA009 was a resuscitation-bay transfer and the consultant-arrival timestamp was not captured in the structured ED record; the trauma documentation is being retrieved, so the time from arrival cannot yet be confirmed (searched ed_trauma_receptions and the resuscitation note).",
+    "TRA009 betrof een overplaatsing naar de reanimatiekamer en het tijdstip van aankomst van de medisch specialist is niet vastgelegd in het gestructureerde SEH-dossier; de traumadocumentatie wordt opgevraagd, daarom kan de tijd vanaf aankomst nog niet worden bevestigd (ed_trauma_receptions en de reanimatienotitie doorzocht).",
 };
 
 // --- Timeline strings (headlines, details, think snippets, tool headlines) ---
@@ -2167,9 +2167,9 @@ const timeline = {
     inspectedSchema: "Het EPD-schema geïnspecteerd",
     troponinResults: "De troponine-uitslagen gelezen",
     cardiometabolicScreen: "De cardiometabole screening gelezen",
-    epilepsyInvestigations: "Read the MRI and ECG records",
-    traumaReception: "Read the trauma reception times",
-    traumaInterventions: "Read the CT, TXA and airway records",
+    epilepsyInvestigations: "De MRI- en ECG-gegevens gelezen",
+    traumaReception: "De opvangtijden bij trauma gelezen",
+    traumaInterventions: "De CT-, TXA- en luchtweggegevens gelezen",
   },
   // Cord-pH population (timelineA -> cordPhPopulation).
   cord: {
@@ -2215,25 +2215,25 @@ const timeline = {
   },
   // Epilepsy12 population (timelineE -> epilepsyPopulation).
   epilepsy: {
-    mapTemplate: { headline: "Mapping the template to the EHR schema…", detail: "Resolving each Epilepsy12 column to a field in the **EHR database** before copying across the structured demographics and the first-assessment details." },
-    demographics: { headline: "Copying the demographics and referral fields…", detail: "Pulling date of birth, sex, age at first assessment, the referral date and the first paediatric assessment date straight from `patient_demographics` and `epilepsy_assessments`." },
-    clinicLetters: { headline: "Reading the epilepsy clinic letters…", detail: "Reading each child's first epilepsy clinic letter for whether the assessing paediatrician had epilepsy expertise (KPI 1) and the seizure type that drives the ECG KPI." },
-    specialistInput: { headline: "Copying the specialist-nurse and care-plan fields…", detail: "Pulling the epilepsy specialist nurse input date (KPI 2) and the comprehensive care plan date (KPI 9). Where input or a plan is not yet recorded the field carries an explicit label rather than a blank." },
-    investigations: { headline: "Copying the MRI and ECG fields…", detail: "Pulling whether an MRI was indicated and its request/performed dates (KPI 5) and the ECG date for convulsive seizures (KPI 4). Cases where an investigation is not indicated, not yet done or unobtainable carry an explicit label." },
-    mentalHealth: { headline: "Checking mental-health screening and support…", detail: "Pulling the mental-health screening date (KPI 6), then reading the screening note for whether a problem was identified and, where it was, whether support was provided (KPI 7)." },
-    medicationSafety: { headline: "Checking valproate/topiramate safety…", detail: "Pulling the valproate and topiramate prescribing flags and, for females aged 12 or over on either drug, whether a pregnancy prevention programme is in place (KPI 8, safety-critical)." },
-    finalizing: { headline: "Finalizing the audit…", detail: "All cells populated and traceable to the EHR record or the source notes." },
+    mapTemplate: { headline: "De template koppelen aan het EPD-schema…", detail: "Elke Epilepsy12-kolom koppelen aan een veld in de **EPD-database** voordat de gestructureerde demografie en de gegevens van de eerste beoordeling worden overgenomen." },
+    demographics: { headline: "De demografie- en verwijsvelden overnemen…", detail: "Geboortedatum, geslacht, leeftijd bij de eerste beoordeling, de verwijsdatum en de datum van de eerste pediatrische beoordeling rechtstreeks ophalen uit `patient_demographics` en `epilepsy_assessments`." },
+    clinicLetters: { headline: "De poliklinische brieven epilepsie lezen…", detail: "Van elk kind de eerste poliklinische brief epilepsie lezen om vast te stellen of de beoordelend kinderarts epilepsie-expertise had (KPI 1) en welk aanvalstype bepalend is voor de ECG-KPI." },
+    specialistInput: { headline: "De velden voor gespecialiseerd verpleegkundige en zorgplan overnemen…", detail: "De datum van inbreng door de epilepsieverpleegkundige (KPI 2) en de datum van het integrale zorgplan (KPI 9) ophalen. Waar inbreng of een plan nog niet is vastgelegd, krijgt het veld een expliciet label in plaats van een lege waarde." },
+    investigations: { headline: "De MRI- en ECG-velden overnemen…", detail: "Ophalen of een MRI geïndiceerd was en de aanvraag-/uitvoeringsdata daarvan (KPI 5), plus de ECG-datum bij convulsieve aanvallen (KPI 4). Casussen waarbij een onderzoek niet geïndiceerd, nog niet verricht of niet verkrijgbaar is, krijgen een expliciet label." },
+    mentalHealth: { headline: "Screening en ondersteuning psychische gezondheid controleren…", detail: "De datum van de screening psychische gezondheid ophalen (KPI 6) en vervolgens de screeningsnotitie lezen om vast te stellen of een probleem is vastgesteld en, zo ja, of ondersteuning is geboden (KPI 7)." },
+    medicationSafety: { headline: "Veiligheid van valproaat/topiramaat controleren…", detail: "De voorschrijfindicatoren voor valproaat en topiramaat ophalen en, voor vrouwelijke patiënten van 12 jaar of ouder die een van beide gebruiken, of er een zwangerschapspreventieprogramma van kracht is (KPI 8, veiligheidskritisch)." },
+    finalizing: { headline: "De audit afronden…", detail: "Alle cellen zijn gevuld en herleidbaar tot het EPD-dossier of de brondocumentatie." },
   },
   // Major trauma population (timelineT -> traumaPopulation).
   trauma: {
-    mapTemplate: { headline: "Mapping the template to the EHR schema…", detail: "Resolving each NMTR column to a field in the **EHR database** before copying across the structured demographics and the injury-severity details." },
-    demographics: { headline: "Copying the demographics and injury fields…", detail: "Pulling date of birth, sex, age, the Injury Severity Score and the AIS 3+ eligibility flag straight from `patient_demographics` and the trauma registry record." },
-    registrySubmission: { headline: "Copying the registry submission fields…", detail: "Pulling the ED arrival time, discharge date and the NMTR submitted/complete flags with the submission date to check the 25-day BPT window (C1)." },
-    reception: { headline: "Copying the trauma-reception fields…", detail: "Pulling whether a trauma team was activated, whether a consultant was present and the consultant arrival time (C2, Level 2). One reception time could not be located and is flagged." },
-    investigations: { headline: "Copying the CT, TXA and airway fields…", detail: "Pulling the GCS and head-injury flag with the CT-head time (C3), the TXA indication and timing (C4) and the airway-considered time for low-GCS cases (C5). Cases where an intervention is not indicated or not eligible carry an explicit label." },
-    resusNotes: { headline: "Reading the resuscitation notes…", detail: "Reading each case's resuscitation note for whether airway management/intubation was considered as part of the primary survey (C5)." },
-    rehabilitation: { headline: "Checking the rehabilitation prescriptions…", detail: "Pulling whether rehabilitation needs were assessed, then reading the rehab/discharge note for whether a rehabilitation prescription was issued (C6, ISS ≥9)." },
-    finalizing: { headline: "Finalizing the audit…", detail: "All cells populated and traceable to the EHR record or the source notes." },
+    mapTemplate: { headline: "De template koppelen aan het EPD-schema…", detail: "Elke NMTR-kolom koppelen aan een veld in de **EPD-database** voordat de gestructureerde demografie en de gegevens over de letselernst worden overgenomen." },
+    demographics: { headline: "De demografie- en letselvelden overnemen…", detail: "Geboortedatum, geslacht, leeftijd, de Injury Severity Score en de AIS 3+-inclusie-indicator rechtstreeks ophalen uit `patient_demographics` en het traumaregisterdossier." },
+    registrySubmission: { headline: "De velden voor registeraanlevering overnemen…", detail: "De aankomsttijd op de SEH, de ontslagdatum en de NMTR-indicatoren voor aangeleverd/volledig ophalen, samen met de aanleverdatum, om het BPT-venster van 25 dagen te toetsen (C1)." },
+    reception: { headline: "De velden voor traumaopvang overnemen…", detail: "Ophalen of een traumateam is gealarmeerd, of een medisch specialist aanwezig was en het tijdstip van aankomst van de specialist (C2, niveau 2). Eén opvangtijd kon niet worden achterhaald en is gemarkeerd." },
+    investigations: { headline: "De CT-, TXA- en luchtwegvelden overnemen…", detail: "De GCS en de indicator voor schedelhersenletsel ophalen samen met de tijd tot CT-schedel (C3), de TXA-indicatie en -timing (C4) en het tijdstip waarop luchtwegmanagement is overwogen bij casussen met een lage GCS (C5). Casussen waarbij een interventie niet geïndiceerd of niet van toepassing is, krijgen een expliciet label." },
+    resusNotes: { headline: "De reanimatienotities lezen…", detail: "Van elke casus de reanimatienotitie lezen om vast te stellen of luchtwegmanagement/intubatie is overwogen als onderdeel van de primaire opvang (C5)." },
+    rehabilitation: { headline: "De revalidatievoorschriften controleren…", detail: "Ophalen of de revalidatiebehoefte is beoordeeld en vervolgens de revalidatie-/ontslagnotitie lezen om vast te stellen of een revalidatievoorschrift is afgegeven (C6, ISS ≥9)." },
+    finalizing: { headline: "De audit afronden…", detail: "Alle cellen zijn gevuld en herleidbaar tot het EPD-dossier of de brondocumentatie." },
   },
   // Flow openers (timelineA / timelineB / timelineC).
   flowA: {
@@ -2248,10 +2248,10 @@ const timeline = {
     reviewingTemplate: { headline: "De template beoordelen…", detail: "De audit **Kinderdiabetes (NPDA)** beoordelen tegen de **EPD-database** en de veldkoppelingen oplossen." },
   },
   flowE: {
-    reviewingTemplate: { headline: "Reviewing the template…", detail: "Reviewing the **Paediatric epilepsy (Epilepsy12)** audit against the **EHR database** and resolving the field mappings." },
+    reviewingTemplate: { headline: "De template beoordelen…", detail: "De audit **Kinderepilepsie (Epilepsy12)** beoordelen tegen de **EPD-database** en de veldkoppelingen oplossen." },
   },
   flowT: {
-    reviewingTemplate: { headline: "Reviewing the template…", detail: "Reviewing the **Paediatric major trauma (NMTR)** audit against the **EHR database** and resolving the field mappings." },
+    reviewingTemplate: { headline: "De template beoordelen…", detail: "De audit **Ernstig trauma bij kinderen (NMTR)** beoordelen tegen de **EPD-database** en de veldkoppelingen oplossen." },
   },
   // Folded activity-line label for thinking steps.
   thinkingLabel: "Denken",
@@ -2278,36 +2278,36 @@ const dashboards = [
   {
     id: "paediatric-diabetes-bpt",
     auditId: "npda-lo-audit",
-    title: "Diabetes BPT",
+    title: "Diabetes-BPT",
     logo: "dash-diabetes",
-    subtitle: "NPDA · key care processes",
+    subtitle: "NPDA · kernzorgprocessen",
     submissionDeadline: "2026-07-20",
     trackers: ["t-dia-hba1c-coverage", "t-dia-care-processes", "t-dia-mdt-contacts", "t-dia-psychology", "t-dia-dietitian", "t-dia-carb-counting", "t-dia-high-hba1c", "t-dia-coeliac-thyroid"],
   },
   {
     id: "paediatric-epilepsy-bpt",
     auditId: "epilepsy12-lo-audit",
-    title: "Epilepsy BPT",
+    title: "Epilepsie-BPT",
     logo: "dash-epilepsy",
-    subtitle: "Epilepsy12 · service KPIs",
+    subtitle: "Epilepsy12 · KPI's van de dienst",
     submissionDeadline: "2027-01-12",
     trackers: ["t-epi-paediatrician-2wk", "t-epi-esn-first-year", "t-epi-mri-6wk", "t-epi-ecg-convulsive", "t-epi-mh-screening", "t-epi-care-plan-12mo", "t-epi-valproate-ppp"],
   },
   {
     id: "paediatric-trauma-bpt",
     auditId: "nmtr-trauma-lo-audit",
-    title: "Major Trauma BPT",
+    title: "BPT ernstig trauma",
     logo: "dash-trauma",
-    subtitle: "NMTR · acute care standards",
-    submissionDeadline: "Submit ≤25 days of discharge",
+    subtitle: "NMTR · normen voor acute zorg",
+    submissionDeadline: "Indienen ≤25 dagen na ontslag",
     trackers: ["t-tra-registry-25d", "t-tra-consultant-5min", "t-tra-ct-head-60min", "t-tra-txa-1h", "t-tra-airway-30min", "t-tra-rehab-prescription"],
   },
   {
     id: "cord-ph-bpt",
     auditId: "cord-ph-lo-audit",
-    title: "Cord pH Audit",
+    title: "Audit navelstreng-pH",
     logo: "dash-cordph",
-    subtitle: "Cord blood gas · quality at birth",
+    subtitle: "Navelstrengbloedgas · kwaliteit bij de geboorte",
     submissionDeadline: "2026-06-12",
     trackers: ["t-cord-paired-gases", "t-cord-ph-acidosis", "t-cord-severe-acidosis", "t-cord-base-excess", "t-cord-nicu-admission", "t-cord-dcc", "t-cord-acidosis-trend"],
   },
