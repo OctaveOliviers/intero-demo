@@ -2647,7 +2647,7 @@ const trackers = {
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "pH ≥7.1", value: 6 / 8, status: "met", highlightRefs: ["ALL!Z2", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9"] },
+      { key: "met", label: "pH ≥7.1 (niet-acidotisch)", value: 6 / 8, status: "met", highlightRefs: ["ALL!Z2", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9"] },
       { key: "not-met", label: "pH <7.1 (acidotisch)", value: 2 / 8, status: "not-met", highlightRefs: ["ALL!Z3", "ALL!Z10"] },
     ],
     criterion: "Audit navelstrengbloedgas — arteriële navelstreng-pH ≥7.1 bij de geboorte (niet-acidotisch), noemer = baby's met een geldige pH (onderzoek §7.1 D2)",
