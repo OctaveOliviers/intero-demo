@@ -1563,12 +1563,12 @@ const trauma = {
     airwayConsideredMin: 18,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "Yes", e: ["airway was secured by rapid sequence intubation within 18 minutes of arrival"] },
-      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was completed and shared with the family, GP and community team"] },
+      intubationConsidered: { v: "Yes", e: ["der Atemweg wurde innerhalb von 18 Minuten nach Ankunft mittels Rapid-Sequence-Intubation gesichert"] },
+      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde erstellt und der Familie, dem Hausarzt und dem gemeindenahen Versorgungsteam übermittelt"] },
     },
     notes: [
-      { role: "Trauma team — Dr Olusola Bello", date: "2026-01-08", type: "resus", text: "Consultant-led trauma team received this child after a high-speed road traffic collision. GCS 6 on arrival; the airway was secured by rapid sequence intubation within 18 minutes of arrival. Tranexamic acid given for major haemorrhage." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-01-24", type: "rehab", text: "Rehabilitation needs were assessed by the trauma rehabilitation coordinator; a rehabilitation prescription was completed and shared with the family, GP and community team, with core components recorded on the NMTR." },
+      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-01-08", type: "resus", text: "Das oberarztgeleitete Trauma-Team nahm dieses Kind nach einem Verkehrsunfall mit hoher Geschwindigkeit auf. GCS 6 bei Ankunft; der Atemweg wurde innerhalb von 18 Minuten nach Ankunft mittels Rapid-Sequence-Intubation gesichert. Tranexamsäure wurde bei massiver Blutung verabreicht." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-01-24", type: "rehab", text: "Der Rehabilitationsbedarf wurde durch den Rehabilitationskoordinator der Traumaversorgung beurteilt; eine Rehabilitationsverordnung wurde erstellt und der Familie, dem Hausarzt und dem gemeindenahen Versorgungsteam übermittelt, wobei die Kernkomponenten im NMTR dokumentiert wurden." },
     ],
   },
 
@@ -1583,12 +1583,12 @@ const trauma = {
     airwayConsideredMin: null,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "No", e: ["the airway was patent and self-maintained throughout, so intubation was not required"] },
-      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was issued and copied to the GP and ongoing-care provider"] },
+      intubationConsidered: { v: "No", e: ["der Atemweg war durchgängig und wurde durchgehend eigenständig aufrechterhalten, sodass keine Intubation erforderlich war"] },
+      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde ausgestellt und dem Hausarzt sowie dem weiterbehandelnden Leistungserbringer in Kopie übermittelt"] },
     },
     notes: [
-      { role: "Trauma team — Dr Olusola Bello", date: "2026-01-15", type: "resus", text: "Fall from height. GCS 10 on arrival; the airway was patent and self-maintained throughout, so intubation was not required. No indication for tranexamic acid. Consultant attended the bay nine minutes after arrival owing to a concurrent resuscitation." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-01-31", type: "rehab", text: "Rehabilitation needs assessed; a rehabilitation prescription was issued and copied to the GP and ongoing-care provider, with core components on the NMTR." },
+      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-01-15", type: "resus", text: "Sturz aus großer Höhe. GCS 10 bei Ankunft; der Atemweg war durchgängig und wurde durchgehend eigenständig aufrechterhalten, sodass keine Intubation erforderlich war. Keine Indikation für Tranexamsäure. Der Oberarzt traf wegen einer parallel laufenden Reanimation neun Minuten nach Ankunft im Schockraum ein." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-01-31", type: "rehab", text: "Rehabilitationsbedarf beurteilt; eine Rehabilitationsverordnung wurde ausgestellt und dem Hausarzt sowie dem weiterbehandelnden Leistungserbringer in Kopie übermittelt, mit den Kernkomponenten im NMTR." },
     ],
   },
 
@@ -1603,12 +1603,12 @@ const trauma = {
     airwayConsideredMin: 25,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "Yes", e: ["the need for a definitive airway was documented and intubation was performed at 25 minutes"] },
-      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was completed with the family and shared with the GP and community team"] },
+      intubationConsidered: { v: "Yes", e: ["die Notwendigkeit eines definitiven Atemwegs wurde dokumentiert und die Intubation wurde nach 25 Minuten durchgeführt"] },
+      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde gemeinsam mit der Familie erstellt und dem Hausarzt sowie dem gemeindenahen Versorgungsteam übermittelt"] },
     },
     notes: [
-      { role: "Trauma team — Dr Olusola Bello", date: "2026-01-20", type: "resus", text: "Crush injury. GCS 7 on arrival; the need for a definitive airway was documented and intubation was performed at 25 minutes. Tranexamic acid given within the hour. Consultant present in the bay within three minutes." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-03", type: "rehab", text: "Rehabilitation needs assessed; a rehabilitation prescription was completed with the family and shared with the GP and community team." },
+      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-01-20", type: "resus", text: "Quetschverletzung. GCS 7 bei Ankunft; die Notwendigkeit eines definitiven Atemwegs wurde dokumentiert und die Intubation wurde nach 25 Minuten durchgeführt. Tranexamsäure wurde innerhalb einer Stunde verabreicht. Der Oberarzt war innerhalb von drei Minuten im Schockraum anwesend." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-03", type: "rehab", text: "Rehabilitationsbedarf beurteilt; eine Rehabilitationsverordnung wurde gemeinsam mit der Familie erstellt und dem Hausarzt sowie dem gemeindenahen Versorgungsteam übermittelt." },
     ],
   },
 
@@ -1623,12 +1623,12 @@ const trauma = {
     airwayConsideredMin: null,
     rehabNeedsAssessed: "Yes",
     i: {
-      intubationConsidered: { v: "No", e: ["the airway was self-maintained with a GCS of 14 and intubation was not indicated"] },
-      rehabPrescription: { v: "Yes", e: ["a rehabilitation prescription was issued and shared with the family, GP and ongoing-care provider"] },
+      intubationConsidered: { v: "No", e: ["der Atemweg wurde bei einem GCS von 14 eigenständig aufrechterhalten und eine Intubation war nicht indiziert"] },
+      rehabPrescription: { v: "Yes", e: ["eine Rehabilitationsverordnung wurde ausgestellt und der Familie, dem Hausarzt und dem weiterbehandelnden Leistungserbringer übermittelt"] },
     },
     notes: [
-      { role: "Trauma team — Dr Olusola Bello", date: "2026-01-25", type: "resus", text: "Sporting injury with a splenic laceration. GCS 14 on arrival; the airway was self-maintained with a GCS of 14 and intubation was not indicated. No major haemorrhage requiring tranexamic acid." },
-      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-07", type: "rehab", text: "Rehabilitation needs assessed; a rehabilitation prescription was issued and shared with the family, GP and ongoing-care provider." },
+      { role: "Trauma-Team — Dr Olusola Bello", date: "2026-01-25", type: "resus", text: "Sportverletzung mit einer Milzlazeration. GCS 14 bei Ankunft; der Atemweg wurde bei einem GCS von 14 eigenständig aufrechterhalten und eine Intubation war nicht indiziert. Keine massive Blutung, die Tranexamsäure erfordert hätte." },
+      { role: "Rehabilitation — Dr Priya Nair", date: "2026-02-07", type: "rehab", text: "Rehabilitationsbedarf beurteilt; eine Rehabilitationsverordnung wurde ausgestellt und der Familie, dem Hausarzt und dem weiterbehandelnden Leistungserbringer übermittelt." },
     ],
   },
 
