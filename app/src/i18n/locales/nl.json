@@ -93,7 +93,9 @@
     "toggleInclusion": "Paneel inclusiecriteria in-/uitschakelen",
     "toggleActivity": "Activiteitspaneel in-/uitschakelen",
     "countersAria": "Statustellers van de uitvoering",
-    "openReviewSummary": "Controleoverzicht openen"
+    "openReviewSummary": "Controleoverzicht openen",
+    "closeDashboardPane": "Dashboardvenster sluiten",
+    "closeWorkbookPane": "Werkboekvenster sluiten"
   },
   "rightPanel": {
     "closePanel": "Paneel sluiten",
@@ -196,7 +198,11 @@
     "errDbOnly": "Alleen .sqlite-, .sqlite3- en .db-bestanden worden ondersteund.",
     "cloned": "„{name}” gekopieerd naar lokale audits.",
     "renameDbPrompt": "Database hernoemen",
-    "removeDbConfirm": "„{name}” uit de catalogus verwijderen? Het SQLite-bestand op de schijf wordt niet verwijderd."
+    "removeDbConfirm": "„{name}” uit de catalogus verwijderen? Het SQLite-bestand op de schijf wordt niet verwijderd.",
+    "addTemplateTitle": "Audittemplate toevoegen",
+    "addTemplateHint": "Sleep een Excel-bestand (.xlsx) hierheen of klik om te bladeren",
+    "addDatabaseTitle": "Database toevoegen",
+    "addDatabaseHint": "Sleep een SQLite-bestand (.sqlite / .db) hierheen of klik om te bladeren"
   },
   "template": {
     "indexingHelp": "Uw spreadsheet wordt gelezen zodat de agent de kolommen en structuur leert.\nDit duurt enkele seconden — u kunt deze openen zodra deze gereed is.",
@@ -220,7 +226,8 @@
       "dateTo": "bijv. 2024-12-31",
       "hospitals": "bijv. Royal Infirmary, Western General",
       "cohort": "bijv. pediatrisch"
-    }
+    },
+    "auditOptions": "Auditopties"
   },
   "audit": {
     "back": "‹ Sjablonen",
@@ -299,6 +306,8 @@
     "noData": "Geen gegevens",
     "unsupportedChart": "Niet-ondersteunde grafiek",
     "noTrackers": "Geen indicatoren voor dit dashboard.",
-    "submissionDeadline": "Inzendtermijn: {date}"
+    "submissionDeadline": "Inzendtermijn: {date}",
+    "target": "Streefwaarde {value}",
+    "donutChart": "Ringdiagram"
   }
 }

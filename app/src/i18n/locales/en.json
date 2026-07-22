@@ -93,7 +93,9 @@
     "toggleInclusion": "Toggle inclusion criteria panel",
     "toggleActivity": "Toggle activity panel",
     "countersAria": "Run status counters",
-    "openReviewSummary": "Open the review summary"
+    "openReviewSummary": "Open the review summary",
+    "closeDashboardPane": "Close dashboard pane",
+    "closeWorkbookPane": "Close workbook pane"
   },
   "rightPanel": {
     "closePanel": "Close panel",
@@ -196,7 +198,11 @@
     "errDbOnly": "Only .sqlite, .sqlite3, and .db files are supported.",
     "cloned": "Cloned \"{name}\" into Local audits.",
     "renameDbPrompt": "Rename database",
-    "removeDbConfirm": "Remove \"{name}\" from the catalog? The SQLite file on disk will not be deleted."
+    "removeDbConfirm": "Remove \"{name}\" from the catalog? The SQLite file on disk will not be deleted.",
+    "addTemplateTitle": "Add audit template",
+    "addTemplateHint": "Drop an Excel file (.xlsx) or click to browse",
+    "addDatabaseTitle": "Add database",
+    "addDatabaseHint": "Drop a SQLite file (.sqlite / .db) or click to browse"
   },
   "template": {
     "indexingHelp": "Reading your spreadsheet so the agent learns its columns and structure.\nThis takes a few seconds — you can open it once it's ready.",
@@ -220,7 +226,8 @@
       "dateTo": "e.g. 2024-12-31",
       "hospitals": "e.g. Royal Infirmary, Western General",
       "cohort": "e.g. paediatric"
-    }
+    },
+    "auditOptions": "Audit options"
   },
   "audit": {
     "back": "‹ Templates",
@@ -299,6 +306,8 @@
     "noData": "No data",
     "unsupportedChart": "Unsupported chart",
     "noTrackers": "No trackers for this dashboard.",
-    "submissionDeadline": "Submission deadline: {date}"
+    "submissionDeadline": "Submission deadline: {date}",
+    "target": "Target {value}",
+    "donutChart": "Donut chart"
   }
 }

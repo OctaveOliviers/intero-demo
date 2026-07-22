@@ -1852,6 +1852,10 @@ const labels = {
   // word for the cord record Yes/No values and for these labels.
   yes: "Ja",
   no: "Nein",
+  // Ableitung des Auditnamens (lib/spec.js): die aus dem Vorlagennamen entfernten
+  // Geltungsbereichsangaben und die anschließende Form des Auditnamens.
+  scopeQualifiers: ["lokal", "regional", "national"],
+  auditNameFormat: (base) => `${base}-Audit`,
 };
 
 // --- Mock audit-detail strings (criteria + summary) -------------------------
@@ -2296,7 +2300,7 @@ const dashboards = [
   {
     id: "paediatric-trauma-bpt",
     auditId: "nmtr-trauma-lo-audit",
-    title: "BPT Schwerverletztenversorgung",
+    title: "BPT Schweres Trauma",
     logo: "dash-trauma",
     subtitle: "NMTR · Standards der Akutversorgung",
     submissionDeadline: "Einreichung ≤25 Tage nach Entlassung",
@@ -2542,7 +2546,7 @@ const trackers = {
   "t-tra-registry-25d": {
     id: "t-tra-registry-25d",
     dashboardId: "paediatric-trauma-bpt",
-    title: "Registeraanlieferung ≤25 Tage",
+    title: "Registerübermittlung ≤25 Tage",
     kind: "timeseries",
     target: { op: ">=", value: 0.9 },
     elements: [

@@ -93,7 +93,9 @@
     "toggleInclusion": "Afficher/masquer le panneau des critères d’inclusion",
     "toggleActivity": "Afficher/masquer le panneau d’activité",
     "countersAria": "Compteurs de statut de l’exécution",
-    "openReviewSummary": "Ouvrir le récapitulatif de vérification"
+    "openReviewSummary": "Ouvrir le récapitulatif de vérification",
+    "closeDashboardPane": "Fermer le volet du tableau de bord",
+    "closeWorkbookPane": "Fermer le volet du classeur"
   },
   "rightPanel": {
     "closePanel": "Fermer le panneau",
@@ -196,7 +198,11 @@
     "errDbOnly": "Seuls les fichiers .sqlite, .sqlite3 et .db sont pris en charge.",
     "cloned": "« {name} » cloné dans les audits locaux.",
     "renameDbPrompt": "Renommer la base de données",
-    "removeDbConfirm": "Retirer « {name} » du catalogue ? Le fichier SQLite sur le disque ne sera pas supprimé."
+    "removeDbConfirm": "Retirer « {name} » du catalogue ? Le fichier SQLite sur le disque ne sera pas supprimé.",
+    "addTemplateTitle": "Ajouter un modèle d'audit",
+    "addTemplateHint": "Déposez un fichier Excel (.xlsx) ou cliquez pour parcourir",
+    "addDatabaseTitle": "Ajouter une base de données",
+    "addDatabaseHint": "Déposez un fichier SQLite (.sqlite / .db) ou cliquez pour parcourir"
   },
   "template": {
     "indexingHelp": "Lecture de votre tableur pour que l’agent en apprenne les colonnes et la structure.\nCela prend quelques secondes — vous pourrez l’ouvrir dès qu’il sera prêt.",
@@ -220,7 +226,8 @@
       "dateTo": "ex. 2024-12-31",
       "hospitals": "ex. Royal Infirmary, Western General",
       "cohort": "ex. pédiatrique"
-    }
+    },
+    "auditOptions": "Options de l'audit"
   },
   "audit": {
     "back": "‹ Modèles",
@@ -299,6 +306,8 @@
     "noData": "Aucune donnée",
     "unsupportedChart": "Graphique non pris en charge",
     "noTrackers": "Aucun indicateur pour ce tableau de bord.",
-    "submissionDeadline": "Date limite de soumission : {date}"
+    "submissionDeadline": "Date limite de soumission : {date}",
+    "target": "Cible {value}",
+    "donutChart": "Graphique en anneau"
   }
 }

@@ -180,12 +180,28 @@ export function startAudit(template, filters, criteria = []) {
 // Idempotently add seeded mock dashboard records to the sidebar. Adds only
 // records whose id is not already present, so re-running on every login is a
 // no-op. `createdAt` is stamped here to keep the seed source pure.
+//
+// It also re-syncs the localized fields of rows that ARE already present.
+// Records persist to localStorage, and the seed carries its title/deadline from
+// the active locale pack — so a row first seeded in one language would keep
+// that language's title after the user switches locale (switching reloads the
+// page but never rewrites stored audits). Only the seeded ids are touched;
+// audits the user created keep the name they were created with.
 export function seedMockDashboardRecords(records) {
   if (!Array.isArray(records) || !records.length) return;
+  const seeded = new Map(records.filter((r) => r && r.id).map((r) => [r.id, r]));
   audits.update((list) => {
+    let changed = false;
+    const synced = list.map((a) => {
+      const s = seeded.get(a.id);
+      if (!s || (a.title === s.title && a.submissionDeadline === s.submissionDeadline)) return a;
+      changed = true;
+      return { ...a, title: s.title, submissionDeadline: s.submissionDeadline };
+    });
     const have = new Set(list.map((a) => a.id));
     const additions = records.filter((r) => r && r.id && !have.has(r.id)).map((r) => ({ createdAt: Date.now(), ...r }));
-    return additions.length ? [...additions, ...list] : list;
+    if (additions.length) return [...additions, ...synced];
+    return changed ? synced : list;
   });
 }
 

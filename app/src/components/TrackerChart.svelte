@@ -204,7 +204,7 @@
     <svg
       viewBox="0 0 {DONUT.size} {DONUT.size}"
       role="img"
-      aria-label="Donut chart"
+      aria-label={$_("tracker.donutChart")}
     >
       <!-- track -->
       <circle
@@ -246,7 +246,7 @@
           x2={donutTargetTick.outer.x}
           y2={donutTargetTick.outer.y}
         >
-          <title>Target {targetLabel}</title>
+          <title>{$_("tracker.target", { values: { value: targetLabel } })}</title>
         </line>
       {/if}
       <!-- centre headline = first ("pass") element -->
@@ -276,7 +276,7 @@
         </li>
       {/each}
       {#if targetLabel}
-        <li class="legend-target">Target {targetLabel}</li>
+        <li class="legend-target">{$_("tracker.target", { values: { value: targetLabel } })}</li>
       {/if}
     </ul>
   </div>
@@ -304,7 +304,7 @@
           x2={TS.w - TS.padX}
           y2={tsTargetY}
         >
-          <title>Target {targetLabel}</title>
+          <title>{$_("tracker.target", { values: { value: targetLabel } })}</title>
         </line>
       {/if}
       <!-- metric line -->
@@ -332,7 +332,7 @@
       {/each}
     </svg>
     {#if targetLabel}
-      <div class="caption">Target {targetLabel}</div>
+      <div class="caption">{$_("tracker.target", { values: { value: targetLabel } })}</div>
     {/if}
   </div>
 {:else if kind === "histogram"}
@@ -383,7 +383,7 @@
           x2={HG.w - HG.padX}
           y2={hgTargetY}
         >
-          <title>Target {targetLabel}</title>
+          <title>{$_("tracker.target", { values: { value: targetLabel } })}</title>
         </line>
       {/if}
     </svg>
@@ -403,7 +403,7 @@
         </li>
       {/each}
       {#if targetLabel}
-        <li class="legend-target">Target {targetLabel}</li>
+        <li class="legend-target">{$_("tracker.target", { values: { value: targetLabel } })}</li>
       {/if}
     </ul>
   </div>
@@ -421,7 +421,7 @@
       <span class="stat-label">{statEl.label}</span>
     {/if}
     {#if statTargetDisplay != null}
-      <span class="stat-target">Target {target.op || ""} {statTargetDisplay}</span>
+      <span class="stat-target">{$_("tracker.target", { values: { value: `${target.op || ""} ${statTargetDisplay}`.trim() } })}</span>
     {/if}
   </button>
 {:else}

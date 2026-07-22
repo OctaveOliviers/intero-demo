@@ -88,6 +88,18 @@
     margin-bottom: var(--space-1);
   }
 
+  /* Titles and deadlines are translated, so their length varies widely by
+     language (German compounds are the worst case). Wrap inside the card —
+     breaking a long word only when there is no other option — so text can
+     never spill past the card edge. */
+  .title,
+  .deadline {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    hyphens: auto;
+  }
+
   .title {
     font-size: 1rem;
     font-weight: 600;

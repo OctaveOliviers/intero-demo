@@ -1535,15 +1535,24 @@ export function buildPopulatedWorkbookForRun(runId) {
   return hit ? markAllReviewed(hit.dataset.populatedWorkbook()) : cordPopulatedWorkbook();
 }
 
-// The 3 seed audit records (sidebar rows). Hardcoded per the wiring contract so
-// this works even before any CONTENT.dashboards exists. `createdAt` is set by
-// the store seeder, keeping this pure.
+// The 3 seed audit records (sidebar rows). The ids/runIds are the wiring
+// contract and stay hardcoded; the human-readable title and deadline are read
+// from the locale pack's dashboard descriptor (matched on auditId) so the
+// sidebar row and the audit page read in the active language — the home cards
+// already source them from there. The literals below stay as a fallback for a
+// pack that carries no matching descriptor. `createdAt` is set by the store
+// seeder, keeping this pure.
 export function seededDashboardAuditRecords() {
   const base = { status: "completed", messages: [], activity: [], reviewSummary: null, workbook: null, runStartedAt: null, runEndedAt: null, filters: {}, criteria: [] };
+  const descriptorFor = new Map((CONTENT.dashboards || []).map((d) => [d.auditId, d]));
+  const seed = (id, runId, title, submissionDeadline) => {
+    const d = descriptorFor.get(id);
+    return { ...base, id, runId, title: d?.title || title, submissionDeadline: d?.submissionDeadline || submissionDeadline };
+  };
   return [
-    { ...base, id: "npda-lo-audit", runId: "mock-run-npda", title: "Diabetes BPT", submissionDeadline: "2026-07-20" },
-    { ...base, id: "epilepsy12-lo-audit", runId: "mock-run-epilepsy", title: "Epilepsy BPT", submissionDeadline: "2027-01-12" },
-    { ...base, id: "nmtr-trauma-lo-audit", runId: "mock-run-trauma", title: "Major Trauma BPT", submissionDeadline: "Submit ≤25 days of discharge" },
+    seed("npda-lo-audit", "mock-run-npda", "Diabetes BPT", "2026-07-20"),
+    seed("epilepsy12-lo-audit", "mock-run-epilepsy", "Epilepsy BPT", "2027-01-12"),
+    seed("nmtr-trauma-lo-audit", "mock-run-trauma", "Major Trauma BPT", "Submit ≤25 days of discharge"),
   ];
 }
 

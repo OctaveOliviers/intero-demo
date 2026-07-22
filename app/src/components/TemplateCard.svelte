@@ -199,7 +199,7 @@
     </div>
   </button>
 
-  <button class="menu-btn" on:click={toggleMenu} aria-label="Audit options">
+  <button class="menu-btn" on:click={toggleMenu} aria-label={$_("template.auditOptions")}>
     <Icon name="more" size={18} />
   </button>
   {#if menuOpen}

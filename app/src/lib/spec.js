@@ -130,6 +130,20 @@ const SPEC_VALUES = CONTENT.specValues || {
   },
 };
 
+// Derive the created audit's name from the chosen template's name: drop the
+// trailing scope qualifier — "(local)" / "(regional)" / "(national)" IN THE
+// ACTIVE LANGUAGE — then apply the locale's audit-name format. Both the words
+// and the format live in the content pack, so a translated template name no
+// longer yields a half-English name like "Nabelschnur-pH audit".
+function auditNameFromTemplate(templateName) {
+  const scope = CONTENT.labels?.scopeQualifiers || ["local", "regional", "national"];
+  const stripped = String(templateName || "")
+    .replace(new RegExp(`\\s*\\((?:${scope.join("|")})\\)\\s*$`, "i"), "")
+    .trim();
+  const format = CONTENT.labels?.auditNameFormat;
+  return format ? format(stripped) : `${stripped} audit`;
+}
+
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -339,7 +353,7 @@ export async function parseRequest(text, { templates = null } = {}) {
   }
   if (chosen) {
     templateId = chosen.id;
-    summary = `${chosen.name.replace(/\s*\((?:local|regional|national)\)\s*$/i, "").trim()} audit`;
+    summary = auditNameFromTemplate(chosen.name);
   }
 
   // The cord branch gets a richer, prefilled chip set (the typical filters a

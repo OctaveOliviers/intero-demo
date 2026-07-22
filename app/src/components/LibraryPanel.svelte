@@ -378,8 +378,8 @@
           on:dragleave={() => (auditDragOver = false)}
         >
           <div class="card-body">
-            <h3>Add audit template</h3>
-            <p>Drop an Excel file (.xlsx) or click to browse</p>
+            <h3>{$_("library.addTemplateTitle")}</h3>
+            <p>{$_("library.addTemplateHint")}</p>
           </div>
         </button>
         <input
@@ -462,8 +462,8 @@
             on:dragleave={() => (dbDragOver = false)}
           >
             <div class="card-body">
-              <h3>Add database</h3>
-              <p>Drop a SQLite file (.sqlite / .db) or click to browse</p>
+              <h3>{$_("library.addDatabaseTitle")}</h3>
+              <p>{$_("library.addDatabaseHint")}</p>
             </div>
           </button>
           <input

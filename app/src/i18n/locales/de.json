@@ -93,7 +93,9 @@
     "toggleInclusion": "Bereich „Einschlusskriterien“ umschalten",
     "toggleActivity": "Aktivitätsbereich umschalten",
     "countersAria": "Status-Zähler des Laufs",
-    "openReviewSummary": "Prüfübersicht öffnen"
+    "openReviewSummary": "Prüfübersicht öffnen",
+    "closeDashboardPane": "Dashboard-Bereich schließen",
+    "closeWorkbookPane": "Arbeitsmappen-Bereich schließen"
   },
   "rightPanel": {
     "closePanel": "Bereich schließen",
@@ -196,7 +198,11 @@
     "errDbOnly": "Nur .sqlite-, .sqlite3- und .db-Dateien werden unterstützt.",
     "cloned": "„{name}“ in lokale Audits dupliziert.",
     "renameDbPrompt": "Datenbank umbenennen",
-    "removeDbConfirm": "„{name}“ aus dem Katalog entfernen? Die SQLite-Datei auf dem Datenträger wird nicht gelöscht."
+    "removeDbConfirm": "„{name}“ aus dem Katalog entfernen? Die SQLite-Datei auf dem Datenträger wird nicht gelöscht.",
+    "addTemplateTitle": "Audit-Vorlage hinzufügen",
+    "addTemplateHint": "Excel-Datei (.xlsx) hierher ziehen oder zum Auswählen klicken",
+    "addDatabaseTitle": "Datenbank hinzufügen",
+    "addDatabaseHint": "SQLite-Datei (.sqlite / .db) hierher ziehen oder zum Auswählen klicken"
   },
   "template": {
     "indexingHelp": "Ihre Tabelle wird gelesen, damit der Agent ihre Spalten und Struktur lernt.\nDas dauert ein paar Sekunden — Sie können sie öffnen, sobald sie bereit ist.",
@@ -220,7 +226,8 @@
       "dateTo": "z. B. 2024-12-31",
       "hospitals": "z. B. Royal Infirmary, Western General",
       "cohort": "z. B. pädiatrisch"
-    }
+    },
+    "auditOptions": "Audit-Optionen"
   },
   "audit": {
     "back": "‹ Vorlagen",
@@ -299,6 +306,8 @@
     "noData": "Keine Daten",
     "unsupportedChart": "Nicht unterstütztes Diagramm",
     "noTrackers": "Keine Kennzahlen für dieses Dashboard.",
-    "submissionDeadline": "Einreichungsfrist: {date}"
+    "submissionDeadline": "Einreichungsfrist: {date}",
+    "target": "Zielwert {value}",
+    "donutChart": "Ringdiagramm"
   }
 }

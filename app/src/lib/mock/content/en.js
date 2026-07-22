@@ -1852,6 +1852,10 @@ const labels = {
   // word for the cord record Yes/No values and for these labels.
   yes: "Yes",
   no: "No",
+  // Audit-name derivation (lib/spec.js): the scope qualifiers stripped from a
+  // template name, and how the created audit's name is then formed.
+  scopeQualifiers: ["local", "regional", "national"],
+  auditNameFormat: (base) => `${base} audit`,
 };
 
 // --- Mock audit-detail strings (criteria + summary) -------------------------

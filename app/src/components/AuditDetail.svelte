@@ -272,7 +272,7 @@
               <Chip value={t.title} variant="template" editable={false} />
               <span class="kind-badge">{t.kind}</span>
               {#if formatTarget(t.target)}
-                <span class="kind-badge target">Target {formatTarget(t.target)}</span>
+                <span class="kind-badge target">{$_("tracker.target", { values: { value: formatTarget(t.target) } })}</span>
               {/if}
               {#if t.criterion}<span class="row-desc">{t.criterion}</span>{/if}
             </div>

@@ -303,7 +303,7 @@
             <button
               type="button"
               class="pane-close"
-              aria-label="Close dashboard pane"
+              aria-label={$_("results.closeDashboardPane")}
               on:click={() => closePane("dashboard")}
             >
               <Icon name="close" size={14} />
@@ -323,7 +323,7 @@
             <button
               type="button"
               class="pane-close"
-              aria-label="Close workbook pane"
+              aria-label={$_("results.closeWorkbookPane")}
               on:click={() => closePane("workbook")}
             >
               <Icon name="close" size={14} />

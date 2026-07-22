@@ -1852,6 +1852,10 @@ const labels = {
   // word for the cord record Yes/No values and for these labels.
   yes: "Ja",
   no: "Nee",
+  // Afleiding van de auditnaam (lib/spec.js): de reikwijdte-aanduidingen die uit
+  // de templatenaam worden verwijderd, en hoe de naam daarna wordt gevormd.
+  scopeQualifiers: ["lokaal", "regionaal", "landelijk"],
+  auditNameFormat: (base) => `Audit ${base}`,
 };
 
 // --- Mock audit-detail strings (criteria + summary) -------------------------
