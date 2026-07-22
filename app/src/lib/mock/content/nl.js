@@ -2669,43 +2669,43 @@ const trackers = {
   "t-cord-base-excess": {
     id: "t-cord-base-excess",
     dashboardId: "cord-ph-bpt",
-    title: "Base excess distribution",
+    title: "Verdeling van het base excess",
     kind: "histogram",
     target: { op: ">=", value: 0.9 },
     elements: [
       { key: "be1", label: "≥ -8", value: 4 / 8, status: "met", highlightRefs: ["ALL!AA2", "ALL!AA5", "ALL!AA8", "ALL!AA9"] },
-      { key: "be2", label: "-8 to -12", value: 2 / 8, status: "not-met", highlightRefs: ["ALL!AA6", "ALL!AA7"] },
+      { key: "be2", label: "-8 tot -12", value: 2 / 8, status: "not-met", highlightRefs: ["ALL!AA6", "ALL!AA7"] },
       { key: "be3", label: "< -12", value: 2 / 8, status: "not-met", highlightRefs: ["ALL!AA3", "ALL!AA10"] },
     ],
-    criterion: "Cord blood gas audit — cord arterial base excess distribution; BE ≥ -8 mmol/L is the reassuring band, denominator = babies with a recorded BE (research §7.1 D4)",
+    criterion: "Audit navelstrengbloedgas — verdeling van het arteriële navelstreng-base excess; BE ≥ -8 mmol/L is de geruststellende band, noemer = baby's met een geregistreerd BE (onderzoek §7.1 D4)",
   },
   // D5 — NICU admission (col AM). met = not admitted (6, rows 2,4,5,6,8,9);
   // not-met = admitted (3, rows 3,7,10).
   "t-cord-nicu-admission": {
     id: "t-cord-nicu-admission",
     dashboardId: "cord-ph-bpt",
-    title: "NICU admission",
+    title: "Opname op de NICU",
     kind: "donut",
     target: { op: "<=", value: 0.2 },
     elements: [
-      { key: "met", label: "Not admitted", value: 6 / 9, status: "met", highlightRefs: ["ALL!AM2", "ALL!AM5", "ALL!AM6", "ALL!AM8", "ALL!AM9", "ALL!AM4"] },
-      { key: "not-met", label: "Admitted to NICU", value: 3 / 9, status: "not-met", highlightRefs: ["ALL!AM3", "ALL!AM7", "ALL!AM10"] },
+      { key: "met", label: "Niet opgenomen", value: 6 / 9, status: "met", highlightRefs: ["ALL!AM2", "ALL!AM5", "ALL!AM6", "ALL!AM8", "ALL!AM9", "ALL!AM4"] },
+      { key: "not-met", label: "Opgenomen op de NICU", value: 3 / 9, status: "not-met", highlightRefs: ["ALL!AM3", "ALL!AM7", "ALL!AM10"] },
     ],
-    criterion: "Cord blood gas audit — term admissions to NICU after birth; lower is better, framed as a quality-at-birth indicator (research §7.1 D5)",
+    criterion: "Audit navelstrengbloedgas — opnames van à terme geboren baby's op de NICU na de geboorte; lager is beter, gepositioneerd als indicator voor kwaliteit bij de geboorte (onderzoek §7.1 D5)",
   },
   // D6 — delayed cord clamping performed (i.dcc.v, col Y). met = Yes (4, rows
   // 2,4,5,9); not-met = No (5, rows 3,6,7,8,10).
   "t-cord-dcc": {
     id: "t-cord-dcc",
     dashboardId: "cord-ph-bpt",
-    title: "Delayed cord clamping performed",
+    title: "Late navelstrengafklemming uitgevoerd",
     kind: "donut",
     target: { op: ">=", value: 0.9 },
     elements: [
-      { key: "met", label: "DCC performed", value: 4 / 9, status: "met", highlightRefs: ["ALL!Y2", "ALL!Y4", "ALL!Y5", "ALL!Y9"] },
-      { key: "not-met", label: "No DCC", value: 5 / 9, status: "not-met", highlightRefs: ["ALL!Y3", "ALL!Y6", "ALL!Y7", "ALL!Y8", "ALL!Y10"] },
+      { key: "met", label: "DCC uitgevoerd", value: 4 / 9, status: "met", highlightRefs: ["ALL!Y2", "ALL!Y4", "ALL!Y5", "ALL!Y9"] },
+      { key: "not-met", label: "Geen DCC", value: 5 / 9, status: "not-met", highlightRefs: ["ALL!Y3", "ALL!Y6", "ALL!Y7", "ALL!Y8", "ALL!Y10"] },
     ],
-    criterion: "Cord blood gas audit — delayed cord clamping performed at birth, target ≥90% of eligible births (research §7.1 D6)",
+    criterion: "Audit navelstrengbloedgas — late navelstrengafklemming uitgevoerd bij de geboorte, doel ≥90% van de in aanmerking komende geboorten (onderzoek §7.1 D6)",
   },
   // D7 — acidosis rate (pH <7.1) trend. Lower is better, target ≤0.10. Six
   // monthly points trending down; the latest (Jan) ≈ the current cohort's <7.1
@@ -2713,7 +2713,7 @@ const trackers = {
   "t-cord-acidosis-trend": {
     id: "t-cord-acidosis-trend",
     dashboardId: "cord-ph-bpt",
-    title: "Acidosis rate (pH <7.1) trend",
+    title: "Trend acidosepercentage (pH <7.1)",
     kind: "timeseries",
     target: { op: "<=", value: 0.1 },
     elements: [
@@ -2724,7 +2724,7 @@ const trackers = {
       { key: "m5", label: "dec.", value: 0.28, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
       { key: "m6", label: "jan.", value: 0.25, status: "not-met", highlightRefs: ["ALL!Z2", "ALL!Z3", "ALL!Z4", "ALL!Z5", "ALL!Z6", "ALL!Z7", "ALL!Z8", "ALL!Z9", "ALL!Z10"] },
     ],
-    criterion: "Cord blood gas audit — monthly cord arterial acidosis rate (pH <7.1); lower is better, improvement target ≤10% (research §7.1 D7)",
+    criterion: "Audit navelstrengbloedgas — maandelijks percentage arteriële navelstrengacidose (pH <7.1); lager is beter, verbeterdoel ≤10% (onderzoek §7.1 D7)",
   },
 };
 
