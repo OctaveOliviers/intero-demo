@@ -1832,9 +1832,9 @@ const codeMaps = {
   // displayed/evidence wording (translatable). The ECG KPI keys off whether the
   // type is convulsive.
   seizureType: {
-    Convulsive: { code: "convulsive", label: "convulsive (generalised tonic-clonic / focal to bilateral)" },
-    "Non-convulsive": { code: "non-convulsive", label: "non-convulsive (absence / focal aware)" },
-    Absence: { code: "absence", label: "absence (non-convulsive)" },
+    Convulsive: { code: "convulsive", label: "convulsive (tonicoclonique généralisée / focale à bilatérale)" },
+    "Non-convulsive": { code: "non convulsive", label: "non convulsive (absence / focale avec conscience préservée)" },
+    Absence: { code: "absence", label: "absence (non convulsive)" },
   },
 };
 
