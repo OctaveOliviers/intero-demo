@@ -9,8 +9,6 @@
 
   export let evidence;
   export let onClose = () => {};
-  // Called with a source id when the doctor accepts one side of a conflict.
-  export let onResolve = () => {};
   // Called with a source id when a MOC-note reference hyperlink is clicked.
   export let onReference = () => {};
 
@@ -45,28 +43,18 @@
           <span class="conflict-badge">{AW.evidence.conflictHeading}</span>
           <p class="conflict-hint">{AW.evidence.conflictHint}</p>
         </div>
+        <!-- Both readings stay on file and both stay visible. Choosing between
+             them is an ordinary edit of the field, not a button here — the
+             clinician reads these, then writes what stands. -->
         {#each evidence.sources as source (source.id)}
-          <article class="source" class:accepted={source.accepted === true} class:rejected={source.accepted === false}>
+          <article class="source">
             <header class="source-head">
               <span class="source-label">{source.label} · {source.date}</span>
-              {#if source.accepted === true}
-                <span class="state-badge state-selected">{AW.evidence.selected}</span>
-              {:else if source.accepted === false}
-                <span class="state-badge state-notselected">{AW.evidence.notSelected}</span>
-              {/if}
+              <span class="source-value">{source.value}</span>
             </header>
             <div class="source-body">
               <NoteEvidenceView result={noteResult(source.body)} quotes={source.quotes} />
             </div>
-            <button
-              class="use-btn"
-              class:is-accepted={source.accepted === true}
-              type="button"
-              on:click={() => onResolve(source.id)}
-              aria-label={AW.evidence.useFrom(source.value, source.label)}
-            >
-              {source.accepted === true ? AW.evidence.using(source.value) : AW.evidence.use(source.value)}
-            </button>
           </article>
         {/each}
       </div>
@@ -106,26 +94,6 @@
         <div class="block">
           <div class="block-label">{AW.evidence.blockReport}</div>
           <NoteEvidenceView result={noteResult(evidence.body)} quotes={evidence.quotes} />
-        </div>
-      </div>
-    {:else if evidence.provenance}
-      <div class="simple-evidence">
-        <CellEvidencePanel {command} {selectedCellMeta} compact />
-        <div class="provenance">
-          <div class="block-label">{AW.provenance.heading}</div>
-          <dl class="provenance-fields">
-            {#each evidence.provenance.fields as field (field.label)}
-              <div class="provenance-row">
-                <dt class="provenance-key">{field.label}</dt>
-                <dd class="provenance-val">
-                  {field.value}
-                  {#if field.status}
-                    <span class="provenance-flag">{field.status}</span>
-                  {/if}
-                </dd>
-              </div>
-            {/each}
-          </dl>
         </div>
       </div>
     {:else}
@@ -265,16 +233,6 @@
     background: var(--color-surface);
   }
 
-  .source.accepted {
-    border-color: var(--color-success);
-    box-shadow: inset 0 0 0 1px var(--color-success);
-  }
-
-  /* Rejected source stays fully legible under a translucent veil. */
-  .source.rejected {
-    opacity: 0.55;
-  }
-
   .source-head {
     display: flex;
     align-items: center;
@@ -288,121 +246,13 @@
     color: var(--color-text-secondary);
   }
 
-  .state-badge {
+  /* The reading this source carries, so the two are comparable at a glance
+     without reading both note bodies. */
+  .source-value {
     flex-shrink: 0;
-    border-radius: var(--radius-pill);
-    padding: 1px var(--space-2);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-semibold);
-  }
-
-  .state-selected {
-    border: 1px solid var(--color-success);
-    background: var(--color-success-weak);
-    color: var(--color-success);
-  }
-
-  .state-notselected {
-    border: 1px solid var(--color-border);
-    background: var(--color-surface-muted);
-    color: var(--color-text-muted);
-  }
-
-  .use-btn {
-    align-self: flex-start;
-    border-radius: var(--radius-sm);
-    padding: var(--space-1) var(--space-3);
     font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    border: 1px solid var(--color-border-strong);
-    background: var(--color-surface);
-    color: var(--color-text);
-    cursor: pointer;
-    transition:
-      background var(--dur-fast) var(--ease),
-      border-color var(--dur-fast) var(--ease);
-  }
-
-  .use-btn:hover,
-  .use-btn:focus-visible {
-    background: var(--color-hover);
-  }
-
-  .use-btn:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
-  }
-
-  .use-btn.is-accepted {
-    border-color: var(--color-success);
-    background: var(--color-success-weak);
-    color: var(--color-success);
-  }
-
-  /* Simple cell evidence with an appended provenance block scrolls as one
-     column; the inner CellEvidencePanel sizes to content rather than owning
-     its own scroll. */
-  .simple-evidence {
-    flex: 1 1 auto;
-    min-width: 0;
-    min-height: 0;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-
-  .simple-evidence :global(.cell-evidence-panel) {
-    flex: 0 0 auto;
-    overflow: visible;
-  }
-
-  .provenance {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    padding: 0 var(--space-4) var(--space-2);
-  }
-
-  .provenance-fields {
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: var(--space-3);
-    background: var(--color-surface);
-  }
-
-  .provenance-row {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-
-  .provenance-key {
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
-  }
-
-  .provenance-val {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: var(--text-sm);
-    color: var(--color-text);
-  }
-
-  .provenance-flag {
-    flex-shrink: 0;
-    padding: 1px var(--space-2);
-    border-radius: var(--radius-pill);
-    background: var(--color-warning-weak);
-    color: var(--color-warning);
-    font-size: var(--text-xs);
     font-weight: var(--weight-semibold);
+    color: var(--color-text);
   }
 
   .block {

@@ -10,20 +10,23 @@ import {
   closeArtifact,
   closeEvidence,
   closeTab,
+  completePatient,
   createArtifactWorkspaceState,
+  editField,
   finishRun,
   lungMocRows,
   openArtifact,
+  openEvidence,
   openPinnedArtifact,
   openReportTab,
   removeArtifact,
   removeContextChip,
   renameArtifact,
-  resolveConflictCell,
   revealCells,
   revealColumn,
   reviewCell,
   selectCell,
+  selectPatient,
   startRun,
   toggleChatFold,
   toggleContextCapture,
@@ -85,6 +88,10 @@ export function selectDemoCell(tableId, rowId, columnId) {
   artifactWorkspaceDemoState.update((state) => selectCell(state, tableId, rowId, columnId));
 }
 
+export function openDemoEvidence(evidenceId) {
+  artifactWorkspaceDemoState.update((state) => openEvidence(state, evidenceId));
+}
+
 export function openDemoReportTab(sourceId) {
   artifactWorkspaceDemoState.update((state) => openReportTab(state, sourceId));
 }
@@ -109,8 +116,12 @@ export function removeDemoContextChip(chipId) {
   artifactWorkspaceDemoState.update((state) => removeContextChip(state, chipId));
 }
 
-export function resolveDemoConflictCell(tableId, rowId, columnId, sourceId) {
-  artifactWorkspaceDemoState.update((state) => resolveConflictCell(state, tableId, rowId, columnId, sourceId));
+export function selectDemoPatient(rowId) {
+  artifactWorkspaceDemoState.update((state) => selectPatient(state, rowId));
+}
+
+export function editDemoField(tableId, rowId, columnId, value) {
+  artifactWorkspaceDemoState.update((state) => editField(state, tableId, rowId, columnId, value));
 }
 
 export function markDemoCellReviewed(tableId, rowId, columnId) {
@@ -127,7 +138,20 @@ export function addDemoFollowUpNote(tableId, rowId, noteText, sourceIds = []) {
 // agent-activity lines and reveals the matrix (structured columns in bulk,
 // interpreted fields cell-by-cell with jitter) over ~20s, then finishes.
 
-const STRUCTURED_REVEAL = ["histology", "tnm", "pdl1", "egfr", "ngs"];
+// Direct fields, revealed a whole field at a time across the cohort. The five
+// Annexe 55 registration fields promoted onto the form fill with them.
+const STRUCTURED_REVEAL = [
+  "histology",
+  "baseOfDiagnosis",
+  "localisation",
+  "differentiation",
+  "tnm",
+  "biopsy",
+  "petct",
+  "pdl1",
+  "egfr",
+  "ngs",
+];
 let runTimers = [];
 
 function clearRunTimers() {
@@ -167,8 +191,17 @@ export function startLungMocDemoRun(userText) {
   push(700, activity("act-stage", AW.run.stage));
   for (const row of lungMocRows) push(jitter(360, 320), (s) => revealCells(s, [{ rowId: row.id, columnId: "stage" }]));
 
+  push(700, activity("act-prior", AW.run.priorTreatment));
+  for (const row of lungMocRows)
+    push(jitter(360, 320), (s) => revealCells(s, [{ rowId: row.id, columnId: "previousTreatment" }]));
+
+  // Current treatment is each patient's last field, so revealing it IS that
+  // patient's record completing — the rail's checkmarks are caused by the work
+  // finishing, not decorated to look that way. The jitter above is what makes
+  // them land at visibly different moments.
   push(700, activity("act-treatment", AW.run.treatment));
-  for (const row of lungMocRows) push(jitter(360, 320), (s) => revealCells(s, [{ rowId: row.id, columnId: "treatment" }]));
+  for (const row of lungMocRows)
+    push(jitter(360, 320), (s) => completePatient(revealCells(s, [{ rowId: row.id, columnId: "treatment" }]), row.id));
 
   // Conflict + gap checks.
   push(700, activity("act-conflicts", AW.run.conflicts));

@@ -8,11 +8,12 @@
   // The evidence panel is box-level, NOT owned by any one view: a table cell, a
   // note hyperlink, or a dashboard tile can all open it. Whenever `evidence` is
   // set the box splits its body into [content | evidence].
+  import { tick } from "svelte";
   import { ARTIFACT_WORKSPACE_STATES } from "../../lib/artifactWorkspaceDemo.js";
   import { CONTENT } from "../../lib/mock/content/index.js";
   import Icon from "../Icon.svelte";
   import ArtifactEvidence from "./ArtifactEvidence.svelte";
-  import ArtifactTableView from "./ArtifactTableView.svelte";
+  import ArtifactFormView from "./ArtifactFormView.svelte";
   import ArtifactNoteView from "./ArtifactNoteView.svelte";
 
   const AW = CONTENT.artifactWorkspace;
@@ -20,19 +21,21 @@
   export let state;
   export let tabs = [];
   export let activeTab = null;
-  export let tableArtifact;
+  export let form = null;
+  export let patients = [];
+  export let streaming = false;
   export let noteDoc = null;
   export let evidence;
-  export let cellClass = () => "direct";
   export let onToggleFold = () => {};
   export let onClose = () => {};
   export let onActivateTab = () => {};
   export let onCloseTab = () => {};
   export let onEvidenceClose = () => {};
-  export let onResolve = () => {};
   export let onReference = () => {};
-  export let onCell = () => {};
-  export let onCellContext = () => {};
+  export let onSelectPatient = () => {};
+  export let onEdit = () => {};
+  export let onSource = () => {};
+  export let onFieldPick = () => {};
   export let contextCaptureMode = false;
   export let onContextToggle = () => {};
   export let onContextSend = () => {};
@@ -43,11 +46,21 @@
 
   // tab.kind -> content view component. The one place that knows the types.
   const VIEW_REGISTRY = {
-    table: ArtifactTableView,
+    table: ArtifactFormView,
     note: ArtifactNoteView,
   };
 
   let contextDraft = "";
+  let composerTextarea;
+
+  // The flying composer's whole point is to type a question the moment you pick
+  // a field — so focus it as soon as it appears, and again on each further pick
+  // (clicking a field moves focus off the textarea). tick() (a microtask, not
+  // rAF) so it still fires when the window is backgrounded, where rAF is paused.
+  $: focusComposer(pendingCount, composerTextarea);
+  function focusComposer(count, el) {
+    if (count > 0 && el) tick().then(() => el.focus());
+  }
 
   function submitContextNote() {
     const comment = contextDraft.trim();
@@ -73,7 +86,17 @@
   // Svelte's reactivity tracking them (a helper fn would only track `kind`).
   $: contentProps =
     activeTab?.kind === "table"
-      ? { table: tableArtifact, state, cellClass, contextCaptureMode, onCell, onCellContext }
+      ? {
+          form,
+          patients,
+          streaming,
+          contextCaptureMode,
+          pickedRefIds: (state?.pendingContextCells || []).map((cell) => cell.refId),
+          onSelectPatient,
+          onEdit,
+          onSource,
+          onFieldPick,
+        }
       : activeTab?.kind === "note"
         ? { doc: noteDoc }
         : {};
@@ -164,7 +187,7 @@
 
     {#if showEvidence}
       <div class="evidence-divider" aria-hidden="true"></div>
-      <ArtifactEvidence {evidence} onClose={onEvidenceClose} {onResolve} {onReference} />
+      <ArtifactEvidence {evidence} onClose={onEvidenceClose} {onReference} />
     {/if}
   </div>
 
@@ -177,6 +200,7 @@
     >
       <textarea
         rows="2"
+        bind:this={composerTextarea}
         placeholder={AW.box.askPlaceholder(pendingCount === 1 ? AW.box.askAboutOne : AW.box.askAboutMany(pendingCount))}
         bind:value={contextDraft}
         on:keydown={(event) => {

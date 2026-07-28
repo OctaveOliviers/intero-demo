@@ -11,7 +11,7 @@ test("ArtifactBox compiles", () => {
 
 test("ArtifactBox swaps content by tab kind via a registry, not hardcoded views", () => {
   assert.match(source, /const VIEW_REGISTRY = \{/);
-  assert.match(source, /table: ArtifactTableView/);
+  assert.match(source, /table: ArtifactFormView/);
   assert.match(source, /note: ArtifactNoteView/);
   assert.match(source, /\$: ContentView = VIEW_REGISTRY\[activeTab\?\.kind\]/);
   assert.match(source, /<svelte:component this=\{ContentView\} \{\.\.\.contentProps\} \/>/);
@@ -32,7 +32,7 @@ test("ArtifactBox renders a Chrome-style tab bar with closeable tabs", () => {
 test("ArtifactBox shows the side-panel evidence only for the table tab", () => {
   assert.match(source, /import ArtifactEvidence from "\.\/ArtifactEvidence\.svelte"/);
   assert.match(source, /\$: showEvidence = activeTab\?\.kind === "table" && !!evidence/);
-  assert.match(source, /\{#if showEvidence\}[\s\S]*<ArtifactEvidence \{evidence\} onClose=\{onEvidenceClose\} \{onResolve\}/);
+  assert.match(source, /\{#if showEvidence\}[\s\S]*<ArtifactEvidence \{evidence\} onClose=\{onEvidenceClose\} \{onReference\}/);
 });
 
 test("ArtifactBox keeps context/fold/close controls, resize handle and flying composer", () => {
@@ -44,6 +44,6 @@ test("ArtifactBox keeps context/fold/close controls, resize handle and flying co
 });
 
 test("ArtifactBox builds table view props reactively (tracks table + state deps)", () => {
-  assert.match(source, /activeTab\?\.kind === "table"\s*\?\s*\{ table: tableArtifact, state, cellClass, contextCaptureMode, onCell, onCellContext \}/);
+  assert.match(source, /activeTab\?\.kind === "table"\s*\?\s*\{\s*form,\s*patients,\s*streaming,/);
   assert.match(source, /activeTab\?\.kind === "note"\s*\?\s*\{ doc: noteDoc \}/);
 });

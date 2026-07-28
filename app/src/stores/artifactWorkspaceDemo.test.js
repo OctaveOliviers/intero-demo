@@ -15,7 +15,8 @@ import {
   commitDemoContextChip,
   clearDemoContextChips,
   removeDemoContextChip,
-  resolveDemoConflictCell,
+  editDemoField,
+  selectDemoPatient,
   addDemoFollowUpNote,
   openDemoReportTab,
 } from "./artifactWorkspaceDemo.js";
@@ -80,15 +81,21 @@ test("context chips can be committed, removed, and cleared via the store", () =>
   assert.equal(get(artifactWorkspaceDemoState).contextChips.length, 0);
 });
 
-test("resolving the PD-L1 conflict via the store updates the cell and MOC Notes", () => {
+test("editing the PD-L1 conflict via the store settles the field and writes nothing else", () => {
   resetArtifactWorkspaceDemo();
-  resolveDemoConflictCell(LUNG_MOC_TABLE_ID, "L-3404", "pdl1", "pathology");
+  editDemoField(LUNG_MOC_TABLE_ID, "L-3404", "pdl1", "10%");
 
   const state = get(artifactWorkspaceDemoState);
-  assert.equal(cellClassFor(state, LUNG_MOC_TABLE_ID, "L-3404", "pdl1"), "direct");
+  assert.equal(cellClassFor(state, LUNG_MOC_TABLE_ID, "L-3404", "pdl1"), "edited");
   const row = resolvedTable(state).rows.find((candidate) => candidate.id === "L-3404");
-  assert.equal(row.pdl1, "60%");
-  assert.match(row.mocNotes, /PD-L1 conflict resolved/);
+  assert.equal(row.pdl1, "10%");
+  assert.equal(row.mocNotes, "");
+});
+
+test("selecting a patient via the store switches the form", () => {
+  resetArtifactWorkspaceDemo();
+  selectDemoPatient("L-3407");
+  assert.equal(get(artifactWorkspaceDemoState).selectedPatientId, "L-3407");
 });
 
 test("adding a follow-up note via the store writes the MOC Notes cell", () => {

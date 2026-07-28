@@ -46,9 +46,9 @@
     demoAttentionItems,
     visibleDemoArtifacts,
     evidenceById,
-    resolvedTable,
+    patientForm,
+    patientList,
     cellAwaitingReview,
-    cellClassFor,
     matchFollowUp,
     followUpById,
     sourceDocById,
@@ -64,12 +64,14 @@
     closeDemoTab,
     markDemoCellReviewed,
     openDemoArtifact,
+    openDemoEvidence,
     openDemoReportTab,
     removeDemoArtifact,
     removeDemoContextChip,
     renameDemoArtifact,
-    resolveDemoConflictCell,
     selectDemoCell,
+    selectDemoPatient,
+    editDemoField,
     toggleDemoArtifactPin,
     toggleDemoContextCapture,
     toggleDemoPendingContextCell,
@@ -179,11 +181,13 @@
       : tab,
   );
   $: activeTab = tabs.find((tab) => tab.id === artifactState.activeTabId) || null;
-  // Resolved table carries MOC-note writes and resolved conflict values.
-  $: tableArtifact = resolvedTable(artifactState);
+  // The record on screen and the cohort beside it — both straight from the
+  // demo module's selectors, so this component only routes them.
+  $: form = artifactMode ? patientForm(artifactState) : null;
+  $: patients = artifactMode ? patientList(artifactState) : [];
+  $: streaming = runStatus === "running";
   $: noteDoc = activeTab?.kind === "note" ? sourceDocById(activeTab.sourceId) : null;
   $: evidence = evidenceById(artifactState, artifactState.activeEvidenceId);
-  $: cellClass = (rowId, columnId) => cellClassFor(artifactState, LUNG_MOC_TABLE_ID, rowId, columnId);
   $: contextChips = artifactMode ? artifactState.contextChips || [] : [];
 
   // Scripted follow-up turns live locally (not in the mock chat backend) so the
@@ -233,6 +237,18 @@
 
   function openAttentionItem(item) {
     selectDemoCell(LUNG_MOC_TABLE_ID, item.rowId, item.columnId);
+  }
+
+  // A field's source control hands back either a cited document or the field's
+  // own cell evidence; both open in the same side panel.
+  function openDemoFieldSource(sourceId) {
+    const id = String(sourceId || "");
+    if (id.startsWith("cell:")) {
+      const [, tableId, rowId, columnId] = id.split(":");
+      selectDemoCell(tableId, rowId, columnId);
+      return;
+    }
+    openDemoEvidence(id);
   }
 
   // A follow-up first streams fake agent activity (~8s), then reveals its reply
@@ -1041,19 +1057,22 @@
       state={artifactState}
       {tabs}
       {activeTab}
-      {tableArtifact}
+      {form}
+      {patients}
+      {streaming}
       {noteDoc}
       {evidence}
-      {cellClass}
       onActivateTab={activateDemoTab}
       onCloseTab={closeDemoTab}
       onToggleFold={toggleDemoChatFold}
       onClose={closeDemoArtifact}
       onEvidenceClose={closeDemoEvidence}
-      onResolve={(sourceId) => resolveDemoConflictCell(LUNG_MOC_TABLE_ID, "L-3404", "pdl1", sourceId)}
       onReference={openDemoReportTab}
-      onCell={selectDemoCell}
-      onCellContext={toggleDemoPendingContextCell}
+      onSelectPatient={selectDemoPatient}
+      onEdit={(fieldId, value) => editDemoField(LUNG_MOC_TABLE_ID, artifactState.selectedPatientId, fieldId, value)}
+      onSource={openDemoFieldSource}
+      onFieldPick={(fieldId, anchor) =>
+        toggleDemoPendingContextCell(LUNG_MOC_TABLE_ID, artifactState.selectedPatientId, fieldId, anchor)}
       contextCaptureMode={artifactState.contextCaptureMode}
       onContextToggle={toggleDemoContextCapture}
       onContextSend={submit}

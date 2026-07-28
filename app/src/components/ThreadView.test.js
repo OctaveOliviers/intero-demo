@@ -150,7 +150,7 @@ test("ThreadView wires artifact context capture into the real chat composer", ()
   assert.match(source, /import ContextChip from "\.\/artifact-workspace\/ContextChip\.svelte"/);
   assert.match(source, /\$: contextChips = artifactMode \? artifactState\.contextChips \|\| \[\] : \[\]/);
   assert.match(source, /<ContextChip chips=\{contextChips\} onRemove=\{removeDemoContextChip\}/);
-  assert.match(source, /onCellContext=\{toggleDemoPendingContextCell\}/);
+  assert.match(source, /onFieldPick=\{\(fieldId, anchor\) =>/);
   assert.match(source, /contextCaptureMode=\{artifactState\.contextCaptureMode\}/);
   assert.match(source, /onContextCommit=\{commitDemoContextChip\}/);
 });

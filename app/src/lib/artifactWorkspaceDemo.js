@@ -30,22 +30,40 @@ function demoResult(columns, rows) {
   };
 }
 
-// cellClass: "direct" (structured field, white), "interpreted" (free-text
-// extraction, yellow until reviewed via reviewCell). Conflicting cells override
-// their column's class to "conflict" (red) until resolved via
-// resolveConflictCell. `width` is the display width in characters (sized to the
-// longest fixture value so every cell is readable without resizing).
+// cellClass: "direct" (structured field, neutral), "interpreted" (free-text
+// extraction, amber until reviewed via reviewCell). Conflicting fields override
+// their own class to "conflict" (red) until the clinician edits the value.
+// `kind` drives the form control: "value" is a one-line input, "prose" a
+// multi-line box. Ids are unchanged from the table era so every cell ref,
+// evidence key and follow-up anchor keeps working.
 export const lungMocColumns = [
-  { id: "patient", title: AW.columns.patient, cellClass: "direct", width: 6 },
-  { id: "histology", title: AW.columns.histology, cellClass: "direct", width: 20 },
-  { id: "ecog", title: AW.columns.ecog, cellClass: "interpreted", width: 16 },
-  { id: "tnm", title: AW.columns.tnm, cellClass: "direct", width: 16 },
-  { id: "stage", title: AW.columns.stage, cellClass: "interpreted", width: 16 },
-  { id: "pdl1", title: AW.columns.pdl1, cellClass: "direct", width: 24 },
-  { id: "egfr", title: AW.columns.egfr, cellClass: "direct", width: 22 },
-  { id: "ngs", title: AW.columns.ngs, cellClass: "direct", width: 38 },
-  { id: "treatment", title: AW.columns.treatment, cellClass: "interpreted", width: 66 },
-  { id: "mocNotes", title: AW.columns.mocNotes, cellClass: "interpreted", width: 46 },
+  { id: "patient", title: AW.columns.patient, cellClass: "direct", kind: "value" },
+  { id: "histology", title: AW.columns.histology, cellClass: "direct", kind: "value" },
+  { id: "baseOfDiagnosis", title: AW.provenance.labels.baseOfDiagnosis, cellClass: "direct", kind: "value" },
+  { id: "localisation", title: AW.provenance.labels.localisationLaterality, cellClass: "direct", kind: "value" },
+  { id: "differentiation", title: AW.provenance.labels.differentiationGrade, cellClass: "direct", kind: "value" },
+  { id: "tnm", title: AW.columns.tnm, cellClass: "direct", kind: "value" },
+  { id: "stage", title: AW.columns.stage, cellClass: "interpreted", kind: "value" },
+  { id: "biopsy", title: AW.provenance.labels.biopsy, cellClass: "direct", kind: "value" },
+  { id: "petct", title: AW.provenance.labels.petct, cellClass: "direct", kind: "value" },
+  { id: "ecog", title: AW.columns.ecog, cellClass: "interpreted", kind: "value" },
+  { id: "pdl1", title: AW.columns.pdl1, cellClass: "direct", kind: "value" },
+  { id: "egfr", title: AW.columns.egfr, cellClass: "direct", kind: "value" },
+  { id: "ngs", title: AW.columns.ngs, cellClass: "direct", kind: "value" },
+  { id: "previousTreatment", title: AW.columns.previousTreatment, cellClass: "interpreted", kind: "prose" },
+  { id: "treatment", title: AW.columns.treatment, cellClass: "interpreted", kind: "prose" },
+  { id: "mocNotes", title: AW.columns.mocNotes, cellClass: "interpreted", kind: "prose" },
+];
+
+// The form's render order: sections top to bottom, fields within each. Patient
+// is the page title, not a field, so it appears in no section.
+export const FORM_SECTIONS = [
+  { key: "diagnosis", title: AW.sections.diagnosis, fieldIds: ["histology", "baseOfDiagnosis", "localisation", "differentiation"] },
+  { key: "staging", title: AW.sections.staging, fieldIds: ["tnm", "stage", "biopsy", "petct"] },
+  { key: "performance", title: AW.sections.performance, fieldIds: ["ecog"] },
+  { key: "molecular", title: AW.sections.molecular, fieldIds: ["pdl1", "egfr", "ngs"] },
+  { key: "treatment", title: AW.sections.treatment, fieldIds: ["previousTreatment", "treatment"] },
+  { key: "moc", title: AW.sections.moc, fieldIds: ["mocNotes"] },
 ];
 
 // Each displayed value is composed from a translatable name in the pack plus the
@@ -64,7 +82,9 @@ export const lungMocRows = [
     pdl1: "80%",
     egfr: AW.values.negative,
     ngs: AW.values.completeWith("KRAS G12C"),
-    treatment: coded(AW.treatment.pembrolizumabStarted, 60),
+    // Progressed on first-line chemo-immunotherapy; the next line is the
+    // meeting's job, so the fact half stops at "stopped".
+    treatment: coded(AW.treatment.stoppedAtProgression, 90),
     mocNotes: "",
   },
   {
@@ -77,7 +97,9 @@ export const lungMocRows = [
     pdl1: AW.values.missing,
     egfr: AW.values.negative,
     ngs: AW.values.pending,
-    treatment: `${coded(`${AW.treatment.concurrentChemoRtCompleted} 2026-06-20`, 25)} — ${coded(AW.treatment.noConsolidationImmunotherapy, 60)} ${AW.treatment.documented}`,
+    // The completed chemo-RT is now a Previous treatment; what is left here is
+    // exactly the gap the opening flags.
+    treatment: `${coded(AW.treatment.noConsolidationImmunotherapy, 60)} ${AW.treatment.documented}`,
     mocNotes: "",
   },
   {
@@ -168,18 +190,16 @@ export const lungMocRows = [
     pdl1: AW.values.naSclc,
     egfr: AW.values.na,
     ngs: AW.values.na,
-    treatment: coded(AW.treatment.carboEtoposideAtezolizumab, 66),
+    treatment: coded(AW.treatment.carboEtoposideAtezolizumabRechallenge, 66),
     mocNotes: "",
   },
 ];
 
-// Annexe 55 provenance for the Histology cell's evidence panel (fields 2, 4, 5,
-// 7 of the registration form) plus the biopsy/PET-CT dates that used to be their
-// own columns. Base of diagnosis is Histology of primary (code 2) throughout
-// except L-3403 (pleural cytology → code 4). Localisation, laterality and
-// differentiation are derived from each patient's note narrative where the spec
-// does not fix them (see the builder's report). L-3408's biopsy is 86 days old
-// → flagged Old result in the evidence status only; the cell colour is unchanged.
+// The Annexe 55 registration fields (2, 4, 5, 7) plus the biopsy/PET-CT dates,
+// folded into each patient's record as ordinary form fields (see lungMocRecords).
+// Base of diagnosis is Histology of primary (code 2) throughout except L-3403
+// (pleural cytology → code 4). Localisation, laterality and differentiation are
+// derived from each patient's note narrative where the spec does not fix them.
 const P = AW.provenance;
 // Localisation `{lobe} · {laterality (code n)}` and coded fields are composed from
 // pack names + invariant codes/dates; the code NUMBERS and dates stay here.
@@ -244,8 +264,6 @@ export const demoHistologyProvenance = {
     differentiation: moderatelyDifferentiated,
     biopsy: P.biopsyValue("2026-04-15", P.biopsyProcedures.bronchoscopy),
     petct: "2026-04-18",
-    biopsyOldResult: true,
-    biopsyAgeDetail: P.biopsyAgeDetail("2026-04-15", 86),
   },
   "L-3409": {
     baseOfDiagnosis: histologyOfPrimary,
@@ -256,6 +274,63 @@ export const demoHistologyProvenance = {
   },
 };
 
+// --- Previous treatments ----------------------------------------------------
+//
+// One prose line per prior treatment, composed as `{ISO date} — {name}` with the
+// name localised and the dates / cycle counts / doses / code numbers invariant.
+// Three patients carry a real history: L-3401 progressed on first-line
+// chemo-immunotherapy (which is what makes its KRAS G12C actionable), L-3402's
+// completed chemo-RT moves here (leaving Current treatment undocumented — the
+// gap the opening flags), and L-3409 relapsed after a >6-month platinum-free
+// interval (which is what makes its current line a re-challenge). The other six
+// are treatment-naive; their absence is still sourced, to a record review.
+const PT = AW.priorTreatment;
+const priorLine = (date, text) => `${date} — ${text}`;
+const RECORD_REVIEW_SOURCE = (rowId) => `${rowId}-record-review`;
+
+export const demoPriorTreatments = {
+  "L-3401": {
+    lines: [
+      priorLine("2025-11-12", coded(PT.carboPemetrexedPembrolizumab(4), 66)),
+      priorLine("2026-03-04", coded(PT.pemetrexedPembrolizumabMaintenance, 60)),
+      priorLine("2026-05-28", PT.progressionSystemicStopped),
+    ],
+    sourceIds: ["l3401-oncology-note-2025-11-12", "l3401-radiology-note-2026-05-28"],
+  },
+  "L-3402": {
+    lines: [priorLine("2026-06-20", coded(PT.concurrentChemoRtCompleted("60 Gy", 30), 25))],
+    sourceIds: ["l3402-radiation-oncology-note-2026-06-20"],
+  },
+  "L-3409": {
+    lines: [
+      priorLine("2025-08-14", coded(PT.carboEtoposideAtezolizumab(4), 66)),
+      priorLine("2025-11-28", coded(PT.atezolizumabMaintenance, 60)),
+      priorLine("2026-06-02", PT.progressionPlatinumFreeInterval(6)),
+    ],
+    sourceIds: ["l3409-oncology-note-2025-08-14", "l3409-radiology-note-2026-06-02"],
+  },
+};
+
+function priorTreatmentFor(rowId) {
+  return demoPriorTreatments[rowId] ?? { lines: [PT.none], sourceIds: [RECORD_REVIEW_SOURCE(rowId)] };
+}
+
+// The Annexe 55 registration fields that used to live only inside the histology
+// cell's evidence block are ordinary fields on the record now; fold them in from
+// the provenance fixture rather than duplicating them.
+export const lungMocRecords = lungMocRows.map((row) => {
+  const provenance = demoHistologyProvenance[row.id];
+  return {
+    ...row,
+    baseOfDiagnosis: provenance.baseOfDiagnosis,
+    localisation: provenance.localisation,
+    differentiation: provenance.differentiation,
+    biopsy: provenance.biopsy,
+    petct: provenance.petct,
+    previousTreatment: priorTreatmentFor(row.id).lines.join("\n"),
+  };
+});
+
 export const demoArtifacts = [
   {
     id: LUNG_MOC_ARTIFACT_ID,
@@ -263,7 +338,7 @@ export const demoArtifacts = [
     title: AW.artifactTitle,
     tableId: LUNG_MOC_TABLE_ID,
     columns: lungMocColumns,
-    rows: lungMocRows,
+    rows: lungMocRecords,
   },
 ];
 
@@ -585,8 +660,41 @@ export function followUpById(id) {
 
 // Every cited source document keyed by id, so a [source] link in a chat reply
 // or a chart point can open the underlying note in the evidence panel.
+// Source documents behind the Previous treatments field. Ids, labels and dates
+// are invariant and live here; the prose comes from the pack. L-3402 reuses the
+// radiation-oncology completion note already written for its treatment cell —
+// the same document evidences both the completed chemo-RT and the missing
+// consolidation line.
+const PTS = AW.priorTreatmentSources;
+const PRIOR_TREATMENT_DOCS = [
+  { id: "l3401-oncology-note-2025-11-12", rowId: "L-3401", label: AW.noteLabels.oncologyTreatment, date: "2025-11-12", content: PTS.l3401FirstLine },
+  { id: "l3401-radiology-note-2026-05-28", rowId: "L-3401", label: AW.noteLabels.radiologyNote, date: "2026-05-28", content: PTS.l3401Progression },
+  { id: "l3402-radiation-oncology-note-2026-06-20", rowId: "L-3402", label: AW.noteLabels.radiationOncologyCompletion, date: "2026-06-20", content: AW.interpretedNotes["L-3402:treatment"] },
+  { id: "l3409-oncology-note-2025-08-14", rowId: "L-3409", label: AW.noteLabels.oncologyTreatment, date: "2025-08-14", content: PTS.l3409FirstLine },
+  { id: "l3409-radiology-note-2026-06-02", rowId: "L-3409", label: AW.noteLabels.radiologyNote, date: "2026-06-02", content: PTS.l3409Relapse },
+  // The treatment-naive patients: the record review IS the evidence for the
+  // absence, so no value is left without a document behind it.
+  ...lungMocRows
+    .filter((row) => !demoPriorTreatments[row.id])
+    .map((row) => ({
+      id: RECORD_REVIEW_SOURCE(row.id),
+      rowId: row.id,
+      label: AW.noteLabels.recordReview,
+      date: TODAY_DATE,
+      content: PTS.noneDocumented,
+    })),
+];
+
 export const demoSourceDocs = (() => {
   const docs = {};
+  for (const doc of PRIOR_TREATMENT_DOCS) {
+    docs[doc.id] = {
+      id: doc.id,
+      header: `${doc.label} · ${doc.date} · ${doc.rowId}`,
+      body: doc.content.body,
+      quotes: doc.content.quotes,
+    };
+  }
   for (const conflict of Object.values(demoConflicts)) {
     for (const source of conflict.sources) {
       docs[source.id] = {
@@ -624,6 +732,13 @@ export function sourceDocById(id) {
 
 const FIELD_SOURCES = {
   histology: { table: "condition_occurrence", concept: "histology" },
+  // The five Annexe 55 registration fields promoted onto the form: each reads
+  // from a structured record, so its evidence is a direct lookup, not a note.
+  baseOfDiagnosis: { table: "condition_occurrence", concept: "base of diagnosis" },
+  localisation: { table: "condition_occurrence", concept: "primary tumour site" },
+  differentiation: { table: "condition_occurrence", concept: "differentiation grade" },
+  biopsy: { table: "procedure_occurrence", concept: "diagnostic biopsy" },
+  petct: { table: "procedure_occurrence", concept: "PET-CT" },
   ecog: { table: "note_nlp", concept: "ECOG performance status" },
   tnm: { table: "condition_occurrence", concept: "TNM classification" },
   stage: { table: "condition_occurrence", concept: "UICC stage group" },
@@ -727,11 +842,19 @@ export function createArtifactWorkspaceState() {
     contextComposerAnchor: null,
     pendingContextCells: [],
     contextChips: [],
-    // { [cellRefId]: { value, cellClass, meta } } — MOC Notes writes and
-    // resolved conflict values. Never mutates the static fixtures above.
+    // Which patient's form the artifact is showing. The rail always has a
+    // selection — the artifact never opens on an empty panel.
+    selectedPatientId: lungMocRows[0].id,
+    // { [cellRefId]: { value, cellClass, meta } } — MOC Notes writes from
+    // follow-ups. Never mutates the static fixtures above.
     cellOverrides: {},
-    // { [cellRefId]: sourceId } — which source was accepted for a conflict.
-    conflictResolutions: {},
+    // { [cellRefId]: value } — values the clinician typed into the form. Held
+    // separately from cellOverrides so a clinician-written value can always be
+    // told apart from an agent-written one, and so it survives navigation.
+    fieldEdits: {},
+    // { [rowId]: true } — patients whose own last field has landed. Jittered by
+    // the run controller so they complete at visibly different times.
+    completedPatients: {},
     // { [cellRefId]: true } — interpreted (yellow) cells the doctor has
     // reviewed: after 2s of dwelling on the cell's note evidence the cell
     // settles needs-review -> reviewed (white), mirroring the product.
@@ -763,7 +886,7 @@ const cellKey = (rowId, columnId) => `${rowId}:${columnId}`;
 export const structuredColumnIds = lungMocColumns
   .filter((column) => column.cellClass === "direct")
   .map((column) => column.id);
-export const interpretedColumnIds = ["ecog", "stage", "treatment"]; // MOC Notes stays empty at open
+export const interpretedColumnIds = ["ecog", "stage", "previousTreatment", "treatment"]; // MOC Notes stays empty at open
 
 // --- Streamed opening run reducers -----------------------------------------
 
@@ -931,6 +1054,17 @@ export function toggleChatFold(state) {
   };
 }
 
+// Open any evidence id in the side panel — a cited document (`src:…`) picked
+// from a field's source control, or a field's own cell evidence.
+export function openEvidence(state, evidenceId) {
+  if (!evidenceById(state, evidenceId)) return state;
+  return {
+    ...withTab(state, TABLE_TAB),
+    activeEvidenceId: evidenceId,
+    selectedCellRefs: [],
+  };
+}
+
 export function selectCell(state, tableId, rowId, columnId) {
   const table = tableArtifactByTableId(tableId);
   const row = table?.rows.find((candidate) => candidate.id === rowId);
@@ -940,8 +1074,10 @@ export function selectCell(state, tableId, rowId, columnId) {
     return state;
   }
 
-  // Clicking a cell opens/focuses the table tab and its side-panel evidence.
-  const opened = withTab(state, TABLE_TAB);
+  // Opening a field's evidence also brings that patient's record up — an
+  // attention line in the thread names a patient AND a field, so both have to
+  // move for the click to land where it points.
+  const opened = withTab(selectPatient(state, rowId), TABLE_TAB);
   return {
     ...opened,
     activeEvidenceId: `cell:${tableId}:${rowId}:${columnId}`,
@@ -1022,48 +1158,35 @@ function setCellOverride(state, tableId, rowId, columnId, override) {
   };
 }
 
-// Resolving a conflict: pick which source's value wins. Writes the cell
-// value, marks the resolution for the evidence panel's accept/reject
-// display, and auto-writes a MOC Notes line — no separate confirm step,
-// choosing a value is already the deliberate action.
-export function resolveConflictCell(state, tableId, rowId, columnId, sourceId) {
-  const conflict = demoConflicts[cellRefId(tableId, rowId, columnId)];
-  const source = conflict?.sources.find((candidate) => candidate.id === sourceId);
-  if (!conflict || !source) return state;
+// Show a patient's form. The rail always has a selection, so an unknown id is
+// ignored rather than clearing the panel.
+export function selectPatient(state, rowId) {
+  if (!lungMocRows.some((row) => row.id === rowId)) return state;
+  return { ...state, selectedPatientId: rowId };
+}
 
+// The clinician typing into a field. Every field is editable and the value is
+// theirs — it carries no source and is never confused with an extraction. An
+// edit also settles an interpretive field's review (looking at a value closely
+// enough to correct it IS reviewing it) and clears a conflict marking, since
+// the clinician has just said which reading stands.
+export function editField(state, tableId, rowId, columnId, value) {
+  const column = tableArtifactByTableId(tableId)?.columns.find((candidate) => candidate.id === columnId);
+  if (!column) return state;
   const key = cellRefId(tableId, rowId, columnId);
-  const otherSource = conflict.sources.find((candidate) => candidate.id !== sourceId);
-  const noteText = AW.evidence.conflictResolvedNote(
-    source.value,
-    source.label.toLowerCase(),
-    otherSource.value,
-    otherSource.label.toLowerCase(),
-    TODAY_DATE,
-  );
-
-  let next = setCellOverride(state, tableId, rowId, columnId, {
-    value: source.value,
-    cellClass: "direct",
-  });
-  next = {
-    ...next,
-    conflictResolutions: { ...next.conflictResolutions, [key]: sourceId },
-  };
-  // MOC Notes entries are the doctor's own notes — plain white cells, not
-  // yellow needs-review extractions.
-  next = setCellOverride(next, tableId, conflict.rowId, "mocNotes", {
-    value: noteText,
-    cellClass: "direct",
-    sourceIds: conflict.sources.map((candidate) => candidate.id),
-  });
   return {
-    ...next,
-    tableTick: next.tableTick + 1,
-    lastUpdatedRefs: [
-      { rowId, columnId },
-      { rowId: conflict.rowId, columnId: "mocNotes" },
-    ],
+    ...state,
+    fieldEdits: { ...state.fieldEdits, [key]: String(value ?? "") },
+    reviewedCells: { ...state.reviewedCells, [key]: true },
+    tableTick: state.tableTick + 1,
+    lastUpdatedRefs: [{ rowId, columnId }],
   };
+}
+
+// Mark a patient's record complete (its own last field has landed).
+export function completePatient(state, rowId) {
+  if (state.completedPatients[rowId]) return state;
+  return { ...state, completedPatients: { ...state.completedPatients, [rowId]: true } };
 }
 
 // Writes a follow-up's finding into a patient's MOC Notes cell. Used by the
@@ -1086,8 +1209,9 @@ export function artifactById(id) {
   return demoArtifacts.find((artifact) => artifact.id === id) ?? null;
 }
 
-// Returns the table artifact with cellOverrides applied — the fixture
-// itself is never mutated.
+// Returns the table artifact with clinician edits and cellOverrides applied —
+// the fixture itself is never mutated. An edit wins over an agent write, since
+// it is the later and more deliberate act.
 export function resolvedTable(state, tableId = LUNG_MOC_TABLE_ID) {
   const table = tableArtifactByTableId(tableId);
   if (!table) return null;
@@ -1096,14 +1220,19 @@ export function resolvedTable(state, tableId = LUNG_MOC_TABLE_ID) {
     rows: table.rows.map((row) => {
       const patched = { ...row };
       for (const column of table.columns) {
-        const override = state.cellOverrides[cellRefId(tableId, row.id, column.id)];
+        const key = cellRefId(tableId, row.id, column.id);
+        const override = state.cellOverrides[key];
         if (override) {
           patched[column.id] = override.value;
         }
-        // During the streamed opening, unrevealed cells are blank so the grid
-        // fills in progressively as the agent extracts each field.
+        // During the streamed opening, unrevealed fields are blank so the form
+        // fills in progressively as the agent extracts each one.
         if (!isCellRevealed(state, row.id, column.id)) {
           patched[column.id] = "";
+        }
+        // A clinician edit outranks both.
+        if (key in state.fieldEdits) {
+          patched[column.id] = state.fieldEdits[key];
         }
       }
       return patched;
@@ -1111,25 +1240,50 @@ export function resolvedTable(state, tableId = LUNG_MOC_TABLE_ID) {
   };
 }
 
+// Previous treatments is interpretive where the history was assembled by reading
+// notes and orders, and direct where the record review simply found nothing —
+// so the class follows the patient, not the field.
+const CELL_CLASS_OVERRIDES = Object.fromEntries(
+  lungMocRows.map((row) => [
+    `${row.id}:previousTreatment`,
+    demoPriorTreatments[row.id] ? "interpreted" : "direct",
+  ]),
+);
+
+// One field's value, with the same precedence resolvedTable applies: a
+// clinician edit wins over everything, an unrevealed field is still blank, and
+// an agent write outranks the fixture.
+export function cellValue(state, tableId, rowId, columnId) {
+  const key = cellRefId(tableId, rowId, columnId);
+  if (key in state.fieldEdits) return state.fieldEdits[key];
+  if (!isCellRevealed(state, rowId, columnId)) return "";
+  const override = state.cellOverrides[key];
+  if (override) return override.value;
+  return lungMocRecords.find((record) => record.id === rowId)?.[columnId] ?? "";
+}
+
 export function cellClassFor(state, tableId, rowId, columnId) {
   const key = cellRefId(tableId, rowId, columnId);
+  // A value the clinician typed is theirs — never an extraction to check, never
+  // a conflict to resolve.
+  if (key in state.fieldEdits) return "edited";
+  // An empty field carries no marking at all: a blank MOC Notes before the
+  // meeting is not something to review, and neither is a field still filling.
+  if (String(cellValue(state, tableId, rowId, columnId)).trim() === "") return "direct";
   const override = state.cellOverrides[key];
   if (override) return override.cellClass;
-  if (demoConflicts[key] && !state.conflictResolutions[key]) return "conflict";
+  if (demoConflicts[key]) return "conflict";
   const column = tableArtifactByTableId(tableId)?.columns.find((candidate) => candidate.id === columnId);
-  const klass = column?.cellClass ?? "direct";
+  const klass = CELL_CLASS_OVERRIDES[`${rowId}:${columnId}`] ?? column?.cellClass ?? "direct";
   if (klass === "interpreted" && state.reviewedCells[key]) return "interpreted-reviewed";
   return klass;
 }
 
-// True while an interpreted note-backed cell still needs the doctor's review
-// (yellow). Overridden cells (conflict resolutions, MOC-note writes) and
-// structured cells never do.
+// True while an interpretive field still needs the clinician's review (amber).
+// Edited fields, agent writes, direct fields and empty fields never do — which
+// falls straight out of the class, so the two can never disagree.
 export function cellAwaitingReview(state, tableId, rowId, columnId) {
-  const key = cellRefId(tableId, rowId, columnId);
-  if (state.cellOverrides[key]) return false;
-  if (!demoInterpretedNotes[`${rowId}:${columnId}`]) return false;
-  return !state.reviewedCells[key];
+  return cellClassFor(state, tableId, rowId, columnId) === "interpreted";
 }
 
 // Dwelling on a needs-review cell's evidence marks it reviewed: the cell
@@ -1144,18 +1298,110 @@ export function reviewCell(state, tableId, rowId, columnId) {
   };
 }
 
+// --- The form view-model ----------------------------------------------------
+//
+// Everything the form and the rail render comes from here, so the components
+// stay dumb and the whole feature is testable without a DOM.
+
+const FIELD_STATUS_LABEL = {
+  interpreted: AW.fieldStatus.interpreted,
+  conflict: AW.fieldStatus.conflict,
+  edited: AW.fieldStatus.edited,
+};
+
+// The documents behind one field, as `{ id, title }`. One source opens straight
+// from the field's source control; several are offered as a list to pick from.
+// Editing a field does NOT strip its provenance: the reports that backed the
+// value stay reachable, so a doctor who resolves a conflict by typing can still
+// open the two disagreeing reports. Only a genuinely empty field has nothing.
+export function fieldSources(state, tableId, rowId, columnId) {
+  const key = cellRefId(tableId, rowId, columnId);
+  const asDocs = (ids) =>
+    ids.filter((id) => demoSourceDocs[id]).map((id) => ({ id: `src:${id}`, title: demoSourceDocs[id].header }));
+
+  if (String(cellValue(state, tableId, rowId, columnId)).trim() === "") return [];
+  if (columnId === "previousTreatment") return asDocs(priorTreatmentFor(rowId).sourceIds);
+
+  const conflict = demoConflicts[key];
+  if (conflict) return asDocs(conflict.sources.map((source) => source.id));
+
+  const override = state.cellOverrides[key];
+  if (override) return asDocs(override.sourceIds || []);
+
+  // A note-backed field's source is the note itself; a direct field's is the
+  // query over the structured record. Both open as this field's cell evidence.
+  const note = demoInterpretedNotes[`${rowId}:${columnId}`];
+  if (note) return [{ id: key, title: `${note.label} · ${note.date} · ${rowId}` }];
+  return [{ id: key, title: AW.fieldSourceConcepts[columnId] ?? columnId }];
+}
+
+function formField(state, rowId, fieldId, tableId) {
+  const column = lungMocColumns.find((candidate) => candidate.id === fieldId);
+  const status = cellClassFor(state, tableId, rowId, fieldId);
+  return {
+    id: fieldId,
+    refId: cellRefId(tableId, rowId, fieldId),
+    label: column.title,
+    kind: column.kind,
+    value: cellValue(state, tableId, rowId, fieldId),
+    status,
+    statusLabel: FIELD_STATUS_LABEL[status] ?? null,
+    awaitingReview: cellAwaitingReview(state, tableId, rowId, fieldId),
+    revealed: isCellRevealed(state, rowId, fieldId),
+    sources: fieldSources(state, tableId, rowId, fieldId),
+  };
+}
+
+// A patient is complete once its own last field has landed; outside a run every
+// field is shown, so every patient reads complete.
+function patientComplete(state, rowId) {
+  return state.runStatus === "running" ? !!state.completedPatients[rowId] : true;
+}
+
+// The rail: every patient on the list, with the clinical one-liner composed from
+// strings already in the pack.
+export function patientList(state) {
+  return lungMocRecords.map((record) => ({
+    id: record.id,
+    summary: AW.form.summary(record.histology, record.stage),
+    complete: patientComplete(state, record.id),
+    selected: state.selectedPatientId === record.id,
+  }));
+}
+
+// One patient's page: the title, the rail summary, and the fields in section
+// order. Returns null for an unknown patient.
+export function patientForm(state, patientId = state.selectedPatientId, tableId = LUNG_MOC_TABLE_ID) {
+  const record = lungMocRecords.find((candidate) => candidate.id === patientId);
+  if (!record) return null;
+  return {
+    patientId,
+    title: patientId,
+    summary: AW.form.summary(record.histology, record.stage),
+    complete: patientComplete(state, patientId),
+    sections: FORM_SECTIONS.map((section) => ({
+      key: section.key,
+      title: section.title,
+      fields: section.fieldIds.map((fieldId) => formField(state, patientId, fieldId, tableId)),
+    })),
+  };
+}
+
+// A conflicting field's evidence is the two disagreeing reports side by side —
+// there is no single database cell that says "Conflicting (60% vs 10%)"; that
+// display value is synthesised from two sources. The two reports stay on file
+// even after the doctor resolves the conflict by editing the value, so the
+// resolution is always traceable back to what disagreed.
 export function conflictEvidenceFor(state, tableId, rowId, columnId) {
   const key = cellRefId(tableId, rowId, columnId);
   const conflict = demoConflicts[key];
   if (!conflict) return null;
-  const acceptedSourceId = state.conflictResolutions[key] ?? null;
   return {
     kind: "conflict",
     title: AW.evidence.selectedCell,
     rowId,
     columnId,
-    acceptedSourceId,
-    sources: conflict.sources.map((source) => ({ ...source, accepted: acceptedSourceId ? source.id === acceptedSourceId : null })),
+    sources: conflict.sources.map((source) => ({ ...source })),
   };
 }
 
@@ -1243,31 +1489,6 @@ export function evidenceById(state, id) {
     : AW.evidence.directExplanation(column.title, conceptLabel, rowId);
   const meta = metaForCell(rowId, columnId, !!override);
 
-  // Histology cells carry the Annexe 55 provenance block (base of diagnosis,
-  // localisation + laterality, differentiation, biopsy/PET-CT dates). L-3408's
-  // biopsy is 86 days old → flagged Old result in the status only.
-  const provenanceEntry = columnId === "histology" ? demoHistologyProvenance[rowId] : null;
-  let provenance = null;
-  if (provenanceEntry) {
-    provenance = {
-      fields: [
-        { label: AW.provenance.labels.baseOfDiagnosis, value: provenanceEntry.baseOfDiagnosis },
-        { label: AW.provenance.labels.localisationLaterality, value: provenanceEntry.localisation },
-        { label: AW.provenance.labels.differentiationGrade, value: provenanceEntry.differentiation },
-        {
-          label: AW.provenance.labels.biopsy,
-          value: provenanceEntry.biopsy,
-          status: provenanceEntry.biopsyOldResult ? AW.provenance.oldResult : null,
-        },
-        { label: AW.provenance.labels.petct, value: provenanceEntry.petct },
-      ],
-    };
-    if (provenanceEntry.biopsyOldResult) {
-      meta.reason_code = "old_result";
-      meta.reason_detail = provenanceEntry.biopsyAgeDetail;
-    }
-  }
-
   return {
     kind: "simple",
     title: AW.evidence.selectedCell,
@@ -1275,7 +1496,6 @@ export function evidenceById(state, id) {
     explanation,
     query,
     result: demoResult(["patient_id", column.title], [[rowId, value]]),
-    provenance,
     selectedCellMeta: {
       ...meta,
       explanation,

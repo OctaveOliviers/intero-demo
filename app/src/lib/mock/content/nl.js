@@ -34,7 +34,10 @@
 // structural-parity test guards this. Coded values render as `name (code NN)`:
 // the NAME localises, the NUMBER comes from logic via the `coded` helper.
 const artifactWorkspace = {
-  // Matrix column headers (Annexe 55 field names).
+  // Field labels (Annexe 55 field names). The five promoted registration fields
+  // (base of diagnosis, localisation·laterality, differentiation, biopsy, PET-CT)
+  // keep their labels in `provenance.labels` — they are the same strings, now
+  // rendered as form fields rather than inside the histology evidence block.
   columns: {
     patient: "Patiënt",
     histology: "Histologie",
@@ -44,8 +47,26 @@ const artifactWorkspace = {
     pdl1: "PD-L1 TPS",
     egfr: "EGFR",
     ngs: "NGS/Moleculair",
-    treatment: "Behandeling",
+    previousTreatment: "Eerdere behandelingen",
+    treatment: "Huidige behandeling",
     mocNotes: "MOC-notities",
+  },
+
+  // Form section headings, in render order (see FORM_SECTIONS in the demo module).
+  sections: {
+    diagnosis: "Diagnose",
+    staging: "Stadiëring en onderzoek",
+    performance: "Performancestatus",
+    molecular: "Moleculair",
+    treatment: "Behandeling",
+    moc: "MOC",
+  },
+
+  // Per-field status word shown beside the label; the colour is the form's own.
+  fieldStatus: {
+    interpreted: "te controleren",
+    conflict: "conflict",
+    edited: "door u bewerkt",
   },
 
   // Coded-value composition: `name (code NN)`. Name localises; the code number is
@@ -102,7 +123,9 @@ const artifactWorkspace = {
   treatment: {
     pembrolizumabStarted: "Pembrolizumab, gestart",
     concurrentChemoRtCompleted: "Concomitante chemo-RT, voltooid",
-    noConsolidationImmunotherapy: "geen consolidatie-immunotherapie",
+    // Stands alone as L-3402's whole Current treatment value now that its
+    // completed chemo-RT has moved to Previous treatments.
+    noConsolidationImmunotherapy: "Geen consolidatie-immunotherapie",
     documented: "gedocumenteerd",
     carboPaclitaxelPembrolizumab: "Carbo/paclitaxel + pembrolizumab",
     osimertinibStarted: "Osimertinib, gestart",
@@ -111,6 +134,28 @@ const artifactWorkspace = {
     alectinibStarted: "Alectinib, gestart",
     concurrentChemoRtOngoing: "Concomitante chemo-RT, lopend",
     carboEtoposideAtezolizumab: "Carbo/etoposide + atezolizumab",
+    // L-3401 progressed on first-line chemo-immunotherapy; L-3409 is a platinum
+    // re-challenge after a >6-month platinum-free interval. Both are facts, not
+    // plans — the next line is the meeting's job (design principle 1).
+    stoppedAtProgression: "Gestopt bij progressie — geen nieuwe lijn gestart",
+    carboEtoposideAtezolizumabRechallenge: "Carbo/etoposide + atezolizumab, herbehandeling",
+  },
+
+  // Previous-treatment lines (Annexe 55 field 10 · coded chronology, rendered as
+  // one prose line per prior treatment). Each line composes in logic as
+  // `{ISO date} — {name}`; dates, cycle counts, doses, month counts and code
+  // numbers are invariant and interpolated in from there.
+  priorTreatment: {
+    none: "Geen eerdere systemische therapie, radiotherapie of chirurgie gedocumenteerd.",
+    carboPemetrexedPembrolizumab: (cycles) => `Carboplatin/pemetrexed + pembrolizumab, ${cycles} cycli`,
+    pemetrexedPembrolizumabMaintenance: "Onderhoud met pemetrexed/pembrolizumab",
+    progressionSystemicStopped: "Progressie onder onderhoud — systemische therapie gestopt",
+    concurrentChemoRtCompleted: (dose, fractions) =>
+      `Concomitante chemo-RT voltooid, ${dose} in ${fractions} fracties met wekelijks carboplatin/paclitaxel`,
+    carboEtoposideAtezolizumab: (cycles) => `Carboplatin/etoposide + atezolizumab, ${cycles} cycli`,
+    atezolizumabMaintenance: "Onderhoud met atezolizumab",
+    progressionPlatinumFreeInterval: (months) =>
+      `Progressie onder onderhoud — platinavrij interval ${months} maanden`,
   },
 
   // Clinical note-type labels, shared across interpreted-cell notes, conflict
@@ -126,6 +171,7 @@ const artifactWorkspace = {
     oncologyNote: "Oncologieverslag",
     oncologyFollowUp: "Oncologisch follow-upverslag",
     radiologyNote: "Radiologieverslag",
+    recordReview: "Controle van medicatie- en verrichtingendossier",
     pathologyReport: "Pathologieverslag",
     molecularPathologyReread: "Moleculaire pathologie-herbeoordeling",
   },
@@ -134,8 +180,6 @@ const artifactWorkspace = {
   // Coded names render through `coded`; lobe/laterality/differentiation names and
   // biopsy procedure names localise, the code numbers and dates stay in logic.
   provenance: {
-    heading: "Annexe 55-herkomst",
-    oldResult: "Oud resultaat",
     labels: {
       baseOfDiagnosis: "Diagnosebasis",
       localisationLaterality: "Lokalisatie · lateraliteit",
@@ -173,7 +217,6 @@ const artifactWorkspace = {
     localisation: (lobe, lateralityCoded) => `${lobe} · ${lateralityCoded}`,
     // `{ISO date} ({procedure})` — the date is invariant, from logic.
     biopsyValue: (date, procedure) => `${date} (${procedure})`,
-    biopsyAgeDetail: (date, days) => `Biopsie ${date} is ${days} dagen oud — oud resultaat.`,
   },
 
   // Evidence side panel (both the fixture-built evidence and the component chrome).
@@ -185,16 +228,9 @@ const artifactWorkspace = {
     directExplanation: (columnTitle, concept, rowId) =>
       `De waarde ${columnTitle} is afgelezen uit de bron ${concept} gekoppeld aan patiënt ${rowId}.`,
     mocNoteExplanation: (rowId) => `Naar MOC-notities geschreven vanuit een vervolggesprek over ${rowId}.`,
-    conflictResolvedNote: (acceptedValue, acceptedLabel, rejectedValue, rejectedLabel, date) =>
-      `PD-L1-conflict opgelost: ${acceptedValue} (${acceptedLabel}) geaccepteerd boven ${rejectedValue} (${rejectedLabel}), bevestigd ${date}.`,
     // ArtifactEvidence.svelte chrome.
     conflictHeading: "Tegenstrijdige bronnen",
-    conflictHint: "Beide aflezingen worden bewaard. Accepteer de waarde die u voor deze cel wilt gebruiken.",
-    selected: "Geselecteerd",
-    notSelected: "Niet geselecteerd",
-    use: (value) => `Gebruik ${value}`,
-    using: (value) => `In gebruik: ${value}`,
-    useFrom: (value, label) => `Gebruik ${value} uit ${label}`,
+    conflictHint: "Beide aflezingen worden bewaard. Corrigeer het veld om vast te leggen welke geldt.",
     blockNote: "Notitie",
     blockReferences: "Referenties",
     blockSource: "Bron",
@@ -213,8 +249,16 @@ const artifactWorkspace = {
     pdl1: "PD-L1 TPS",
     egfr: "EGFR-mutatie",
     ngs: "NGS-panel",
+    previousTreatment: "eerdere behandellijnen",
     treatment: "huidige behandeling",
     mocNotes: "MOC-besprekingsnotitie",
+    // The five Annexe 55 registration fields promoted out of the histology
+    // evidence block into the form.
+    baseOfDiagnosis: "diagnosebasis",
+    localisation: "tumorlokalisatie",
+    differentiation: "differentiatiegraad",
+    biopsy: "biopsieverslag",
+    petct: "PET-CT-verslag",
   },
 
   // The two attention-list lines shown in the opening turn. Ids, code numbers,
@@ -251,15 +295,15 @@ const artifactWorkspace = {
   interpretedNotes: {
     "L-3401:ecog": {
       quotes: ["ECOG-performancestatus 1"],
-      body: "Beoordeeld op de polikliniek vóór systemische therapie. ECOG-performancestatus 1: symptomatisch door hoest maar volledig ambulant en zelfredzaam. Geschikt voor immunotherapie.",
+      body: "Beoordeeld op de polikliniek vóór herbespreking op de MOC. ECOG-performancestatus 1: symptomatisch door hoest maar volledig ambulant en zelfredzaam. Geschikt voor verdere systemische therapie.",
     },
     "L-3401:stage": {
       quotes: ["gestadieerd als cT2 cN3 cM1b, UICC-stadium IVA"],
-      body: "Stadiëringsonderzoek nu voltooid. CT en PET tonen een primaire tumor van 4.2cm in de RUL met mediastinale klierziekte in meerdere stations en contralaterale klierziekte, plus een solitaire bijniermetastase; gestadieerd als cT2 cN3 cM1b, UICC-stadium IVA. Moleculaire resultaten met de patiënt besproken; opties voor systemische therapie besproken.",
+      body: "Herstadiëring na progressie onder onderhoud. CT en PET tonen de bekende primaire tumor van 4.2cm in de RUL met mediastinale klierziekte in meerdere stations en contralaterale klierziekte, plus een solitaire bijniermetastase; gestadieerd als cT2 cN3 cM1b, UICC-stadium IVA. Weefsel-NGS herbevestigd en met de patiënt besproken.",
     },
     "L-3401:treatment": {
-      quotes: ["Pembrolizumab-monotherapie vandaag gestart"],
-      body: "PD-L1 TPS 80%, geen actioneerbare driver op NGS behalve KRAS G12C. Pembrolizumab-monotherapie vandaag gestart, cyclus 1 zonder complicaties toegediend. Plan: 3-wekelijks voortzetten, herstadiërings-CT na cyclus 3.",
+      quotes: ["systemische therapie gestopt en geen nieuwe lijn gestart"],
+      body: "Eerstelijns carboplatin/pemetrexed met pembrolizumab: 4 cycli voltooid, gevolgd door onderhoud met pemetrexed/pembrolizumab. Progressie onder onderhoud bevestigd op de CT van 2026-05-28; systemische therapie gestopt en geen nieuwe lijn gestart. Weefsel-NGS toont KRAS G12C. Opnieuw te bespreken op de MOC.",
     },
     "L-3402:ecog": {
       quotes: ["ECOG-performancestatus 1"],
@@ -347,15 +391,44 @@ const artifactWorkspace = {
     },
     "L-3409:ecog": {
       quotes: ["ECOG-performancestatus 1"],
-      body: "Kleincellig longcarcinoom met een snel ziektebeloop. ECOG-performancestatus 1: symptomatisch maar ambulant en zelfredzaam. Voor eerstelijns chemo-immunotherapie zonder uitstel.",
+      body: "Recidief kleincellig longcarcinoom dat zich opnieuw presenteert na een behandelvrij interval. ECOG-performancestatus 1: symptomatisch maar ambulant en zelfredzaam. Geschikt voor verdere chemo-immunotherapie zonder uitstel.",
     },
     "L-3409:stage": {
       quotes: ["ziekte in uitgebreid stadium"],
-      body: "Kleincellig longcarcinoom bevestigd op bronchoscopische biopsie. Stadiërings-CT toont levermetastasen en contralaterale hilaire klieren: ziekte in uitgebreid stadium. ECOG 1. Voor eerstelijns chemo-immunotherapie zonder uitstel gezien het ziektetempo.",
+      body: "Recidief kleincellig longcarcinoom bevestigd op de bronchoscopische herbiopsie van 2026-06-07. Herstadiërings-CT toont levermetastasen en contralaterale hilaire klieren: ziekte in uitgebreid stadium. ECOG 1. Platinavrij interval 6 maanden.",
     },
     "L-3409:treatment": {
       quotes: ["carboplatin/etoposide met atezolizumab"],
-      body: "Cyclus 1 van carboplatin/etoposide met atezolizumab vandaag toegediend. Anti-emetica en G-CSF-ondersteuning voorgeschreven. Plan: 4 cycli daarna onderhouds-atezolizumab; respons-CT na cyclus 2.",
+      body: "Cyclus 1 van carboplatin/etoposide met atezolizumab vandaag toegediend als platinaherbehandeling, met een platinavrij interval van 6 maanden. Anti-emetica en G-CSF-ondersteuning voorgeschreven. Plan: 4 cycli daarna onderhouds-atezolizumab; respons-CT na cyclus 2.",
+    },
+  },
+
+  // Source documents behind the Previous treatments field for the two patients
+  // that carry a real prior-treatment history (L-3401, L-3409). The other seven
+  // reuse notes already in this pack. Ids, note labels and dates stay in logic.
+  priorTreatmentSources: {
+    l3401FirstLine: {
+      quotes: ["Cyclus 1 van carboplatin/pemetrexed met pembrolizumab vandaag toegediend"],
+      body: "Cyclus 1 van carboplatin/pemetrexed met pembrolizumab vandaag toegediend. PD-L1 TPS 80%; weefsel-NGS toont KRAS G12C zonder andere actioneerbare driver. Plan: 4 cycli, daarna onderhoud met pemetrexed/pembrolizumab.",
+    },
+    l3401Progression: {
+      quotes: ["Nieuwe en in omvang toenemende leverlaesies passend bij progressieve ziekte"],
+      body: "CT thorax/abdomen: Nieuwe en in omvang toenemende leverlaesies passend bij progressieve ziekte vergeleken met het eerdere onderzoek. De primaire tumor in de rechterbovenkwab en de mediastinale klieren zijn eveneens groter. Conclusie: progressie onder onderhoudsbehandeling.",
+    },
+    l3409FirstLine: {
+      quotes: ["Cyclus 1 van carboplatin/etoposide met atezolizumab vandaag toegediend"],
+      body: "Cyclus 1 van carboplatin/etoposide met atezolizumab vandaag toegediend voor kleincellig longcarcinoom in uitgebreid stadium. Anti-emetica en G-CSF-ondersteuning voorgeschreven. Plan: 4 cycli, daarna onderhouds-atezolizumab.",
+    },
+    l3409Relapse: {
+      quotes: ["nieuwe lever- en klierlaesies passend bij recidiefziekte"],
+      body: "CT thorax/abdomen bij surveillance: nieuwe lever- en klierlaesies passend bij recidiefziekte. Geen nieuwe intracraniële symptomen gemeld. Conclusie: recidief na een behandelvrij interval; voor herbiopsie en herbespreking.",
+    },
+    // The treatment-naive patients: an absence still needs a document behind it
+    // (design principle 3), so the record review itself is the source. One body,
+    // rendered per patient — the header carries the patient id.
+    noneDocumented: {
+      quotes: ["geen eerdere systemische therapie, radiotherapie of chirurgische resectie geregistreerd"],
+      body: "Controle van medicatie- en verrichtingendossier vóór de MOC: er is voor deze patiënt geen eerdere systemische therapie, radiotherapie of chirurgische resectie geregistreerd vóór de huidige lijn. Dossiers doorgenomen in de systemen van oncologie, radiotherapie en operatiekamer.",
     },
   },
 
@@ -460,6 +533,7 @@ const artifactWorkspace = {
     structured: "Gestructureerde velden lezen: histologie, TNM-classificatie en biomarkers.",
     ecog: "ECOG-performancestatus extraheren uit oncologieverslagen.",
     stage: "De UICC-stadiumgroep synthetiseren uit de TNM van elke patiënt.",
+    priorTreatment: "Eerdere behandellijnen samenstellen uit medicatievoorschriften en verslagen.",
     treatment: "Huidige behandeling extraheren uit medicatievoorschriften en verslagen.",
     conflicts: "Biomarkerbronnen kruiscontroleren op conflicten.",
     flag3404: (pathologyValue, rereadValue) =>
@@ -502,6 +576,22 @@ const artifactWorkspace = {
   cellMeta: {
     direct: (columnTitle, rowId) => `${columnTitle} voor ${rowId}.`,
     interpreted: (columnTitle, rowId) => `${columnTitle} voor ${rowId}, geëxtraheerd uit vrijetekstverslagen.`,
+  },
+
+  // Cohort rail + patient form chrome. The rail's summary line is composed from
+  // strings already in this pack (histology name + UICC stage group from logic),
+  // so it costs no new translation.
+  form: {
+    railLabel: "Patiënten op de lijst",
+    filling: "nog aan het vullen",
+    complete: "compleet",
+    // `{histology} · {stage group}` — the middot is punctuation, from logic.
+    summary: (histology, stage) => `${histology} · ${stage}`,
+    sourceButton: "Bronnen voor deze waarde",
+    sourceOne: (label) => `Bron openen: ${label}`,
+    sourceListLabel: "Kies een bron",
+    noSources: "Geen bron in dossier",
+    empty: "—",
   },
 
   // ArtifactBox.svelte tab & control labels.
